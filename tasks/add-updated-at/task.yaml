@@ -1,0 +1,27 @@
+id: add-updated-at
+name: Add updatedAt Field
+prompt: |
+  Add an updatedAt timestamp field to the User model that automatically
+  updates whenever the user record is modified.
+
+category: feature
+difficulty: easy
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - prisma/schema.prisma
+    - src/modules/users/users.service.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+  expected_line_count: 10
+
+timeout_seconds: 300

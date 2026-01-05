@@ -1,0 +1,9 @@
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -12,4 +12,5 @@ model users {
+   email String  @db.VarChar(255)
+   name  String  @db.VarChar(255)
+   phone String? @db.VarChar(255)
++  updatedAt DateTime @updatedAt
+ }

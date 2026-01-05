@@ -1,0 +1,30 @@
+id: list-users-paginated
+name: List Users with Pagination
+prompt: |
+  Add a GET /users endpoint that returns a paginated list of users.
+  Support `page` and `limit` query parameters with sensible defaults.
+  Return the total count along with the paginated results.
+
+category: feature
+difficulty: medium
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/modules/users/users.route.ts
+    - src/modules/users/users.controller.ts
+    - src/modules/users/users.service.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+    - prisma/schema.prisma
+  expected_line_count: 45
+
+timeout_seconds: 600

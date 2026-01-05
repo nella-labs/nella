@@ -1,0 +1,27 @@
+id: fix-duplicate-email
+name: Fix Duplicate Email Error
+prompt: |
+  The signup endpoint crashes when a user tries to register with an existing email.
+  Fix it to return a 409 Conflict response with a clear error message instead of crashing.
+
+category: bug-fix
+difficulty: easy
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/modules/users/users.service.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+    - prisma/schema.prisma
+  expected_line_count: 15
+
+timeout_seconds: 300

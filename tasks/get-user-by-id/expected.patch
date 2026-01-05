@@ -1,0 +1,63 @@
+diff --git a/src/modules/users/users.route.ts b/src/modules/users/users.route.ts
+--- a/src/modules/users/users.route.ts
++++ b/src/modules/users/users.route.ts
+@@ -23,6 +23,20 @@ import { verifyAuthToken } from "@/middlewares/auth";
+  */
+ const users = Router();
+ 
++/**
++ * GET /users/{id}
++ * @summary Get a user by ID
++ * @tags Users
++ * @param {string} id.path.required - User ID
++ * @return {object} 200 - User found
++ * @return {object} 404 - User not found
++ */
++users.get(
++  "/:id",
++  verifyAuthToken,
++  controller.getUserById
++);
++
+ /**
+  * POST /users/create
+  * @summary Create a new user
+
+diff --git a/src/modules/users/users.controller.ts b/src/modules/users/users.controller.ts
+--- a/src/modules/users/users.controller.ts
++++ b/src/modules/users/users.controller.ts
+@@ -15,6 +15,19 @@ class UsersController {
+     }
+   }
+ 
++  public getUserById = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      const { id } = req.params;
++      const user = await this.usersService.getUserById(id);
++      if (!user) {
++        return res.status(404).json({ success: false, message: "User not found" });
++      }
++      return res.status(200).json({ success: true, data: user });
++    } catch (error) {
++      next(error);
++    }
++  };
++
+   public createUser = async (req: Request, res: Response, next: NextFunction) => {
+     try {
+       const user = await this.usersService.createUser(req.body);
+
+diff --git a/src/modules/users/users.service.ts b/src/modules/users/users.service.ts
+--- a/src/modules/users/users.service.ts
++++ b/src/modules/users/users.service.ts
+@@ -8,6 +8,10 @@ class UsersService {
+     return user;
+   }
+ 
++  public async getUserById(id: string) {
++    return prisma.users.findUnique({ where: { id } });
++  }
++
+ }
+ 
+ export default UsersService;

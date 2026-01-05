@@ -1,0 +1,20 @@
+diff --git a/src/dto/user.dto.ts b/src/dto/user.dto.ts
+--- a/src/dto/user.dto.ts
++++ b/src/dto/user.dto.ts
+@@ -1,10 +1,15 @@
+-import { IsEmail, IsOptional, IsString } from "class-validator";
++import { IsEmail, IsOptional, IsString, IsNotEmpty, Matches } from "class-validator";
+ 
+ export class CreateUserDto {
+   @IsEmail()
+   email: string;
+ 
+   @IsString()
++  @IsNotEmpty({ message: "Name cannot be empty" })
++  @Matches(/\S/, { message: "Name cannot be only whitespace" })
+   name: string;
+ 
+   @IsOptional()
++  @IsString()
+   phone: string;
+ }

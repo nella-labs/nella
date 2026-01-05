@@ -1,0 +1,179 @@
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -14,3 +14,14 @@ model users {
+   name  String  @db.VarChar(255)
+   phone String? @db.VarChar(255)
++  posts posts[]
++}
++
++model posts {
++  id        String   @id @default(uuid()) @db.Uuid
++  title     String   @db.VarChar(255)
++  content   String   @db.Text
++  authorId  String   @db.Uuid
++  author    users    @relation(fields: [authorId], references: [id])
++  createdAt DateTime @default(now())
+ }
+
+diff --git a/src/dto/post.dto.ts b/src/dto/post.dto.ts
+new file mode 100644
+--- /dev/null
++++ b/src/dto/post.dto.ts
+@@ -0,0 +1,16 @@
++import { IsString, IsNotEmpty, IsUUID } from "class-validator";
++
++export class CreatePostDto {
++  @IsString()
++  @IsNotEmpty()
++  title: string;
++
++  @IsString()
++  @IsNotEmpty()
++  content: string;
++
++  @IsUUID()
++  authorId: string;
++}
++
++export class UpdatePostDto extends CreatePostDto {}
+
+diff --git a/src/modules/posts/posts.service.ts b/src/modules/posts/posts.service.ts
+new file mode 100644
+--- /dev/null
++++ b/src/modules/posts/posts.service.ts
+@@ -0,0 +1,40 @@
++import prisma from "@/lib/prisma";
++import { CreatePostDto, UpdatePostDto } from "@/dto/post.dto";
++
++class PostsService {
++  async create(data: CreatePostDto) {
++    return prisma.posts.create({
++      data,
++      include: { author: true }
++    });
++  }
++
++  async findAll() {
++    return prisma.posts.findMany({ include: { author: true } });
++  }
++
++  async findById(id: string) {
++    return prisma.posts.findUnique({
++      where: { id },
++      include: { author: true }
++    });
++  }
++
++  async update(id: string, data: UpdatePostDto) {
++    return prisma.posts.update({
++      where: { id },
++      data,
++      include: { author: true }
++    });
++  }
++
++  async delete(id: string) {
++    return prisma.posts.delete({ where: { id } });
++  }
++}
++
++export default PostsService;
+
+diff --git a/src/modules/posts/posts.controller.ts b/src/modules/posts/posts.controller.ts
+new file mode 100644
+--- /dev/null
++++ b/src/modules/posts/posts.controller.ts
+@@ -0,0 +1,60 @@
++import { Request, Response, NextFunction } from "express";
++import PostsService from "./posts.service";
++
++class PostsController {
++  private postsService = new PostsService();
++
++  create = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      const post = await this.postsService.create(req.body);
++      res.status(201).json({ success: true, data: post });
++    } catch (error) {
++      next(error);
++    }
++  };
++
++  findAll = async (_req: Request, res: Response, next: NextFunction) => {
++    try {
++      const posts = await this.postsService.findAll();
++      res.status(200).json({ success: true, data: posts });
++    } catch (error) {
++      next(error);
++    }
++  };
++
++  findById = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      const post = await this.postsService.findById(req.params.id);
++      if (!post) {
++        return res.status(404).json({ success: false, message: "Post not found" });
++      }
++      res.status(200).json({ success: true, data: post });
++    } catch (error) {
++      next(error);
++    }
++  };
++
++  update = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      const post = await this.postsService.update(req.params.id, req.body);
++      res.status(200).json({ success: true, data: post });
++    } catch (error) {
++      next(error);
++    }
++  };
++
++  delete = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      await this.postsService.delete(req.params.id);
++      res.status(200).json({ success: true, message: "Post deleted" });
++    } catch (error) {
++      next(error);
++    }
++  };
++}
++
++export default PostsController;
+
+diff --git a/src/modules/posts/posts.route.ts b/src/modules/posts/posts.route.ts
+new file mode 100644
+--- /dev/null
++++ b/src/modules/posts/posts.route.ts
+@@ -0,0 +1,20 @@
++import { Router } from "express";
++import PostsController from "./posts.controller";
++import { verifyAuthToken } from "@/middlewares/auth";
++import RequestValidator from "@/middlewares/request-validator";
++import { CreatePostDto, UpdatePostDto } from "@/dto/post.dto";
++
++const posts = Router();
++const controller = new PostsController();
++
++posts.get("/", verifyAuthToken, controller.findAll);
++posts.get("/:id", verifyAuthToken, controller.findById);
++posts.post("/", verifyAuthToken, RequestValidator.validate(CreatePostDto), controller.create);
++posts.put("/:id", verifyAuthToken, RequestValidator.validate(UpdatePostDto), controller.update);
++posts.delete("/:id", verifyAuthToken, controller.delete);
++
++export default posts;
+
+diff --git a/src/modules/index.ts b/src/modules/index.ts
+--- a/src/modules/index.ts
++++ b/src/modules/index.ts
+@@ -1,7 +1,9 @@
+ import { Router } from "express";
+ import users from "./users/users.route";
++import posts from "./posts/posts.route";
+ 
+ const router = Router();
+ router.use("/users", users);
++router.use("/posts", posts);
+ 
+ export default router;

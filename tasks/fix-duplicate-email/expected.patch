@@ -1,0 +1,41 @@
+diff --git a/src/modules/users/users.service.ts b/src/modules/users/users.service.ts
+--- a/src/modules/users/users.service.ts
++++ b/src/modules/users/users.service.ts
+@@ -1,10 +1,22 @@
+ import { users } from "@prisma/client";
+ import prisma from "@/lib/prisma";
++import { ConflictError } from "@/lib/errors";
+ 
+ class UsersService {
+   public async createUser(data: users) {
++    // Check if user with this email already exists
++    const existingUser = await prisma.users.findFirst({
++      where: { email: data.email }
++    });
++    
++    if (existingUser) {
++      throw new ConflictError("A user with this email already exists");
++    }
++    
+     const user = await prisma.users.create({ data });
+     return user;
+   }
+ }
+ 
+ export default UsersService;
+
+diff --git a/src/lib/errors.ts b/src/lib/errors.ts
+--- a/src/lib/errors.ts
++++ b/src/lib/errors.ts
+@@ -20,4 +20,12 @@ export class NotFoundError extends ApiError {
+   }
+ }
+ 
++export class ConflictError extends ApiError {
++  constructor(message: string = "Resource already exists") {
++    super(message, 409);
++    this.name = "ConflictError";
++  }
++}
++
+ export default ApiError;

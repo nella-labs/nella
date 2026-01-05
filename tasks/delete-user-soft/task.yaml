@@ -1,0 +1,30 @@
+id: delete-user-soft
+name: Soft Delete User
+prompt: |
+  Implement DELETE /users/:id using a soft-delete pattern.
+  Instead of removing the record from the database, add a deletedAt timestamp field.
+  Soft-deleted users should not appear in any query results.
+
+category: feature
+difficulty: medium
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - prisma/schema.prisma
+    - src/modules/users/users.route.ts
+    - src/modules/users/users.controller.ts
+    - src/modules/users/users.service.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+  expected_line_count: 50
+
+timeout_seconds: 600

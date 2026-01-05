@@ -1,0 +1,44 @@
+id: posts-crud-relations
+name: Posts CRUD with User Relations
+prompt: |
+  Add a Post model with the following fields:
+  - id (UUID, primary key)
+  - title (string, required)
+  - content (text, required)
+  - authorId (foreign key to users)
+  - createdAt (timestamp)
+
+  Implement full CRUD endpoints at /posts:
+  - POST /posts - create a new post
+  - GET /posts - list all posts
+  - GET /posts/:id - get a single post
+  - PUT /posts/:id - update a post
+  - DELETE /posts/:id - delete a post
+
+  Posts should include author information in responses.
+
+category: feature
+difficulty: hard
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - prisma/schema.prisma
+    - src/modules/index.ts
+    - src/modules/posts/posts.route.ts
+    - src/modules/posts/posts.controller.ts
+    - src/modules/posts/posts.service.ts
+    - src/dto/post.dto.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+  expected_line_count: 200
+
+timeout_seconds: 900

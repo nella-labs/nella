@@ -1,0 +1,28 @@
+id: validate-whitespace
+name: Validate Whitespace in Name
+prompt: |
+  The name field currently accepts empty strings or whitespace-only values.
+  Add validation to reject these inputs with a 400 Bad Request response
+  and a clear error message.
+
+category: edge-case
+difficulty: medium
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/dto/user.dto.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+    - prisma/schema.prisma
+  expected_line_count: 10
+
+timeout_seconds: 300

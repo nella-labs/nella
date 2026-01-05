@@ -1,0 +1,40 @@
+id: refactor-repository
+name: Refactor to Repository Pattern
+prompt: |
+  Refactor the users module to use a repository pattern.
+  Extract all Prisma database calls from the service into a new UsersRepository class.
+  The service should depend on the repository, not directly on Prisma.
+
+category: refactor
+difficulty: medium
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints:
+  - id: no-controller-changes
+    description: Do not modify the controller
+    rule: Controller logic must remain unchanged
+    files_not_to_modify:
+      - src/modules/users/users.controller.ts
+  - id: no-route-changes
+    description: Do not modify the routes
+    rule: Route definitions must remain unchanged
+    files_not_to_modify:
+      - src/modules/users/users.route.ts
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/modules/users/users.service.ts
+    - src/modules/users/users.repository.ts
+  files_to_ignore:
+    - src/modules/users/users.controller.ts
+    - src/modules/users/users.route.ts
+    - src/middlewares/auth.ts
+    - src/config/*
+  expected_line_count: 60
+
+timeout_seconds: 600

@@ -1,0 +1,70 @@
+diff --git a/src/modules/users/users.route.ts b/src/modules/users/users.route.ts
+--- a/src/modules/users/users.route.ts
++++ b/src/modules/users/users.route.ts
+@@ -23,6 +23,18 @@ import { verifyAuthToken } from "@/middlewares/auth";
+  */
+ const users = Router();
+ 
++/**
++ * GET /users
++ * @summary List users with pagination
++ * @tags Users
++ * @param {number} page.query - Page number (default: 1)
++ * @param {number} limit.query - Items per page (default: 10)
++ * @return {object} 200 - Paginated users list
++ */
++users.get("/", verifyAuthToken, controller.listUsers);
++
+ /**
+  * POST /users/create
+  * @summary Create a new user
+
+diff --git a/src/modules/users/users.controller.ts b/src/modules/users/users.controller.ts
+--- a/src/modules/users/users.controller.ts
++++ b/src/modules/users/users.controller.ts
+@@ -6,6 +6,23 @@ class UsersController {
+ 
+   constructor() {}
+ 
++  public listUsers = async (req: Request, res: Response, next: NextFunction) => {
++    try {
++      const page = parseInt(req.query.page as string) || 1;
++      const limit = parseInt(req.query.limit as string) || 10;
++      
++      const result = await this.usersService.listUsers(page, limit);
++      
++      return res.status(200).json({
++        success: true,
++        data: result.users,
++        pagination: { page, limit, total: result.total }
++      });
++    } catch (error) {
++      next(error);
++    }
++  };
++
+   public createUser = async (req: Request, res: Response, next: NextFunction) => {
+     try {
+       const user = await this.usersService.createUser(req.body);
+
+diff --git a/src/modules/users/users.service.ts b/src/modules/users/users.service.ts
+--- a/src/modules/users/users.service.ts
++++ b/src/modules/users/users.service.ts
+@@ -3,6 +3,18 @@ import prisma from "@/lib/prisma";
+ 
+ class UsersService {
+ 
++  public async listUsers(page: number, limit: number) {
++    const skip = (page - 1) * limit;
++    
++    const [users, total] = await Promise.all([
++      prisma.users.findMany({ skip, take: limit }),
++      prisma.users.count()
++    ]);
++    
++    return { users, total };
++  }
++
+   public async createUser(data: users) {
+     const user = await prisma.users.create({ data });
+     return user;

@@ -1,0 +1,19 @@
+{
+  "name": "nella-workspace",
+  "version": "1.0.0",
+  "description": "A monorepo containing a benchmark tool and Nella MCP",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "benchmark": "workspace:benchmark",
+    "nella": "workspace:nella",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev": "pnpm -r dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

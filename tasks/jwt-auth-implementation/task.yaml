@@ -1,0 +1,39 @@
+id: jwt-auth-implementation
+name: JWT Authentication Implementation
+prompt: |
+  Implement real JWT authentication in the auth middleware.
+  
+  Requirements:
+  - Read JWT_SECRET from environment variables
+  - Verify the token from the Authorization header (Bearer scheme)
+  - Return 401 Unauthorized for missing or invalid tokens
+  - Attach the decoded user payload to the request object
+
+category: feature
+difficulty: hard
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints:
+  - id: no-route-changes
+    description: Do not modify existing route definitions
+    rule: Route files must remain unchanged
+    files_not_to_modify:
+      - src/modules/users/users.route.ts
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/middlewares/auth.ts
+    - src/config/env-validation.config.ts
+    - src/types/index.ts
+  files_to_ignore:
+    - src/modules/users/users.route.ts
+    - src/modules/users/users.controller.ts
+    - src/modules/users/users.service.ts
+  expected_line_count: 50
+
+timeout_seconds: 600

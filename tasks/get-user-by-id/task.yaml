@@ -1,0 +1,29 @@
+id: get-user-by-id
+name: Get User by ID
+prompt: |
+  Add a GET /users/:id endpoint that returns a single user by their ID.
+  Return 404 if the user is not found.
+
+category: feature
+difficulty: easy
+fixture: expressjs-typescript-prisma-boilerplate
+
+constraints: []
+
+validation:
+  test: npm run test
+  lint: npm run lint
+  compile: npm run check:types
+
+expected:
+  files_to_modify:
+    - src/modules/users/users.route.ts
+    - src/modules/users/users.controller.ts
+    - src/modules/users/users.service.ts
+  files_to_ignore:
+    - src/middlewares/auth.ts
+    - src/config/*
+    - prisma/schema.prisma
+  expected_line_count: 30
+
+timeout_seconds: 300

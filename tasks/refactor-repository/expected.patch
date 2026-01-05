@@ -1,0 +1,48 @@
+diff --git a/src/modules/users/users.repository.ts b/src/modules/users/users.repository.ts
+new file mode 100644
+--- /dev/null
++++ b/src/modules/users/users.repository.ts
+@@ -0,0 +1,20 @@
++import { users } from "@prisma/client";
++import prisma from "@/lib/prisma";
++
++class UsersRepository {
++  async create(data: users) {
++    return prisma.users.create({ data });
++  }
++
++  async findById(id: string) {
++    return prisma.users.findUnique({ where: { id } });
++  }
++
++  async findByEmail(email: string) {
++    return prisma.users.findFirst({ where: { email } });
++  }
++}
++
++export default UsersRepository;
+
+diff --git a/src/modules/users/users.service.ts b/src/modules/users/users.service.ts
+--- a/src/modules/users/users.service.ts
++++ b/src/modules/users/users.service.ts
+@@ -1,13 +1,17 @@
+ import { users } from "@prisma/client";
+-import prisma from "@/lib/prisma";
++import UsersRepository from "./users.repository";
+ 
+ class UsersService {
++  private repository: UsersRepository;
++
++  constructor() {
++    this.repository = new UsersRepository();
++  }
++
+   public async createUser(data: users) {
+-    const user = await prisma.users.create({ data });
+-    return user;
++    return this.repository.create(data);
+   }
+-
+ }
+ 
+ export default UsersService;
