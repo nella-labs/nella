@@ -1,0 +1,29 @@
+{
+  "name": "@nella/benchmark",
+  "version": "1.0.0",
+  "description": "Benchmark suite for evaluating coding agents on capability and safety",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"No tests yet\"",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "benchmark",
+    "coding-agents",
+    "evaluation",
+    "safety",
+    "nella"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.3.0"
+  }
+}
