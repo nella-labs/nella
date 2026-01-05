@@ -1,0 +1,4 @@
+[submodule "fixtures/expressjs-typescript-prisma-boilerplate"]
+	path = fixtures/expressjs-typescript-prisma-boilerplate
+	url = https://github.com/ascii-16/expressjs-typescript-prisma-boilerplate.git
+	active = true
