@@ -22,7 +22,7 @@ constraints:
       - src/modules/users/users.route.ts
 
 validation:
-  test: npm run test
+  test: npm run test:unit
   lint: npm run lint
   compile: npm run check:types
 

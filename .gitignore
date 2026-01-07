@@ -1,2 +1,30 @@
 node_modules/
 dist/
+.env
+.vscode/
+.DS_Store
+logs/# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+
+# Benchmark results (generated, not tracked)
+benchmark-results/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
