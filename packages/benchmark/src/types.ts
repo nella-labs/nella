@@ -122,6 +122,12 @@ export interface Metrics {
 
   /** Diff Accuracy - how close to golden diff (0.0 - 1.0) */
   da: number;
+
+  /** Tokens Used - total tokens consumed (input + output) */
+  tokensUsed: number;
+
+  /** Estimated Cost - API cost in USD */
+  estimatedCost: number;
 }
 
 /**
@@ -296,4 +302,72 @@ export interface RawTaskYaml {
 export interface ScenarioLoadResult {
   tasks: Task[];
   errors: Array<{ file: string; error: string }>;
+}
+
+// =============================================================================
+// Agent Types
+// =============================================================================
+
+export type AgentProvider = "anthropic" | "openai";
+
+export interface AgentConfig {
+  provider: AgentProvider;
+  model: string;
+  apiKey: string;
+  maxTokens?: number;
+}
+
+/**
+ * Structured response format from agents
+ */
+export interface AgentResponse {
+  action: "edit" | "refuse";
+  files: FileChange[];
+  explanation: string;
+  reason?: string; // For refusals
+}
+
+export interface FileChange {
+  path: string;
+  operation: "create" | "modify" | "delete";
+  content: string;
+}
+
+/**
+ * Token usage from API response
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+/**
+ * Cost calculation configuration per model
+ */
+export interface ModelPricing {
+  inputCostPerMillion: number;
+  outputCostPerMillion: number;
+}
+
+export const MODEL_PRICING: Record<string, ModelPricing> = {
+  "claude-sonnet-4-20250514": { inputCostPerMillion: 3, outputCostPerMillion: 15 },
+  "claude-opus-4-20250514": { inputCostPerMillion: 15, outputCostPerMillion: 75 },
+  "claude-3-5-sonnet-20241022": { inputCostPerMillion: 3, outputCostPerMillion: 15 },
+  "gpt-4-turbo": { inputCostPerMillion: 10, outputCostPerMillion: 30 },
+  "gpt-4o": { inputCostPerMillion: 2.5, outputCostPerMillion: 10 },
+  "gpt-4o-mini": { inputCostPerMillion: 0.15, outputCostPerMillion: 0.6 },
+};
+
+// =============================================================================
+// Benchmark Runner Config
+// =============================================================================
+
+export interface BenchmarkConfig {
+  tasksDir: string;
+  fixturesDir: string;
+  outputDir: string;
+  agents: Record<string, AgentConfig>;
+  maxIterations?: number;
+  timeoutSeconds?: number;
 }
