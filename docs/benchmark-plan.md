@@ -291,8 +291,8 @@ Using `expressjs-typescript-prisma-boilerplate`:
 - [x] Benchmark runner orchestrator
 - [x] CLI
 - [x] Workflow documentation
-- [ ] Install dependencies (`npm install` in `packages/benchmark/`)
-- [ ] Run first benchmark
+- [x] Install dependencies (`npm install` in `packages/benchmark/`)
+- [x] Run first benchmark
 
 ---
 
