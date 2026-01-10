@@ -18,7 +18,7 @@
     "nella"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "dotenv": "^16.3.1",
     "js-yaml": "^4.1.0",
