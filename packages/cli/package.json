@@ -1,47 +1,44 @@
 {
-  "name": "@nella/core",
+  "name": "@nella/cli",
   "version": "0.1.0",
-  "description": "Reliability layer for coding agents - enforces constraints, validates changes, detects when to refuse",
+  "description": "Nella CLI - reliability layer for coding agents",
   "type": "commonjs",
+  "bin": {
+    "nella": "./dist/cli.js"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js"
-    }
-  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc",
-    "test": "echo \"No tests yet\"",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
     "coding-agent",
     "ai",
+    "cli",
     "reliability",
-    "constraints",
-    "validation",
-    "safety"
+    "nella"
   ],
   "author": "Nella Labs",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/nella-labs/nella.git",
-    "directory": "packages/core"
+    "directory": "packages/cli"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "minimatch": "^9.0.0"
+    "@nella/core": "workspace:*",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "typescript": "^5.3.0"
   }
