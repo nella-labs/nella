@@ -39,7 +39,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@nella/core':
+      '@nella-labs/core':
         specifier: workspace:*
         version: link:../core
       js-yaml:
