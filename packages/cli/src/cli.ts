@@ -19,7 +19,7 @@ import {
   RawTaskYaml,
   Changes,
   FileChange,
-} from "@nella/core";
+} from "@nella-labs/core";
 
 // =============================================================================
 // Argument Parsing
