@@ -1,5 +1,5 @@
 {
-  "name": "@nella/benchmark",
+  "name": "@nella-labs/benchmark",
   "version": "1.0.0",
   "description": "Benchmark suite for evaluating coding agents on capability and safety",
   "main": "dist/index.js",
