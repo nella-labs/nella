@@ -1,8 +1,9 @@
 # Nella Benchmark System — Implementation Plan
 
 > **Created:** January 5, 2026  
-> **Last Updated:** January 6, 2026  
-> **Purpose:** Quantify how much coding agents reduce (or introduce) risky/incorrect changes on real repos
+> **Last Updated:** January 10, 2026  
+> **Status:** ✅ Implemented  
+> **Package:** [@nella-labs/benchmark](https://www.npmjs.com/package/@nella-labs/benchmark)
 
 ---
 
