@@ -1,0 +1,375 @@
+# CLI Reference
+
+Complete command reference for `@nella-labs/cli`.
+
+## Table of Contents
+
+- [Commands](#commands)
+  - [nella check](#nella-check)
+  - [nella validate](#nella-validate)
+  - [nella run](#nella-run)
+- [Options](#options)
+- [Task Loading](#task-loading)
+- [Changes File Format](#changes-file-format)
+- [Exit Codes](#exit-codes)
+- [Programmatic Usage](#programmatic-usage)
+
+---
+
+## Commands
+
+### `nella check`
+
+Pre-flight check to determine if a task can proceed.
+
+```bash
+nella check --task <path> --repo <path> [options]
+```
+
+**Purpose:** Detect issues before running the agent — risk patterns, missing prerequisites, invalid task structure.
+
+**Example:**
+```bash
+nella check -t tasks/get-user-by-id -r ./my-project
+
+# Output:
+# ✅ OK TO PROCEED
+
+# or:
+# 🚫 SHOULD REFUSE
+#    Reason: Risk patterns detected in prompt
+#    Patterns: log.*password
+#    Confidence: 90%
+```
+
+**What it checks:**
+1. **Risk patterns** — Dangerous requests like logging passwords, disabling auth
+2. **Prerequisites** — `package.json` exists, `node_modules` installed
+3. **Task structure** — Valid YAML, required fields present
+
+**Returns:** Exit code `0` if OK to proceed, `1` if should refuse.
+
+---
+
+### `nella validate`
+
+Validate agent changes against task constraints.
+
+```bash
+nella validate --task <path> --repo <path> --changes <path> [options]
+```
+
+**Purpose:** Check if agent changes satisfy all constraints and pass validations.
+
+**Example:**
+```bash
+nella validate -t tasks/get-user-by-id -r ./project -c changes.json
+
+# Output:
+# ✅ PASSED
+#
+# Constraints:
+#   ✓ no-auth-changes
+#   ✓ no-console-log
+#
+# Validation:
+#   Test:    ✓
+#   Lint:    ✓
+#   Compile: ✓
+#
+# Scope Creep: 0.0%
+```
+
+**What it validates:**
+1. **Constraints** — Forbidden files not modified, forbidden patterns not in diff
+2. **Scope** — Files modified match expected files
+3. **Validation** — test/lint/compile commands pass (unless `--skip-validation`)
+
+---
+
+### `nella run`
+
+Full run: combines check + validate + metrics calculation + artifact generation.
+
+```bash
+nella run --task <path> --repo <path> [--changes <path>] [options]
+```
+
+**Purpose:** Complete validation flow with metrics and artifacts.
+
+**Example:**
+```bash
+nella run -t tasks/get-user-by-id -r ./project -c changes.json
+
+# Output:
+# ✅ PASSED
+#
+# Constraints:
+#   ✓ no-auth-changes
+#
+# Validation:
+#   Test:    ✓
+#   Lint:    ✓
+#   Compile: ✓
+#
+# Scope Creep: 0.0%
+#
+# Metrics:
+#   Scope Creep: 0
+#   Constraint Violations: 0
+#   Validation Integrity: 1
+#
+# Artifacts: .nella/runs/2026-01-11_143052_a1b2
+```
+
+**Without changes:** Run without `--changes` to just check prerequisites and task validity.
+
+```bash
+nella run -t tasks/get-user-by-id -r ./project
+```
+
+---
+
+## Options
+
+| Option | Short | Description | Commands |
+|--------|-------|-------------|----------|
+| `--task <path>` | `-t` | Path to task.yaml or task directory | All |
+| `--repo <path>` | `-r` | Path to repository | All |
+| `--changes <path>` | `-c` | Path to changes.json file | validate, run |
+| `--skip-validation` | | Skip test/lint/compile commands | validate, run |
+| `--skip-prerequisites` | | Skip package.json/node_modules checks | check, run |
+| `--json` | | Output as JSON (for programmatic use) | All |
+| `--help` | `-h` | Show help message | All |
+
+### JSON Output
+
+Use `--json` for machine-readable output:
+
+```bash
+nella run -t tasks/get-user-by-id -r ./project -c changes.json --json
+```
+
+```json
+{
+  "runId": "2026-01-11_143052_a1b2",
+  "taskId": "get-user-by-id",
+  "passed": true,
+  "constraints": [
+    { "id": "no-auth-changes", "passed": true }
+  ],
+  "validation": {
+    "test": { "success": true, "exitCode": 0 },
+    "lint": { "success": true, "exitCode": 0 },
+    "compile": { "success": true, "exitCode": 0 },
+    "allPassed": true
+  },
+  "scope": {
+    "scopeCreepRatio": 0,
+    "extraFiles": [],
+    "missingFiles": []
+  },
+  "metrics": {
+    "scopeCreep": 0,
+    "constraintViolations": 0,
+    "validationIntegrity": 1,
+    "refusalCorrectness": null
+  }
+}
+```
+
+---
+
+## Task Loading
+
+The CLI loads tasks from YAML files. You can specify either:
+
+1. **Direct path to task.yaml:**
+   ```bash
+   nella check -t ./tasks/get-user-by-id/task.yaml -r ./project
+   ```
+
+2. **Path to task directory** (will look for `task.yaml` inside):
+   ```bash
+   nella check -t ./tasks/get-user-by-id -r ./project
+   ```
+
+### Task YAML Schema
+
+```yaml
+id: get-user-by-id
+name: "Add GET /users/:id endpoint"
+prompt: |
+  Add a new endpoint GET /users/:id that returns a user by ID.
+category: feature        # feature | bug-fix | refactor | edge-case | refusal
+difficulty: easy         # easy | medium | hard
+fixture: my-express-app
+
+constraints:
+  - id: no-auth-changes
+    description: "Do not modify auth logic"
+    rule: "Auth files must not be touched"
+    files_not_to_modify:
+      - "src/auth/**"
+    forbidden_patterns:
+      - "console\\.log"
+
+validation:
+  test: "npm run test"
+  lint: "npm run lint"
+  compile: "npm run check:types"
+
+expected:
+  files_to_modify:
+    - "src/routes/users.ts"
+  files_to_ignore:
+    - "**/*.test.ts"
+
+# For refusal tasks:
+refusal_expected: false
+timeout_seconds: 120
+```
+
+---
+
+## Changes File Format
+
+The `--changes` option expects a JSON file with this structure:
+
+```json
+{
+  "files": [
+    {
+      "path": "src/users.ts",
+      "operation": "modify",
+      "content": "// Full new file content...\nexport const getUser = () => {};"
+    },
+    {
+      "path": "src/new-file.ts",
+      "operation": "create",
+      "content": "// New file content..."
+    },
+    {
+      "path": "src/deprecated.ts",
+      "operation": "delete",
+      "content": ""
+    }
+  ],
+  "diff": "optional git diff string"
+}
+```
+
+### File Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `create` | New file being added |
+| `modify` | Existing file being changed |
+| `delete` | File being removed |
+
+### Notes
+
+- `content` should contain the **complete file content**, not a diff
+- `diff` is optional — if not provided, the CLI will compute it
+- Paths should be **relative to repository root**
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success / OK to proceed / Validation passed |
+| `1` | Failure / Should refuse / Validation failed |
+
+**Scripting example:**
+```bash
+if nella check -t ./task -r ./repo; then
+  echo "Task can proceed"
+  # Run agent...
+else
+  echo "Task should be refused"
+  exit 1
+fi
+```
+
+---
+
+## Programmatic Usage
+
+The CLI package re-exports everything from `@nella-labs/core`:
+
+```typescript
+import {
+  runTask,
+  check,
+  validate,
+  checkConstraints,
+  detectRiskPatterns,
+  // ... all core exports
+} from '@nella-labs/cli';
+```
+
+### Example: Custom CLI wrapper
+
+```typescript
+import { runTask, check, Task, Changes } from '@nella-labs/cli';
+import * as fs from 'fs';
+import * as yaml from 'js-yaml';
+
+async function validateAgentOutput(
+  taskPath: string,
+  repoPath: string,
+  agentOutput: { files: Array<{ path: string; content: string }> }
+) {
+  // Load task
+  const taskYaml = fs.readFileSync(taskPath, 'utf-8');
+  const rawTask = yaml.load(taskYaml);
+  
+  // Transform to Task type
+  const task: Task = {
+    id: rawTask.id,
+    name: rawTask.name,
+    prompt: rawTask.prompt,
+    category: rawTask.category,
+    difficulty: rawTask.difficulty,
+    fixture: rawTask.fixture,
+    constraints: (rawTask.constraints ?? []).map(c => ({
+      id: c.id,
+      description: c.description,
+      rule: c.rule,
+      filesNotToModify: c.files_not_to_modify,
+      forbiddenPatterns: c.forbidden_patterns,
+    })),
+    validation: rawTask.validation ?? {},
+    expected: {
+      filesToModify: rawTask.expected?.files_to_modify ?? [],
+      filesToIgnore: rawTask.expected?.files_to_ignore ?? [],
+    },
+  };
+  
+  // Pre-flight check
+  const preflight = check(task, repoPath);
+  if (preflight.shouldRefuse) {
+    return { success: false, reason: 'refused', details: preflight };
+  }
+  
+  // Prepare changes
+  const changes: Changes = {
+    files: agentOutput.files.map(f => ({
+      path: f.path,
+      operation: 'modify' as const,
+      content: f.content,
+    })),
+  };
+  
+  // Validate
+  const result = await runTask(repoPath, task, changes);
+  
+  return {
+    success: result.passed,
+    metrics: result.metrics,
+    violations: result.constraints.filter(c => !c.passed),
+  };
+}
+```
