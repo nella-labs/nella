@@ -12,6 +12,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
+import chalk from "chalk";
+import Table from "cli-table3";
+import figures from "figures";
 import {
   runTask,
   check,
@@ -20,6 +23,74 @@ import {
   Changes,
   FileChange,
 } from "@nella-labs/core";
+
+// =============================================================================
+// Theme & Styling
+// =============================================================================
+
+const theme = {
+  // Brand colors
+  primary: chalk.hex("#7C3AED"),      // Purple
+  secondary: chalk.hex("#06B6D4"),    // Cyan
+  accent: chalk.hex("#F59E0B"),       // Amber
+  
+  // Status colors
+  success: chalk.hex("#10B981"),      // Green
+  error: chalk.hex("#EF4444"),        // Red
+  warning: chalk.hex("#F59E0B"),      // Amber
+  info: chalk.hex("#3B82F6"),         // Blue
+  
+  // Text colors
+  muted: chalk.hex("#6B7280"),        // Gray
+  dim: chalk.dim,
+  bold: chalk.bold,
+  
+  // Icons
+  icons: {
+    success: chalk.hex("#10B981")(figures.tick),
+    error: chalk.hex("#EF4444")(figures.cross),
+    warning: chalk.hex("#F59E0B")(figures.warning),
+    info: chalk.hex("#3B82F6")(figures.info),
+    arrow: chalk.hex("#7C3AED")(figures.arrowRight),
+    bullet: chalk.hex("#6B7280")(figures.bullet),
+    star: chalk.hex("#F59E0B")(figures.star),
+  },
+};
+
+// ASCII art logo
+const logo = `
+${theme.primary("  ███╗   ██╗███████╗██╗     ██╗      █████╗ ")}
+${theme.primary("  ████╗  ██║██╔════╝██║     ██║     ██╔══██╗")}
+${theme.primary("  ██╔██╗ ██║█████╗  ██║     ██║     ███████║")}
+${theme.primary("  ██║╚██╗██║██╔══╝  ██║     ██║     ██╔══██║")}
+${theme.primary("  ██║ ╚████║███████╗███████╗███████╗██║  ██║")}
+${theme.primary("  ╚═╝  ╚═══╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝")}
+`;
+
+const tagline = theme.muted("  Reliability layer for coding agents\n");
+
+function box(content: string, title?: string): string {
+  const lines = content.split("\n");
+  const maxLen = Math.max(...lines.map(l => l.replace(/\x1b\[[0-9;]*m/g, "").length), (title?.length ?? 0) + 4);
+  const width = Math.min(maxLen + 4, 70);
+  
+  const top = title 
+    ? `${theme.muted("┌─")} ${theme.bold(title)} ${theme.muted("─".repeat(Math.max(0, width - title.length - 5)) + "┐")}`
+    : theme.muted("┌" + "─".repeat(width) + "┐");
+  const bottom = theme.muted("└" + "─".repeat(width) + "┘");
+  
+  const boxedLines = lines.map(line => {
+    const cleanLen = line.replace(/\x1b\[[0-9;]*m/g, "").length;
+    const padding = " ".repeat(Math.max(0, width - cleanLen - 2));
+    return `${theme.muted("│")} ${line}${padding} ${theme.muted("│")}`;
+  });
+  
+  return [top, ...boxedLines, bottom].join("\n");
+}
+
+function divider(char = "─"): string {
+  return theme.muted(char.repeat(50));
+}
 
 // =============================================================================
 // Argument Parsing
@@ -139,73 +210,195 @@ function loadChanges(changesPath: string): Changes {
 
 function formatPretty(result: Record<string, unknown>): string {
   const lines: string[] = [];
-
+  
+  // Header with pass/fail status
   if (result.passed !== undefined) {
-    lines.push(result.passed ? "✅ PASSED" : "❌ FAILED");
+    if (result.passed) {
+      lines.push("");
+      lines.push(`  ${theme.icons.success}  ${theme.success.bold("PASSED")}`);
+    } else {
+      lines.push("");
+      lines.push(`  ${theme.icons.error}  ${theme.error.bold("FAILED")}`);
+    }
     lines.push("");
   }
 
+  // Refusal section
   if (result.refusal) {
     const refusal = result.refusal as { shouldRefuse: boolean; reason: string };
     if (refusal.shouldRefuse) {
-      lines.push("🚫 REFUSAL");
-      lines.push(`   Reason: ${refusal.reason}`);
+      lines.push(`  ${theme.icons.warning}  ${theme.warning.bold("REFUSAL DETECTED")}`);
+      lines.push(`     ${theme.muted("Reason:")} ${refusal.reason}`);
       lines.push("");
     }
   }
 
+  // Constraints table
   if (result.constraints) {
     const constraints = result.constraints as Array<{ id: string; passed: boolean; violationDetails?: string }>;
     if (constraints.length > 0) {
-      lines.push("Constraints:");
+      lines.push(`  ${theme.secondary.bold("Constraints")}`);
+      lines.push("");
+      
+      const table = new Table({
+        chars: {
+          "top": "", "top-mid": "", "top-left": "", "top-right": "",
+          "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+          "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
+          "right": "", "right-mid": "", "middle": " │ ",
+        },
+        style: { "padding-left": 1, "padding-right": 1 },
+      });
+      
       for (const c of constraints) {
-        const icon = c.passed ? "✓" : "✗";
-        lines.push(`  ${icon} ${c.id}${c.violationDetails ? `: ${c.violationDetails}` : ""}`);
+        const icon = c.passed ? theme.icons.success : theme.icons.error;
+        const status = c.passed ? theme.success("pass") : theme.error("fail");
+        const details = c.violationDetails ? theme.muted(c.violationDetails) : "";
+        table.push([icon, c.id, status, details]);
       }
+      
+      lines.push(table.toString());
       lines.push("");
     }
   }
 
+  // Validation section
   if (result.validation) {
     const val = result.validation as {
       test?: { success: boolean };
       lint?: { success: boolean };
       compile?: { success: boolean };
     };
-    lines.push("Validation:");
-    if (val.test) lines.push(`  Test:    ${val.test.success ? "✓" : "✗"}`);
-    if (val.lint) lines.push(`  Lint:    ${val.lint.success ? "✓" : "✗"}`);
-    if (val.compile) lines.push(`  Compile: ${val.compile.success ? "✓" : "✗"}`);
+    
+    lines.push(`  ${theme.secondary.bold("Validation")}`);
+    lines.push("");
+    
+    const items: string[] = [];
+    if (val.test) {
+      const icon = val.test.success ? theme.icons.success : theme.icons.error;
+      items.push(`  ${icon}  Test`);
+    }
+    if (val.lint) {
+      const icon = val.lint.success ? theme.icons.success : theme.icons.error;
+      items.push(`  ${icon}  Lint`);
+    }
+    if (val.compile) {
+      const icon = val.compile.success ? theme.icons.success : theme.icons.error;
+      items.push(`  ${icon}  Compile`);
+    }
+    
+    lines.push(items.join("    "));
     lines.push("");
   }
 
+  // Scope section
   if (result.scope) {
     const scope = result.scope as { scopeCreepRatio: number; extraFiles: string[] };
-    lines.push(`Scope Creep: ${(scope.scopeCreepRatio * 100).toFixed(1)}%`);
+    lines.push(`  ${theme.secondary.bold("Scope Analysis")}`);
+    lines.push("");
+    
+    const ratio = scope.scopeCreepRatio * 100;
+    const color = ratio === 0 ? theme.success : ratio < 50 ? theme.warning : theme.error;
+    const bar = createProgressBar(Math.min(ratio, 100), 20, ratio === 0);
+    
+    lines.push(`  ${theme.muted("Scope Creep:")} ${bar} ${color(`${ratio.toFixed(0)}%`)}`);
+    
     if (scope.extraFiles.length > 0) {
-      lines.push(`  Extra files: ${scope.extraFiles.join(", ")}`);
+      lines.push("");
+      lines.push(`  ${theme.muted("Extra files:")}`);
+      for (const file of scope.extraFiles.slice(0, 5)) {
+        lines.push(`    ${theme.icons.bullet} ${theme.warning(file)}`);
+      }
+      if (scope.extraFiles.length > 5) {
+        lines.push(`    ${theme.muted(`... and ${scope.extraFiles.length - 5} more`)}`);
+      }
     }
     lines.push("");
   }
 
+  // Metrics section
   if (result.metrics) {
     const metrics = result.metrics as Record<string, unknown>;
-    lines.push("Metrics:");
-    lines.push(`  Scope Creep: ${metrics.scopeCreep}`);
-    lines.push(`  Constraint Violations: ${metrics.constraintViolations}`);
-    lines.push(`  Validation Integrity: ${metrics.validationIntegrity}`);
+    lines.push(`  ${theme.secondary.bold("Metrics")}`);
+    lines.push("");
+    
+    const table = new Table({
+      chars: {
+        "top": "", "top-mid": "", "top-left": "", "top-right": "",
+        "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+        "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
+        "right": "", "right-mid": "", "middle": "  ",
+      },
+      style: { "padding-left": 0, "padding-right": 2 },
+    });
+    
+    const sc = metrics.scopeCreep as number;
+    const cv = metrics.constraintViolations as number;
+    const vi = metrics.validationIntegrity as number;
+    
+    table.push([
+      theme.muted("Scope Creep"),
+      formatMetricValue(sc, { good: 0, bad: 0.5, format: "percent" }),
+    ]);
+    table.push([
+      theme.muted("Violations"),
+      formatMetricValue(cv, { good: 0, bad: 0, format: "count" }),
+    ]);
+    table.push([
+      theme.muted("Validation"),
+      formatMetricValue(vi, { good: 1, bad: 0.5, format: "percent", reverse: true }),
+    ]);
+    
     if (metrics.refusalCorrectness !== null) {
-      lines.push(`  Refusal Correctness: ${metrics.refusalCorrectness}`);
+      const rc = metrics.refusalCorrectness as boolean;
+      table.push([
+        theme.muted("Refusal"),
+        rc ? theme.success("correct") : theme.error("incorrect"),
+      ]);
     }
+    
+    lines.push(table.toString());
   }
 
+  // Artifacts section
   if (result.artifacts) {
     const artifacts = result.artifacts as { runDir: string };
     lines.push("");
-    lines.push(`Artifacts: ${artifacts.runDir}`);
+    lines.push(`  ${theme.muted("📁 Artifacts:")} ${theme.dim(artifacts.runDir)}`);
   }
 
+  lines.push("");
   return lines.join("\n");
+}
+
+function createProgressBar(percent: number, width: number, success: boolean): string {
+  const filled = Math.round((percent / 100) * width);
+  const empty = width - filled;
+  
+  if (success) {
+    return theme.success("█".repeat(width));
+  }
+  
+  const color = percent < 30 ? theme.success : percent < 70 ? theme.warning : theme.error;
+  return color("█".repeat(filled)) + theme.dim("░".repeat(empty));
+}
+
+function formatMetricValue(
+  value: number, 
+  opts: { good: number; bad: number; format: "percent" | "count"; reverse?: boolean }
+): string {
+  let color: typeof theme.success;
+  
+  if (opts.reverse) {
+    color = value >= opts.good ? theme.success : value >= opts.bad ? theme.warning : theme.error;
+  } else {
+    color = value <= opts.good ? theme.success : value <= opts.bad ? theme.warning : theme.error;
+  }
+  
+  if (opts.format === "percent") {
+    return color(`${(value * 100).toFixed(0)}%`);
+  }
+  return color(String(value));
 }
 
 // =============================================================================
@@ -214,12 +407,16 @@ function formatPretty(result: Record<string, unknown>): string {
 
 async function runCheckCommand(args: CliArgs): Promise<void> {
   if (!args.taskPath || !args.repoPath) {
-    console.error("Error: --task and --repo are required for check command");
+    console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task and --repo\n`));
     process.exit(1);
   }
 
   const task = loadTask(args.taskPath);
   const repoPath = path.resolve(args.repoPath);
+
+  console.log("");
+  console.log(`  ${theme.icons.arrow}  ${theme.muted("Checking task")} ${theme.primary.bold(task.id)}`);
+  console.log("");
 
   const result = check(task, repoPath, {
     skipPrerequisites: args.skipPrerequisites,
@@ -229,15 +426,22 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
     console.log(JSON.stringify(result, null, 2));
   } else {
     if (result.shouldRefuse) {
-      console.log("🚫 SHOULD REFUSE");
-      console.log(`   Reason: ${result.reason}`);
-      if (result.patternsMatched.length > 0) {
-        console.log(`   Patterns: ${result.patternsMatched.join(", ")}`);
-      }
-      console.log(`   Confidence: ${(result.confidence * 100).toFixed(0)}%`);
+      console.log(box([
+        `${theme.icons.warning}  ${theme.warning.bold("SHOULD REFUSE")}`,
+        "",
+        `${theme.muted("Reason:")}     ${result.reason}`,
+        result.patternsMatched.length > 0 
+          ? `${theme.muted("Patterns:")}   ${result.patternsMatched.join(", ")}`
+          : "",
+        `${theme.muted("Confidence:")} ${theme.accent(`${(result.confidence * 100).toFixed(0)}%`)}`,
+      ].filter(Boolean).join("\n"), "Refusal Check"));
     } else {
-      console.log("✅ OK TO PROCEED");
+      console.log(`  ${theme.icons.success}  ${theme.success.bold("OK TO PROCEED")}`);
+      console.log("");
+      console.log(`  ${theme.muted("Task:")} ${task.name}`);
+      console.log(`  ${theme.muted("Category:")} ${theme.secondary(task.category)} ${theme.muted("•")} ${theme.muted("Difficulty:")} ${theme.secondary(task.difficulty)}`);
     }
+    console.log("");
   }
 
   process.exit(result.shouldRefuse ? 1 : 0);
@@ -245,13 +449,16 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
 
 async function runValidateCommand(args: CliArgs): Promise<void> {
   if (!args.taskPath || !args.repoPath || !args.changesPath) {
-    console.error("Error: --task, --repo, and --changes are required for validate command");
+    console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task, --repo, and --changes\n`));
     process.exit(1);
   }
 
   const task = loadTask(args.taskPath);
   const repoPath = path.resolve(args.repoPath);
   const changes = loadChanges(args.changesPath);
+
+  console.log("");
+  console.log(`  ${theme.icons.arrow}  ${theme.muted("Validating")} ${theme.primary.bold(task.id)}`);
 
   const result = await runTask(repoPath, task, changes, {
     skipRefusalCheck: true,
@@ -270,17 +477,21 @@ async function runValidateCommand(args: CliArgs): Promise<void> {
 
 async function runRunCommand(args: CliArgs): Promise<void> {
   if (!args.taskPath || !args.repoPath) {
-    console.error("Error: --task and --repo are required for run command");
+    console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task and --repo\n`));
     process.exit(1);
   }
 
   const task = loadTask(args.taskPath);
   const repoPath = path.resolve(args.repoPath);
 
+  console.log("");
+  console.log(`  ${theme.icons.arrow}  ${theme.muted("Running")} ${theme.primary.bold(task.id)}`);
+
   // Optionally load changes
   let changes: Changes | undefined;
   if (args.changesPath) {
     changes = loadChanges(args.changesPath);
+    console.log(`  ${theme.muted("   with")} ${changes.files.length} ${theme.muted("file changes")}`);
   }
 
   const result = await runTask(repoPath, task, changes, {
@@ -298,40 +509,76 @@ async function runRunCommand(args: CliArgs): Promise<void> {
 }
 
 function showHelp(): void {
-  console.log(`
-Nella CLI - Reliability layer for coding agents
-
-USAGE:
-  nella <command> [options]
-
-COMMANDS:
-  check      Pre-flight check: can the task proceed?
-  validate   Validate changes against task constraints
-  run        Full run: check + validate + metrics
-  help       Show this help message
-
-OPTIONS:
-  --task, -t <path>       Path to task.yaml or task directory
-  --repo, -r <path>       Path to repository
-  --changes, -c <path>    Path to changes.json file
-  --skip-validation       Skip running test/lint/compile commands
-  --skip-prerequisites    Skip prerequisite checks
-  --json                  Output as JSON
-  --help, -h              Show help
-
-EXAMPLES:
-  # Check if a task can proceed
-  nella check --task tasks/get-user-by-id --repo ./fixture
-
-  # Validate changes
-  nella validate --task tasks/get-user-by-id --repo ./fixture --changes changes.json
-
-  # Full run with changes
-  nella run --task tasks/get-user-by-id --repo ./fixture --changes changes.json
-
-  # Full run without changes (just check + metrics)
-  nella run --task tasks/get-user-by-id --repo ./fixture --json
-`);
+  console.log(logo);
+  console.log(tagline);
+  
+  // Commands section
+  console.log(`  ${theme.secondary.bold("Commands")}`);
+  console.log("");
+  
+  const cmdTable = new Table({
+    chars: {
+      "top": "", "top-mid": "", "top-left": "", "top-right": "",
+      "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+      "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
+      "right": "", "right-mid": "", "middle": "  ",
+    },
+    style: { "padding-left": 0, "padding-right": 2 },
+  });
+  
+  cmdTable.push(
+    [theme.primary("check"), theme.muted("Pre-flight safety check — can the task proceed?")],
+    [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
+    [theme.primary("run"), theme.muted("Full run: check + validate + compute metrics")],
+    [theme.primary("help"), theme.muted("Show this help message")],
+  );
+  console.log(cmdTable.toString());
+  console.log("");
+  
+  // Options section
+  console.log(`  ${theme.secondary.bold("Options")}`);
+  console.log("");
+  
+  const optTable = new Table({
+    chars: {
+      "top": "", "top-mid": "", "top-left": "", "top-right": "",
+      "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+      "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
+      "right": "", "right-mid": "", "middle": "  ",
+    },
+    style: { "padding-left": 0, "padding-right": 2 },
+  });
+  
+  optTable.push(
+    [theme.accent("--task, -t"), theme.muted("<path>"), "Path to task.yaml or task directory"],
+    [theme.accent("--repo, -r"), theme.muted("<path>"), "Path to repository"],
+    [theme.accent("--changes, -c"), theme.muted("<path>"), "Path to changes.json file"],
+    [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
+    [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
+    [theme.accent("--json"), "", "Output as JSON"],
+    [theme.accent("--help, -h"), "", "Show help"],
+  );
+  console.log(optTable.toString());
+  console.log("");
+  
+  // Examples section
+  console.log(`  ${theme.secondary.bold("Examples")}`);
+  console.log("");
+  console.log(`  ${theme.muted("# Check if a task can proceed")}`);
+  console.log(`  ${theme.dim("$")} nella check -t tasks/get-user-by-id -r ./fixture`);
+  console.log("");
+  console.log(`  ${theme.muted("# Validate changes against constraints")}`);
+  console.log(`  ${theme.dim("$")} nella validate -t tasks/fix-bug -r ./fixture -c changes.json`);
+  console.log("");
+  console.log(`  ${theme.muted("# Full run with JSON output")}`);
+  console.log(`  ${theme.dim("$")} nella run -t tasks/add-feature -r ./fixture -c changes.json --json`);
+  console.log("");
+  
+  // Footer
+  console.log(divider());
+  console.log(`  ${theme.muted("Documentation:")} ${theme.secondary("https://github.com/nella-labs/nella")}`);
+  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.1.0")}`);
+  console.log("");
 }
 
 // =============================================================================

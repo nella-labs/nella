@@ -17,7 +17,7 @@ import { Task, TaskCategory, TaskDifficulty } from "./types";
 export function getBenchmarkInfo() {
   return {
     name: "Nella Benchmark Suite",
-    version: "1.0.0",
+    version: "0.1.0",
     totalScenarios: allScenarios.length,
     categories: [
       "feature",
