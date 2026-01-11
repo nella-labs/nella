@@ -2,19 +2,18 @@
 
 [![npm](https://img.shields.io/npm/v/@nella-labs/core)](https://www.npmjs.com/package/@nella-labs/core)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 
 Reliability layer for coding agents. Enforces behavioral contracts that prevent agents from making unsafe or incorrect changes.
 
-## What It Does
+## Features
 
-Core gates and validates agent changes:
-
-- **Refuses** when prerequisites are missing or risk patterns detected
-- **Validates constraints** (don't touch forbidden files, no forbidden patterns)
-- **Runs validation** (test/lint/compile) and captures proof
-- **Checks scope** (detect scope creep outside declared plan)
-- **Calculates metrics** (scope creep ratio, constraint violations, validation integrity)
-- **Emits structured logs** (JSONL run records)
+- **🛡️ Refusal Detection** — Block execution when prerequisites are missing or risk patterns detected
+- **📋 Constraint Validation** — Ensure agents don't touch forbidden files or introduce forbidden patterns
+- **✅ Validation Execution** — Run test/lint/compile commands and capture proof
+- **🔍 Scope Analysis** — Detect scope creep when agents modify files outside the declared plan
+- **📊 Metrics Calculation** — Compute scope creep ratio, constraint violations, validation integrity
+- **📝 Structured Logging** — Emit JSONL run records for auditing and analysis
 
 ## Installation
 
@@ -22,96 +21,86 @@ Core gates and validates agent changes:
 npm install @nella-labs/core
 ```
 
-## Usage
+**Prerequisites:** Target repository must have `package.json` and `node_modules` installed.
+
+## Quick Start
 
 ```typescript
-import { runTask, check, Task } from '@nella-labs/core';
+import { runTask, check, Task, Changes } from '@nella-labs/core';
 
-// Pre-flight check: can this task proceed?
+// 1. Pre-flight check: should this task be refused?
 const refusal = check(task, '/path/to/repo');
 if (refusal.shouldRefuse) {
-  console.log('Refused:', refusal.reason);
+  console.error('Task refused:', refusal.reason);
   process.exit(1);
 }
 
-// Full validation with changes
-const result = await runTask('/path/to/repo', task, {
+// 2. Validate agent changes
+const changes: Changes = {
   files: [
     { path: 'src/users.ts', operation: 'modify', content: '...' }
   ]
-});
+};
+
+const result = await runTask('/path/to/repo', task, changes);
 
 console.log('Passed:', result.passed);
 console.log('Metrics:', result.metrics);
 ```
 
-## API
+## API Overview
 
-### `runTask(repoPath, task, changes?, options?) → RunResult`
+### Main Functions
 
-Main entrypoint. Orchestrates the full validation flow.
+| Function | Description |
+|----------|-------------|
+| `runTask(repoPath, task, changes?, options?)` | Main entrypoint — full validation flow |
+| `check(task, workspacePath, options?)` | Pre-flight refusal check |
+| `validate(task, workspacePath, changes, options?)` | Validate without full run |
 
-**Parameters:**
-- `repoPath` — Path to the repository
-- `task` — Task definition (parsed from YAML)
-- `changes` — Optional file changes to apply
-- `options.skipValidation` — Skip running test/lint/compile commands
-- `options.skipPrerequisites` — Skip prerequisite checks
+### Validators
 
-**Returns:** `RunResult` with validation status, metrics, and artifacts.
+| Function | Description |
+|----------|-------------|
+| `checkConstraints(files, diff, constraints)` | Check all constraints |
+| `checkScope(files, expected)` | Detect scope creep |
+| `runValidation(config, workDir)` | Run test/lint/compile |
+| `runCommand(command, workDir, timeout?)` | Execute single command |
 
-### `check(task, workspacePath, options?) → RefusalResult`
+### Safety
 
-Pre-flight check. Returns whether the task should be refused.
+| Function | Description |
+|----------|-------------|
+| `shouldRefuse(task, workspacePath, options?)` | Full refusal detection |
+| `detectRiskPatterns(prompt)` | Check for risky patterns |
+| `checkPrerequisites(workspacePath)` | Verify prerequisites |
 
-**Use cases:**
-- Detect risky patterns in task prompts (logging passwords, disabling auth)
-- Check if prerequisites are met (required files exist)
-- Validate task structure before execution
+### Utilities
 
-### `checkConstraints(files, diff, constraints) → ConstraintResult[]`
-
-Validate changes against constraint definitions.
-
-**Checks:**
-- Files not to modify (glob patterns)
-- Forbidden patterns in code (regex)
-
-### `runValidation(config, workDir) → ValidationResult`
-
-Execute test/lint/compile commands and capture output.
-
-### `checkScope(files, expected) → ScopeResult`
-
-Detect scope creep by comparing modified files against expected changes.
-
-**Returns:**
-- `scopeCreep` — Ratio of unexpected file changes
-- `extraFiles` — Files modified that weren't in the expected list
-
-## Types
-
-See [types/](./src/types/) for full type definitions:
-
-| Type | Description |
-|------|-------------|
-| `Task` | Task definition with constraints, validation, expected changes |
-| `Constraint` | Constraint rules (files_not_to_modify, forbidden_patterns) |
-| `RunResult` | Complete run output with pass/fail, metrics, artifacts |
-| `RefusalResult` | Pre-flight check result (shouldRefuse, reason, patterns) |
-| `Metrics` | Computed quality metrics (VI, CVR, SC, etc.) |
-| `ValidationResult` | Test/lint/compile execution results |
+| Export | Description |
+|--------|-------------|
+| `RunLogger` | Structured JSONL logging |
+| `generateRunId()` | Generate unique run ID |
+| `createTempWorkspace(path)` | Create isolated workspace copy |
+| `applyChanges(workspace, changes)` | Apply file changes |
 
 ## Metrics
 
-Nella Core computes these metrics:
-
 | Metric | Description |
 |--------|-------------|
-| `validationIntegrity` | Ratio of validation commands that passed |
-| `constraintViolationRate` | Ratio of constraints violated |
 | `scopeCreep` | Ratio of files modified outside expected scope |
-| `passedAll` | Boolean: all validations and constraints passed |
+| `constraintViolations` | Count of violated constraints |
+| `validationIntegrity` | Ratio of validation commands that passed |
+| `refusalCorrectness` | Whether refusal matched expectation |
+
+## Documentation
+
+📖 **Full documentation available in [docs/core/](../../docs/core/):**
+
+- [API Reference](../../docs/core/api-reference.md) — Complete function documentation
+- [Types Reference](../../docs/core/types.md) — All TypeScript interfaces
+- [Configuration](../../docs/core/configuration.md) — Task YAML schema and options
+- [Examples](../../docs/core/examples.md) — Practical code examples
 
 ## Development
 
@@ -124,4 +113,10 @@ pnpm test       # Run tests
 ## License
 
 [Apache-2.0](../../LICENSE)
+
+## See Also
+
+- [Nella Specification](../../docs/spec.md) — Architecture and design
+- [@nella-labs/cli](../cli/README.md) — Command-line interface
+- [@nella-labs/benchmark](../benchmark/README.md) — Benchmarking tools
 
