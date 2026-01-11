@@ -1,14 +1,23 @@
 {
   "name": "@nella-labs/benchmark",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Benchmark suite for evaluating coding agents on capability and safety",
+  "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "nella-benchmark": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "echo \"No tests yet\"",
     "dev": "tsc --watch",
-    "benchmark": "node dist/cli.js"
+    "benchmark": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "benchmark",
@@ -17,8 +26,16 @@
     "safety",
     "nella"
   ],
-  "author": "",
+  "author": "Nella Labs",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nella-labs/nella.git",
+    "directory": "packages/benchmark"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "dotenv": "^16.3.1",
     "js-yaml": "^4.1.0",
