@@ -57,6 +57,12 @@ import {
   cleanupTempWorkspace,
 } from "./utils/workspace";
 
+import {
+  ContextManager,
+  DependencyDiff,
+  AssumptionConflict,
+} from "./context";
+
 // =============================================================================
 // Options
 // =============================================================================
@@ -79,6 +85,32 @@ export interface RunTaskOptions {
 
   /** Pre-declared plan from agent */
   plan?: Plan;
+
+  /** Enable context tracking (stateful session) */
+  enableContextTracking?: boolean;
+
+  /** Check for dependency changes */
+  checkDependencies?: boolean;
+
+  /** Check for assumption conflicts before applying changes */
+  checkAssumptionConflicts?: boolean;
+}
+
+/**
+ * Extended result with context tracking information
+ */
+export interface RunResultWithContext extends RunResult {
+  /** Dependency changes detected since last run */
+  dependencyChanges?: DependencyDiff | null;
+
+  /** Assumptions that were invalidated by this run */
+  invalidatedAssumptions?: number;
+
+  /** Conflicts with existing assumptions */
+  assumptionConflicts?: AssumptionConflict[];
+
+  /** Context summary */
+  contextSummary?: string;
 }
 
 // =============================================================================
@@ -172,6 +204,7 @@ export async function validate(
  * 5. Checks for scope creep
  * 6. Computes metrics
  * 7. Writes artifacts
+ * 8. (Optional) Tracks context - changes, assumptions, dependencies
  *
  * @param repoPath - Path to the repository
  * @param task - Task definition
@@ -184,7 +217,7 @@ export async function runTask(
   task: Task,
   changes?: Changes,
   options: RunTaskOptions = {}
-): Promise<RunResult> {
+): Promise<RunResult | RunResultWithContext> {
   const runId = generateRunId();
   const timestamp = new Date().toISOString();
   const errors: string[] = [];
@@ -196,6 +229,42 @@ export async function runTask(
   if (!options.skipArtifacts) {
     runDir = createNellaDir(repoPath, runId);
     logger = new RunLogger(runDir);
+  }
+
+  // Initialize context tracking if enabled
+  let contextManager: ContextManager | null = null;
+  let dependencyChanges: DependencyDiff | null = null;
+  let assumptionConflicts: AssumptionConflict[] = [];
+
+  if (options.enableContextTracking) {
+    contextManager = new ContextManager(repoPath);
+
+    // Check for dependency changes
+    if (options.checkDependencies !== false) {
+      dependencyChanges = contextManager.checkDependencies(repoPath);
+      if (dependencyChanges?.hasChanges) {
+        logger?.log("dependency_change", {
+          summary: contextManager.dependencies.summarizeChanges(dependencyChanges.changes),
+          changes: dependencyChanges.changes,
+        });
+      }
+    }
+
+    // Check for assumption conflicts with planned changes
+    if (options.checkAssumptionConflicts !== false && changes) {
+      const plannedFiles = changes.files.map((f) => f.path);
+      assumptionConflicts = contextManager.assumptions.getConflicts(plannedFiles);
+      if (assumptionConflicts.length > 0) {
+        logger?.log("assumption_conflict", {
+          count: assumptionConflicts.length,
+          conflicts: assumptionConflicts.map((c) => ({
+            assumption: c.assumption.description,
+            file: c.plannedFile,
+            severity: c.severity,
+          })),
+        });
+      }
+    }
   }
 
   // Initialize result
@@ -323,7 +392,28 @@ export async function runTask(
         artifacts = writeArtifacts(runDir, diff, metrics);
       }
 
-      return {
+      // Record changes in context (if enabled and passed)
+      let invalidatedAssumptions = 0;
+      if (contextManager && passed) {
+        const result = contextManager.recordRunChanges(
+          runId,
+          changes.files.map((f) => ({
+            file: f.path,
+            operation: f.operation,
+            reason: options.plan?.summary ?? "Agent changes",
+            content: f.content,
+          })),
+          true // checkInvalidations
+        );
+        invalidatedAssumptions = result.invalidated;
+
+        if (invalidatedAssumptions > 0) {
+          logger?.log("assumptions_invalidated", { count: invalidatedAssumptions });
+        }
+      }
+
+      // Build result
+      const baseResult: RunResult = {
         runId,
         timestamp,
         taskId: task.id,
@@ -337,6 +427,19 @@ export async function runTask(
         artifacts,
         errors,
       };
+
+      // Add context info if tracking is enabled
+      if (contextManager) {
+        return {
+          ...baseResult,
+          dependencyChanges,
+          invalidatedAssumptions,
+          assumptionConflicts,
+          contextSummary: contextManager.getSummary(),
+        } as RunResultWithContext;
+      }
+
+      return baseResult;
     } finally {
       cleanupTempWorkspace(tempDir);
     }

@@ -18,7 +18,7 @@
 // =============================================================================
 
 export { runTask, check, validate } from "./run";
-export type { RunTaskOptions } from "./run";
+export type { RunTaskOptions, RunResultWithContext } from "./run";
 
 // =============================================================================
 // Types
@@ -87,3 +87,15 @@ export {
   writeArtifacts,
   cleanupTempWorkspace,
 } from "./utils/workspace";
+
+// =============================================================================
+// Context (Stateful Tracking)
+// =============================================================================
+
+export {
+  SessionStore,
+  DependencyTracker,
+  AssumptionTracker,
+  ChangeLedger,
+  ContextManager,
+} from "./context";
