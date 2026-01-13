@@ -248,7 +248,10 @@ export type LogEntryType =
   | "validation"
   | "scope_check"
   | "metrics"
-  | "error";
+  | "error"
+  | "dependency_change"
+  | "assumption_conflict"
+  | "assumptions_invalidated";
 
 /**
  * A single log entry in the run record
