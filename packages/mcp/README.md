@@ -1,10 +1,14 @@
 # @nella-labs/mcp
 
+[![npm](https://img.shields.io/npm/v/@nella-labs/mcp)](https://www.npmjs.com/package/@nella-labs/mcp)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
+
 MCP (Model Context Protocol) server that exposes Nella's reliability layer to AI agents like Claude.
 
 ## Overview
 
-This package provides an MCP server that allows AI agents to:
+This package provides an MCP server with **12 tools** that allow AI agents to:
 
 - **Validate changes** against task constraints before/after making them
 - **Detect risks** in proposed code modifications
@@ -155,6 +159,15 @@ pnpm dev
 # Start server manually
 pnpm start -- --workspace /path/to/project
 ```
+
+## Documentation
+
+📖 **Full documentation available in [docs/mcp/](../../docs/mcp/):**
+
+- [Tools Reference](../../docs/mcp/tools.md) — Complete reference for all 12 tools
+- [Integration Guide](../../docs/mcp/integration.md) — Setup for Claude Desktop, Claude Code, and custom clients
+- [Context Management](../../docs/mcp/context.md) — Session persistence, assumptions, and dependency tracking
+- [Examples](../../docs/mcp/examples.md) — Practical usage examples and workflows
 
 ## Related Packages
 
