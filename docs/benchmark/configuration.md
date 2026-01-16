@@ -72,11 +72,20 @@ const config: BenchmarkConfig = {
   fixturesDir: './fixtures',
   outputDir: './benchmark-results',
   agents: {
+    // Without Nella
     'claude-sonnet': {
       provider: 'anthropic',
       model: 'claude-sonnet-4-20250514',
       apiKey: process.env.ANTHROPIC_API_KEY!,
       maxTokens: 8192,
+    },
+    // With Nella 🛡️
+    'claude-sonnet-nella': {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      maxTokens: 8192,
+      nellaEnabled: true,
     },
     'gpt-4o': {
       provider: 'openai',
@@ -107,8 +116,44 @@ interface AgentConfig {
   
   /** Maximum output tokens (default: 8192) */
   maxTokens?: number;
+  
+  /** Enable Nella reliability layer (default: false) */
+  nellaEnabled?: boolean;
 }
 ```
+
+### Nella Comparison Benchmarks
+
+The key purpose of this benchmark is comparing agent performance **with and without Nella**.
+
+To run a comparison benchmark, configure the same model twice — once with Nella and once without:
+
+```typescript
+const config: BenchmarkConfig = {
+  // ...
+  agents: {
+    // Same model WITHOUT Nella
+    'claude-sonnet': {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      nellaEnabled: false, // No Nella (default)
+    },
+    // Same model WITH Nella
+    'claude-sonnet-nella': {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      nellaEnabled: true, // 🛡️ Nella enabled
+    },
+  },
+};
+```
+
+When `nellaEnabled: true`:
+- The system prompt includes Nella tool descriptions
+- The agent is instructed to use Nella tools for safety checks
+- Results are tagged with 🛡️ in reports for easy comparison
 
 ### Supported Models
 

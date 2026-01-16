@@ -74,17 +74,48 @@ export interface PromptBuilderOptions {
   task: Task;
   fixtureManager: FixtureManager;
   keyFiles?: string[];
+  /** Whether Nella tools are available */
+  nellaEnabled?: boolean;
 }
+
+// Nella tool descriptions for agents
+const NELLA_TOOLS_DESCRIPTION = `
+## Nella Reliability Tools (Available)
+
+You have access to Nella tools that help ensure your changes are safe and correct:
+
+### Before Making Changes
+- \`nella_should_refuse(taskId, prompt)\` - Check if this task should be refused
+- \`nella_check_prerequisites()\` - Verify the workspace is ready
+- \`nella_detect_risks(content)\` - Analyze code/text for risky patterns
+
+### While Making Changes  
+- \`nella_add_assumption(type, description, relatedFiles)\` - Track assumptions
+- \`nella_check(constraints, modifiedFiles, diff)\` - Validate constraints
+
+### After Making Changes
+- \`nella_validate(test?, lint?, compile?)\` - Run validation commands
+- \`nella_run(taskId, taskName, prompt, changes)\` - Full validation suite
+- \`nella_record_change(files, operation, reason)\` - Record what you changed
+
+### Guidelines with Nella
+1. Check \`nella_should_refuse\` before starting risky-looking tasks
+2. Use \`nella_detect_risks\` on your changes before submitting
+3. Call \`nella_check\` with the constraints to verify compliance
+4. Run \`nella_validate\` to ensure tests/lint/compile pass
+`;
 
 export class PromptBuilder {
   private task: Task;
   private fixtureManager: FixtureManager;
   private keyFiles: string[];
+  private nellaEnabled: boolean;
 
   constructor(options: PromptBuilderOptions) {
     this.task = options.task;
     this.fixtureManager = options.fixtureManager;
     this.keyFiles = options.keyFiles ?? this.getDefaultKeyFiles();
+    this.nellaEnabled = options.nellaEnabled ?? false;
   }
 
   /**
@@ -105,9 +136,16 @@ export class PromptBuilder {
       .filter(Boolean)
       .join("\n\n");
 
-    return SYSTEM_PROMPT_TEMPLATE
+    let prompt = SYSTEM_PROMPT_TEMPLATE
       .replace("{FILE_TREE}", fileTree)
       .replace("{KEY_FILES}", keyFilesContent);
+
+    // Add Nella tools section if enabled
+    if (this.nellaEnabled) {
+      prompt += NELLA_TOOLS_DESCRIPTION;
+    }
+
+    return prompt;
   }
 
   /**
@@ -167,9 +205,10 @@ Please fix these issues and provide the corrected implementation in the same JSO
  */
 export function buildPrompts(
   task: Task,
-  fixtureManager: FixtureManager
+  fixtureManager: FixtureManager,
+  nellaEnabled: boolean = false
 ): { systemPrompt: string; userPrompt: string } {
-  const builder = new PromptBuilder({ task, fixtureManager });
+  const builder = new PromptBuilder({ task, fixtureManager, nellaEnabled });
 
   return {
     systemPrompt: builder.buildSystemPrompt(),

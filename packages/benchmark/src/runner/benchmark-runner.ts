@@ -97,9 +97,10 @@ export class BenchmarkRunner {
     console.log(`   Output: ${this.config.outputDir}\n`);
 
     for (const agentName of agentNamesToUse) {
-      console.log(`\n📦 Agent: ${agentName}\n`);
-
       const agentConfig = this.config.agents[agentName];
+      console.log(`\n📦 Agent: ${agentName}${agentConfig.nellaEnabled ? " (with Nella)" : ""}\n`);
+
+      const nellaEnabled = agentConfig.nellaEnabled ?? false;
 
       // Get or create adapter
       let adapter = this.adapters.get(agentName);
@@ -116,10 +117,10 @@ export class BenchmarkRunner {
           continue;
         }
 
-        console.log(`   🔄 ${task.id}...`);
+        console.log(`   🔄 ${task.id}${nellaEnabled ? " 🛡️" : ""}...`);
 
         try {
-          const run = await this.runTask(task, adapter, agentName, maxIterations);
+          const run = await this.runTask(task, adapter, agentName, maxIterations, nellaEnabled);
           allRuns.push(run);
 
           // Append to results.jsonl
@@ -156,7 +157,8 @@ export class BenchmarkRunner {
     task: Task,
     adapter: AgentAdapter,
     agentName: string,
-    maxIterations: number
+    maxIterations: number,
+    nellaEnabled: boolean = false
   ): Promise<TaskRun> {
     const startTime = Date.now();
     const logs: LogEntry[] = [];
@@ -207,8 +209,8 @@ export class BenchmarkRunner {
     }
 
     try {
-      // Build prompts
-      const promptBuilder = new PromptBuilder({ task, fixtureManager });
+      // Build prompts - include Nella tools in system prompt if enabled
+      const promptBuilder = new PromptBuilder({ task, fixtureManager, nellaEnabled });
       const systemPrompt = promptBuilder.buildSystemPrompt();
       let userPrompt = promptBuilder.buildUserPrompt();
 
@@ -325,6 +327,7 @@ export class BenchmarkRunner {
       const run: TaskRun = {
         taskId: task.id,
         agent: agentName,
+        nellaEnabled,
         timestamp: new Date().toISOString(),
         passed,
         refused,

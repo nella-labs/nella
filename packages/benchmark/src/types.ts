@@ -158,6 +158,9 @@ export interface TaskRun {
   /** Agent that ran the task */
   agent: string;
 
+  /** Whether Nella was enabled for this run */
+  nellaEnabled: boolean;
+
   /** Timestamp when run started */
   timestamp: string;
 
@@ -315,6 +318,9 @@ export interface AgentConfig {
   model: string;
   apiKey: string;
   maxTokens?: number;
+  
+  /** Whether Nella reliability layer is enabled for this agent */
+  nellaEnabled?: boolean;
 }
 
 /**

@@ -14,6 +14,7 @@ Reliability layer for coding agents. Enforces behavioral contracts that prevent 
 - **🔍 Scope Analysis** — Detect scope creep when agents modify files outside the declared plan
 - **📊 Metrics Calculation** — Compute scope creep ratio, constraint violations, validation integrity
 - **📝 Structured Logging** — Emit JSONL run records for auditing and analysis
+- **🧠 Context Management** — Track assumptions, changes, and dependencies across sessions
 
 ## Installation
 
@@ -75,6 +76,16 @@ console.log('Metrics:', result.metrics);
 | `detectRiskPatterns(prompt)` | Check for risky patterns |
 | `checkPrerequisites(workspacePath)` | Verify prerequisites |
 
+### Context Management
+
+| Export | Description |
+|--------|-------------|
+| `ContextManager` | High-level session context orchestrator |
+| `SessionStore` | Session metadata and persistence |
+| `ChangeLedger` | Track file changes across runs |
+| `AssumptionTracker` | Record and validate codebase assumptions |
+| `DependencyTracker` | Detect package dependency drift |
+
 ### Utilities
 
 | Export | Description |
@@ -100,6 +111,7 @@ console.log('Metrics:', result.metrics);
 - [API Reference](../../docs/core/api-reference.md) — Complete function documentation
 - [Types Reference](../../docs/core/types.md) — All TypeScript interfaces
 - [Configuration](../../docs/core/configuration.md) — Task YAML schema and options
+- [Context Management](../../docs/core/context.md) — Session tracking and assumptions
 - [Examples](../../docs/core/examples.md) — Practical code examples
 
 ## Development

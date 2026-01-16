@@ -34,11 +34,32 @@ export function generateSummaryMarkdown(options: MarkdownGeneratorOptions): stri
   const agents = Array.from(agentRuns.keys()).sort();
   const taskIds = tasks.map((t) => t.id);
 
+  // Check if we have both Nella and non-Nella runs
+  const hasNellaRuns = runs.some((r) => r.nellaEnabled);
+  const hasNonNellaRuns = runs.some((r) => !r.nellaEnabled);
+  const isMixedBenchmark = hasNellaRuns && hasNonNellaRuns;
+
   let markdown = `# Benchmark Results — ${runDate}\n\n`;
 
-  // Task results table
+  // Show Nella comparison info if applicable
+  if (isMixedBenchmark) {
+    const nellaRuns = runs.filter((r) => r.nellaEnabled);
+    const nonNellaRuns = runs.filter((r) => !r.nellaEnabled);
+    markdown += `> 🛡️ **Nella Comparison Benchmark**: Testing agent performance with and without Nella reliability layer.\n`;
+    markdown += `> - Runs with Nella: ${nellaRuns.length}\n`;
+    markdown += `> - Runs without Nella: ${nonNellaRuns.length}\n\n`;
+  } else if (hasNellaRuns) {
+    markdown += `> 🛡️ All runs in this benchmark used **Nella reliability layer**.\n\n`;
+  }
+
+  // Task results table - show Nella status in agent column header
   markdown += `## Task Results\n\n`;
-  markdown += `| Task | ${agents.join(" | ")} |\n`;
+  const agentHeaders = agents.map((agent) => {
+    const agentTaskRuns = agentRuns.get(agent) ?? [];
+    const nellaEnabled = agentTaskRuns[0]?.nellaEnabled ?? false;
+    return nellaEnabled ? `${agent} 🛡️` : agent;
+  });
+  markdown += `| Task | ${agentHeaders.join(" | ")} |\n`;
   markdown += `|------|${agents.map(() => "------").join("|")}|\n`;
 
   for (const taskId of taskIds) {
@@ -67,15 +88,17 @@ export function generateSummaryMarkdown(options: MarkdownGeneratorOptions): stri
 
   // Metrics summary table
   markdown += `\n## Metrics Summary\n\n`;
-  markdown += `| Agent | Pass Rate | Avg TTG | Refusal Rate | Avg CVR | Total Cost |\n`;
-  markdown += `|-------|-----------|---------|--------------|---------|------------|\n`;
+  markdown += `| Agent | Nella | Pass Rate | Avg TTG | Refusal Rate | Avg CVR | Total Cost |\n`;
+  markdown += `|-------|-------|-----------|---------|--------------|---------|------------|\n`;
 
   for (const agent of agents) {
     const agentTaskRuns = agentRuns.get(agent) ?? [];
     const metrics = agentTaskRuns.map((r) => r.metrics);
     const agg = aggregateAgentMetrics(metrics);
+    const nellaEnabled = agentTaskRuns[0]?.nellaEnabled ?? false;
 
     markdown += `| ${agent} `;
+    markdown += `| ${nellaEnabled ? "🛡️ Yes" : "No"} `;
     markdown += `| ${(agg.passRate * 100).toFixed(0)}% `;
     markdown += `| ${agg.avgTtg.toFixed(0)}s `;
     markdown += `| ${(agg.refusalRate * 100).toFixed(0)}% `;
