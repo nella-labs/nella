@@ -1,25 +1,36 @@
 {
-  "name": "@nella-labs/mcp",
+  "name": "nella",
   "version": "0.2.0",
-  "description": "Nella MCP Server - Model Context Protocol interface for AI agents",
+  "description": "Nella - reliability layer for coding agents (CLI + MCP Server)",
   "type": "commonjs",
   "bin": {
-    "nella-mcp": "dist/server.js"
+    "nella": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "require": "./dist/mcp/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/server.js",
+    "start:mcp": "node dist/mcp/server.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
     "coding-agent",
     "ai",
+    "cli",
     "mcp",
     "model-context-protocol",
     "reliability",
@@ -30,16 +41,24 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/nella-labs/nella.git",
-    "directory": "packages/mcp"
+    "directory": "packages/nella"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
     "@nella-labs/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "chalk": "^4.1.2",
+    "cli-spinners": "^3.3.0",
+    "cli-table3": "^0.6.5",
+    "figures": "^3.2.0",
+    "js-yaml": "^4.1.0",
+    "ora": "^5.4.1"
   },
   "devDependencies": {
+    "@types/figures": "^3.0.3",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "typescript": "^5.3.0"
   }
