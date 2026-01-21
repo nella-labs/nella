@@ -1,5 +1,5 @@
 {
-  "name": "nella",
+  "name": "@nella-labs/nella",
   "version": "0.2.0",
   "description": "Nella - reliability layer for coding agents (CLI + MCP Server)",
   "type": "commonjs",

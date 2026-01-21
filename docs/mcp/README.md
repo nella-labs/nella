@@ -4,7 +4,7 @@ The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude 
 
 ## Overview
 
-The `@nella-labs/mcp` package provides an MCP server that allows AI agents to:
+The `@nella-labs/nella` package provides both a CLI and an MCP server that allows AI agents to:
 
 - **Validate changes** against constraints before/after making them
 - **Detect risks** in proposed code modifications
@@ -25,9 +25,9 @@ The `@nella-labs/mcp` package provides an MCP server that allows AI agents to:
 ### 1. Install
 
 ```bash
-npm install @nella-labs/mcp
-# or
-pnpm add @nella-labs/mcp
+npm install -g @nella-labs/nella
+# or use npx without installing
+npx @nella-labs/nella mcp --help
 ```
 
 ### 2. Configure Claude Desktop
@@ -39,7 +39,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/mcp", "--workspace", "/path/to/project"]
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
