@@ -18,8 +18,8 @@ Nella is a framework that sits between AI coding agents and your codebase. It en
 
 | Package | Description | npm |
 |---------|-------------|-----|
+| [@nella-labs/nella](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@nella-labs/nella)](https://www.npmjs.com/package/@nella-labs/nella) |
 | [@nella-labs/core](./packages/core) | Core validation library | [![npm](https://img.shields.io/npm/v/@nella-labs/core)](https://www.npmjs.com/package/@nella-labs/core) |
-| [@nella-labs/cli](./packages/cli) | Command-line interface | [![npm](https://img.shields.io/npm/v/@nella-labs/cli)](https://www.npmjs.com/package/@nella-labs/cli) |
 | [@nella-labs/benchmark](./packages/benchmark) | Agent evaluation suite | [![npm](https://img.shields.io/npm/v/@nella-labs/benchmark)](https://www.npmjs.com/package/@nella-labs/benchmark) |
 
 ## Quick Start
@@ -28,7 +28,7 @@ Nella is a framework that sits between AI coding agents and your codebase. It en
 
 ```bash
 # Install globally
-npm install -g @nella-labs/cli
+npm install -g @nella-labs/nella
 
 # Check if a task can proceed (pre-flight)
 nella check --task tasks/get-user-by-id --repo ./my-project
