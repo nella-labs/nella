@@ -2,13 +2,13 @@
  * Command line argument parsing for Nella MCP server
  */
 
-export interface ParsedArgs {
+export interface ParsedMcpArgs {
   workspace?: string;
   help: boolean;
 }
 
-export function parseArgs(argv: string[]): ParsedArgs {
-  const result: ParsedArgs = {
+export function parseWorkspaceArg(argv: string[]): ParsedMcpArgs {
+  const result: ParsedMcpArgs = {
     help: false,
   };
 

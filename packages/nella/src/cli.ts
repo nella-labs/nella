@@ -7,6 +7,7 @@
  *   nella check   - Pre-flight check: can the task proceed?
  *   nella validate - Validate changes against task constraints
  *   nella run     - Full run: check + validate + metrics
+ *   nella mcp     - Start MCP server for AI agent integration
  */
 
 import * as fs from "fs";
@@ -23,6 +24,7 @@ import {
   Changes,
   FileChange,
 } from "@nella-labs/core";
+import { startMcpServer } from "./mcp/server";
 
 // =============================================================================
 // Theme & Styling
@@ -97,13 +99,15 @@ function divider(char = "─"): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "check" | "validate" | "run" | "help";
+  command: "check" | "validate" | "run" | "mcp" | "help";
   taskPath?: string;
   repoPath?: string;
   changesPath?: string;
   skipValidation?: boolean;
   skipPrerequisites?: boolean;
   output?: "json" | "pretty";
+  // MCP-specific args
+  workspace?: string;
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -117,7 +121,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "check" || arg === "validate" || arg === "run" || arg === "help") {
+    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "help") {
       result.command = arg;
       i++;
       continue;
@@ -138,6 +142,10 @@ function parseArgs(args: string[]): CliArgs {
       result.output = "json";
     } else if (arg === "--help" || arg === "-h") {
       result.command = "help";
+    } else if (arg === "--workspace" || arg === "-w") {
+      result.workspace = args[++i];
+    } else if (arg.startsWith("--workspace=")) {
+      result.workspace = arg.slice("--workspace=".length);
     }
 
     i++;
@@ -530,6 +538,7 @@ function showHelp(): void {
     [theme.primary("check"), theme.muted("Pre-flight safety check — can the task proceed?")],
     [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
     [theme.primary("run"), theme.muted("Full run: check + validate + compute metrics")],
+    [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
   console.log(cmdTable.toString());
@@ -553,6 +562,7 @@ function showHelp(): void {
     [theme.accent("--task, -t"), theme.muted("<path>"), "Path to task.yaml or task directory"],
     [theme.accent("--repo, -r"), theme.muted("<path>"), "Path to repository"],
     [theme.accent("--changes, -c"), theme.muted("<path>"), "Path to changes.json file"],
+    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (for mcp command)"],
     [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
@@ -572,6 +582,9 @@ function showHelp(): void {
   console.log("");
   console.log(`  ${theme.muted("# Full run with JSON output")}`);
   console.log(`  ${theme.dim("$")} nella run -t tasks/add-feature -r ./fixture -c changes.json --json`);
+  console.log("");
+  console.log(`  ${theme.muted("# Start MCP server for AI agent integration")}`);
+  console.log(`  ${theme.dim("$")} nella mcp --workspace /path/to/project`);
   console.log("");
   
   // Footer
@@ -597,6 +610,9 @@ async function main(): Promise<void> {
       break;
     case "run":
       await runRunCommand(args);
+      break;
+    case "mcp":
+      await startMcpServer({ workspace: args.workspace });
       break;
     case "help":
     default:

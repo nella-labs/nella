@@ -6,8 +6,8 @@
  * to AI agents like Claude.
  *
  * Usage:
- *   nella-mcp --workspace /path/to/project
- *   nella-mcp -w /path/to/project
+ *   nella mcp --workspace /path/to/project
+ *   nella mcp -w /path/to/project
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -19,7 +19,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ContextManager } from "@nella-labs/core";
-import { parseArgs } from "./utils/args";
+import { parseWorkspaceArg } from "./utils/args";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
@@ -37,32 +37,29 @@ export interface ServerContext {
 // Main
 // =============================================================================
 
-async function main(): Promise<void> {
-  // Parse command line arguments
-  const args = parseArgs(process.argv.slice(2));
-
+export async function startMcpServer(args: { workspace?: string; help?: boolean }): Promise<void> {
   if (args.help) {
     console.error(`
 Nella MCP Server - Reliability layer for AI coding agents
 
 Usage:
-  nella-mcp --workspace <path>  Start server with workspace path
-  nella-mcp -w <path>           Short form
-  nella-mcp --help              Show this help
+  nella mcp --workspace <path>  Start server with workspace path
+  nella mcp -w <path>           Short form
+  nella mcp --help              Show this help
 
 Options:
   -w, --workspace <path>   Path to the workspace/project directory (required)
   -h, --help               Show help message
 
 Example:
-  nella-mcp --workspace /home/user/my-project
+  nella mcp --workspace /home/user/my-project
 `);
     process.exit(0);
   }
 
   if (!args.workspace) {
     console.error("Error: --workspace (-w) is required");
-    console.error("Usage: nella-mcp --workspace /path/to/project");
+    console.error("Usage: nella mcp --workspace /path/to/project");
     process.exit(1);
   }
 
@@ -101,21 +98,21 @@ Example:
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: toolArgs } = request.params;
 
     try {
       // Try each tool category
-      const validationResult = await handleValidationTool(name, args || {}, serverContext);
+      const validationResult = await handleValidationTool(name, toolArgs || {}, serverContext);
       if (validationResult !== null) {
         return validationResult as CallToolResult;
       }
 
-      const safetyResult = await handleSafetyTool(name, args || {}, serverContext);
+      const safetyResult = await handleSafetyTool(name, toolArgs || {}, serverContext);
       if (safetyResult !== null) {
         return safetyResult as CallToolResult;
       }
 
-      const contextResult = await handleContextTool(name, args || {}, serverContext);
+      const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
       if (contextResult !== null) {
         return contextResult as CallToolResult;
       }
@@ -152,7 +149,11 @@ Example:
   console.error(`Nella MCP server started for workspace: ${args.workspace}`);
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+// If run directly (for backward compatibility or standalone usage)
+if (require.main === module) {
+  const args = parseWorkspaceArg(process.argv.slice(2));
+  startMcpServer(args).catch((error) => {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  });
+}
