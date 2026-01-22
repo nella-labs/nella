@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete command reference for `@nella-labs/cli`.
+Complete command reference for `@nella-labs/nella`.
 
 ## Table of Contents
 
@@ -8,6 +8,7 @@ Complete command reference for `@nella-labs/cli`.
   - [nella check](#nella-check)
   - [nella validate](#nella-validate)
   - [nella run](#nella-run)
+  - [nella mcp](#nella-mcp)
 - [Options](#options)
 - [Task Loading](#task-loading)
 - [Changes File Format](#changes-file-format)
@@ -130,11 +131,63 @@ nella run -t tasks/get-user-by-id -r ./project
 
 ---
 
+### `nella mcp`
+
+Start an MCP (Model Context Protocol) server for AI agent integration.
+
+```bash
+nella mcp [--workspace <path>]
+```
+
+**Purpose:** Run Nella as an MCP server that AI agents (Claude, GPT, etc.) can connect to for validation capabilities.
+
+**Example:**
+```bash
+# Start MCP server for current directory
+nella mcp
+
+# Start MCP server for specific workspace
+nella mcp --workspace /path/to/project
+nella mcp -w ./my-project
+```
+
+**MCP Tools Exposed:**
+- `nella_check` — Pre-flight task validation
+- `nella_validate` — Validate agent changes
+- `nella_run` — Full validation run
+- `nella_detect_risks` — Detect dangerous patterns in prompts
+- `nella_should_refuse` — Check if task should be refused
+- `nella_check_prerequisites` — Verify project setup
+- `nella_get_context` — Get current validation context
+- `nella_add_assumption` — Add context assumption
+- `nella_check_assumptions` — Validate assumptions
+- `nella_get_file_history` — Track file modifications
+- `nella_check_dependencies` — Verify dependencies
+- `nella_record_change` — Record a file change
+
+**Claude Desktop Integration:**
+
+Add to `~/.config/Claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/project"]
+    }
+  }
+}
+```
+
+---
+
 ## Options
 
 | Option | Short | Description | Commands |
 |--------|-------|-------------|----------|
-| `--task <path>` | `-t` | Path to task.yaml or task directory | All |
+| `--task <path>` | `-t` | Path to task.yaml or task directory | check, validate, run |
+| `--workspace <path>` | `-w` | Path to workspace/project | mcp |
 | `--repo <path>` | `-r` | Path to repository | All |
 | `--changes <path>` | `-c` | Path to changes.json file | validate, run |
 | `--skip-validation` | | Skip test/lint/compile commands | validate, run |
@@ -297,9 +350,10 @@ fi
 
 ## Programmatic Usage
 
-The CLI package re-exports everything from `@nella-labs/core`:
+The package re-exports everything from `@nella-labs/core` and includes the MCP server:
 
 ```typescript
+// Core validation functions
 import {
   runTask,
   check,
@@ -307,13 +361,16 @@ import {
   checkConstraints,
   detectRiskPatterns,
   // ... all core exports
-} from '@nella-labs/cli';
+} from '@nella-labs/nella';
+
+// MCP server (for programmatic use)
+import { startMcpServer } from '@nella-labs/nella/mcp';
 ```
 
 ### Example: Custom CLI wrapper
 
 ```typescript
-import { runTask, check, Task, Changes } from '@nella-labs/cli';
+import { runTask, check, Task, Changes } from '@nella-labs/nella';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
