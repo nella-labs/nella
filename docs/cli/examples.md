@@ -1,11 +1,12 @@
 # CLI Examples
 
-Practical examples for using `@nella-labs/cli`.
+Practical examples for using `@nella-labs/nella`.
 
 ## Table of Contents
 
 - [Basic Usage](#basic-usage)
 - [CI/CD Integration](#cicd-integration)
+- [MCP Integration](#mcp-integration)
 - [Batch Processing](#batch-processing)
 - [Custom Workflows](#custom-workflows)
 
@@ -71,7 +72,7 @@ jobs:
         run: npm ci
       
       - name: Install Nella CLI
-        run: npm install -g @nella-labs/cli
+        run: npm install -g @nella-labs/nella
       
       - name: Pre-flight check
         run: nella check -t ./task.yaml -r .
@@ -103,7 +104,7 @@ validate-changes:
   image: node:20
   script:
     - npm ci
-    - npm install -g @nella-labs/cli
+    - npm install -g @nella-labs/nella
     - nella check -t ./task.yaml -r . --json
     - nella validate -t ./task.yaml -r . -c changes.json
   artifacts:
@@ -129,6 +130,76 @@ if [ -f "task.yaml" ]; then
   
   echo "✅ Pre-flight check passed"
 fi
+```
+
+---
+
+## MCP Integration
+
+### Claude Desktop Setup
+
+Add Nella as an MCP server in Claude Desktop for AI-assisted validation:
+
+**Windows** (`%APPDATA%\Claude\claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "C:/path/to/your/project"]
+    }
+  }
+}
+```
+
+**macOS/Linux** (`~/.config/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+### Multiple Projects
+
+Configure multiple workspaces for different projects:
+
+```json
+{
+  "mcpServers": {
+    "nella-project-a": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "-w", "/projects/project-a"]
+    },
+    "nella-project-b": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "-w", "/projects/project-b"]
+    }
+  }
+}
+```
+
+### Using MCP Tools in AI Conversations
+
+Once configured, Claude can use Nella tools directly:
+
+```
+User: Check if the get-user-by-id task is safe to proceed
+
+Claude: [Uses nella_check tool]
+The task is safe to proceed. No risk patterns detected and all prerequisites are met.
+
+User: Validate my changes against the task constraints
+
+Claude: [Uses nella_validate tool]  
+Validation passed:
+- ✓ no-auth-changes constraint satisfied
+- ✓ All tests passing
+- ✓ No scope creep detected
 ```
 
 ---

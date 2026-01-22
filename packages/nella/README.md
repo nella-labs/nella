@@ -1,77 +1,241 @@
-# @nella-labs/cli
+# @nella-labs/nella
 
-[![npm](https://img.shields.io/npm/v/@nella-labs/cli)](https://www.npmjs.com/package/@nella-labs/cli)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+> Unified CLI and MCP Server for AI agent validation
 
-Command-line interface for Nella — reliability layer for coding agents.
+[![npm version](https://img.shields.io/npm/v/@nella-labs/nella.svg)](https://www.npmjs.com/package/@nella-labs/nella)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Nella is a complete validation toolkit for AI coding agents. It provides both a CLI for direct use and an MCP (Model Context Protocol) server for integration with AI assistants like Claude.
 
 ## Installation
 
 ```bash
-npm install -g @nella-labs/cli
+# Global installation
+npm install -g @nella-labs/nella
+
+# Or use with npx
+npx @nella-labs/nella --help
+
+# As a dev dependency
+npm install -D @nella-labs/nella
+```
+
+## Quick Start
+
+### CLI Usage
+
+```bash
+# Pre-flight check before running an agent
+nella check -t ./tasks/my-task -r ./project
+
+# Validate agent changes
+nella validate -t ./tasks/my-task -r ./project -c changes.json
+
+# Full validation run with metrics
+nella run -t ./tasks/my-task -r ./project -c changes.json
+```
+
+### MCP Server (for Claude Desktop)
+
+```bash
+# Start MCP server
+nella mcp --workspace /path/to/project
 ```
 
 ## Commands
 
-| Command | Description | Exit Codes |
-|---------|-------------|------------|
-| `nella check` | Pre-flight safety check | 0 = proceed, 1 = refuse |
-| `nella validate` | Validate changes against constraints | 0 = pass, 1 = fail |
-| `nella run` | Full run: check + validate + metrics | 0 = pass, 1 = fail |
+### `nella check`
 
-## Quick Start
+Pre-flight check to determine if a task can proceed.
 
 ```bash
-# Check if task is safe to proceed
-nella check -t tasks/get-user-by-id -r ./my-project
-
-# Validate changes against constraints
-nella validate -t tasks/get-user-by-id -r ./my-project -c changes.json
-
-# Full run with JSON output
-nella run -t tasks/get-user-by-id -r ./my-project -c changes.json --json
+nella check --task <path> --repo <path> [options]
 ```
 
-## Options
+Detects:
+- Risk patterns (dangerous requests like logging passwords)
+- Missing prerequisites (package.json, node_modules)
+- Invalid task structure
+
+### `nella validate`
+
+Validate agent changes against task constraints.
+
+```bash
+nella validate --task <path> --repo <path> --changes <path> [options]
+```
+
+Validates:
+- Constraint violations (forbidden files, patterns)
+- Scope creep (unexpected file modifications)
+- Test/lint/compile commands (unless `--skip-validation`)
+
+### `nella run`
+
+Full validation run combining check + validate + metrics.
+
+```bash
+nella run --task <path> --repo <path> [--changes <path>] [options]
+```
+
+Includes:
+- All checks from `check` and `validate`
+- Metrics calculation
+- Artifact generation in `.nella/runs/`
+
+### `nella mcp`
+
+Start an MCP server for AI agent integration.
+
+```bash
+nella mcp [--workspace <path>]
+```
+
+## MCP Integration
+
+### Claude Desktop Setup
+
+Add to your Claude Desktop config:
+
+**Windows** (`%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "C:/path/to/project"]
+    }
+  }
+}
+```
+
+**macOS/Linux** (`~/.config/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/project"]
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `nella_check` | Pre-flight task validation |
+| `nella_validate` | Validate agent changes against constraints |
+| `nella_run` | Full validation run with metrics |
+| `nella_detect_risks` | Detect dangerous patterns in prompts |
+| `nella_should_refuse` | Check if a task should be refused |
+| `nella_check_prerequisites` | Verify project prerequisites |
+| `nella_get_context` | Get current validation context |
+| `nella_add_assumption` | Add a context assumption |
+| `nella_check_assumptions` | Validate all assumptions |
+| `nella_get_file_history` | Track file modification history |
+| `nella_check_dependencies` | Verify project dependencies |
+| `nella_record_change` | Record a file change for validation |
+
+## CLI Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--task` | `-t` | Path to task.yaml or task directory |
-| `--repo` | `-r` | Path to repository |
-| `--changes` | `-c` | Path to changes.json file |
-| `--skip-validation` | | Skip running test/lint/compile |
-| `--skip-prerequisites` | | Skip prerequisite checks |
+| `--task <path>` | `-t` | Path to task.yaml or task directory |
+| `--repo <path>` | `-r` | Path to repository |
+| `--changes <path>` | `-c` | Path to changes.json file |
+| `--workspace <path>` | `-w` | Path to workspace (for `mcp` command) |
+| `--skip-validation` | | Skip test/lint/compile commands |
+| `--skip-prerequisites` | | Skip package.json/node_modules checks |
 | `--json` | | Output as JSON |
 | `--help` | `-h` | Show help |
 
-## What It Checks
+## Programmatic Usage
 
-### `nella check`
-- Risk patterns in task prompt (logging passwords, disabling auth, etc.)
-- Prerequisites (required files exist)
-- Task structure validity
+```typescript
+// Core validation functions
+import {
+  runTask,
+  check,
+  validate,
+  checkConstraints,
+  detectRiskPatterns,
+} from '@nella-labs/nella';
 
-### `nella validate`
-- Constraint violations (forbidden files, patterns)
-- Scope creep (files modified outside expected scope)
-- Validation commands (test/lint/compile)
+// MCP server
+import { startMcpServer } from '@nella-labs/nella/mcp';
 
-### `nella run`
-Returns a complete `RunResult` with pass/fail status, constraint violations, validation results, scope analysis, and computed metrics.
+// Example: Run validation programmatically
+const result = await runTask(repoPath, task, changes);
+console.log(result.passed ? 'Validation passed!' : 'Validation failed');
+```
 
-## Documentation
+## Task YAML Format
 
-| Document | Description |
-|----------|-------------|
-| [Commands Reference](../../docs/cli/commands.md) | Detailed command documentation |
-| [Examples](../../docs/cli/examples.md) | CI/CD integration, batch processing |
-| [Core API](../../docs/core/api-reference.md) | Underlying core library |
+```yaml
+id: my-task
+name: "Task description"
+prompt: |
+  Your task prompt here...
+category: feature  # feature | bug-fix | refactor | edge-case | refusal
+difficulty: easy   # easy | medium | hard
+fixture: my-project
+
+constraints:
+  - id: no-auth-changes
+    description: "Do not modify authentication"
+    files_not_to_modify:
+      - "src/auth/**"
+    forbidden_patterns:
+      - "console\\.log"
+
+validation:
+  test: "npm run test"
+  lint: "npm run lint"
+  compile: "npm run check:types"
+
+expected:
+  files_to_modify:
+    - "src/routes/users.ts"
+```
+
+## Changes JSON Format
+
+```json
+{
+  "files": [
+    {
+      "path": "src/users.ts",
+      "operation": "modify",
+      "content": "// Full file content..."
+    }
+  ]
+}
+```
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success / OK to proceed / Validation passed |
+| `1` | Failure / Should refuse / Validation failed |
 
 ## Related Packages
 
-- [`@nella-labs/core`](../core) — Core reliability primitives
-- [`@nella-labs/benchmark`](../benchmark) — Benchmark suite
+- [`@nella-labs/core`](https://www.npmjs.com/package/@nella-labs/core) - Core validation library
+- [`@nella-labs/benchmark`](https://www.npmjs.com/package/@nella-labs/benchmark) - Benchmarking tools
+
+## Documentation
+
+Full documentation available at:
+- [CLI Commands](../../docs/cli/commands.md)
+- [CLI Examples](../../docs/cli/examples.md)
+- [MCP Integration](../../docs/mcp/integration.md)
+- [Core API Reference](../../docs/core/api-reference.md)
 
 ## License
 
-[Apache-2.0](../../LICENSE)
+MIT © [Nella Labs](https://github.com/nella-labs)
