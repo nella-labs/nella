@@ -11,7 +11,7 @@ import {
   checkPrerequisites,
   type Task,
   type PrerequisiteCheck,
-} from "@nella-labs/core";
+} from "@usenella/core";
 import type { ServerContext } from "../server";
 
 // =============================================================================

@@ -12,9 +12,11 @@ import type {
   WorkspaceConfig,
   WorkspaceEvent,
 } from "./types";
+import { DEFAULT_WORKSPACE_CONFIG } from "./types";
 import { WorkspaceRegistry, getWorkspaceRegistry } from "./registry";
-import { IndexManager } from "../indexing";
-import type { IndexConfig, SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
+import { IndexManager, DEFAULT_INDEX_CONFIG } from "../indexing";
+import type { IndexManagerConfig } from "../indexing";
+import type { SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
 
 // =============================================================================
 // Types
@@ -174,28 +176,38 @@ export class Workspace {
    */
   async getIndexManager(): Promise<IndexManager> {
     if (!this.indexManager) {
-      const config: Partial<IndexConfig> = {};
+      const workspaceConfig = this.entry.config;
 
-      // Use workspace config if available
-      if (this.entry.config) {
-        config.embeddingProvider = this.entry.config.embedder?.provider || "voyage";
-        config.embeddingModel = this.entry.config.embedder?.model || "voyage-code-2";
-        config.vectorWeight = this.entry.config.search?.vectorWeight || 0.4;
-        config.lexicalWeight = this.entry.config.search?.lexicalWeight || 0.6;
-      }
+      const config: IndexManagerConfig = {
+        ...DEFAULT_INDEX_CONFIG,
+        workspaceId: this.entry.id,
+        workspacePath: this.entry.path,
+        storagePath: this.indexPath,
+        include: workspaceConfig?.include ?? DEFAULT_INDEX_CONFIG.include,
+        exclude: workspaceConfig?.exclude ?? DEFAULT_INDEX_CONFIG.exclude,
+        embedder: {
+          ...DEFAULT_INDEX_CONFIG.embedder,
+          ...workspaceConfig?.embedder,
+        },
+        chunking: {
+          ...DEFAULT_INDEX_CONFIG.chunking,
+          ...workspaceConfig?.chunking,
+        },
+        search: {
+          ...DEFAULT_INDEX_CONFIG.search,
+          ...workspaceConfig?.search,
+        },
+      };
 
-      this.indexManager = new IndexManager(this.entry.path, config);
-
-      // Load persisted index
-      await this.indexManager.load(this.indexPath);
+      this.indexManager = new IndexManager(config);
 
       // Forward events
       this.indexManager.onEvent((event) => {
-        if (event.type === "indexing:complete") {
+        if (event.type === "index:complete") {
           this.registry.updateIndexStatus(this.entry.id, "ready", {
-            filesIndexed: event.stats?.filesIndexed || 0,
-            chunksCount: event.stats?.chunksCount || 0,
-            totalTokens: event.stats?.totalTokens || 0,
+            filesIndexed: event.stats.filesIndexed,
+            chunksCount: event.stats.chunksCount,
+            totalTokens: event.stats.totalTokens,
           });
         }
       });
@@ -213,21 +225,22 @@ export class Workspace {
 
     try {
       const manager = await this.getIndexManager();
-      await manager.indexWorkspace({
-        include: this.entry.config?.include || ["**/*.ts", "**/*.js", "**/*.py"],
-        exclude: this.entry.config?.exclude || ["**/node_modules/**", "**/dist/**"],
-        incremental: options?.incremental ?? true,
+      await manager.index({
+        force: options?.incremental === false,
       });
 
-      // Persist to workspace storage
-      await manager.save(this.indexPath);
-
       // Update status through registry
-      const stats = manager.getStats();
+      const status = manager.getStatus();
+      const stats = status.stats || {
+        filesIndexed: 0,
+        chunksCount: 0,
+        totalTokens: 0,
+        embeddingsCount: 0,
+      };
       this.registry.updateIndexStatus(this.entry.id, "ready", {
         filesIndexed: stats.filesIndexed,
         chunksCount: stats.chunksCount,
-        totalTokens: stats.tokensIndexed,
+        totalTokens: stats.totalTokens,
       });
 
       // Update local entry
@@ -428,8 +441,31 @@ export class Workspace {
    * Update workspace configuration
    */
   updateConfig(config: Partial<WorkspaceConfig>): void {
-    const currentConfig = this.entry.config || {};
-    const newConfig = { ...currentConfig, ...config };
+    const currentConfig: WorkspaceConfig = {
+      ...DEFAULT_WORKSPACE_CONFIG,
+      ...this.entry.config,
+      embedder: {
+        ...DEFAULT_WORKSPACE_CONFIG.embedder,
+        ...this.entry.config?.embedder,
+      },
+      search: {
+        ...DEFAULT_WORKSPACE_CONFIG.search,
+        ...this.entry.config?.search,
+      },
+    };
+    const newConfig: WorkspaceConfig = {
+      ...currentConfig,
+      ...config,
+      embedder: {
+        ...currentConfig.embedder,
+        ...config.embedder,
+      },
+      search: {
+        ...currentConfig.search,
+        ...config.search,
+      },
+      chunking: config.chunking ?? currentConfig.chunking,
+    };
 
     this.registry.update(this.entry.id, { config: newConfig });
     this.entry = this.registry.get(this.entry.id)!;
@@ -467,12 +503,22 @@ export class Workspace {
     };
   }> {
     const manager = await this.getIndexManager();
-    const stats = manager.getStats();
+    const status = manager.getStatus();
+    const stats = status.stats || {
+      filesIndexed: 0,
+      chunksCount: 0,
+      totalTokens: 0,
+      embeddingsCount: 0,
+    };
 
     return {
       entry: { ...this.entry },
       context: this.getContext(),
-      indexStats: stats,
+      indexStats: {
+        filesIndexed: stats.filesIndexed,
+        chunksCount: stats.chunksCount,
+        tokensIndexed: stats.totalTokens,
+      },
     };
   }
 

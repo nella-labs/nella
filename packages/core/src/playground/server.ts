@@ -511,8 +511,8 @@ export class PlaygroundServer {
     if (usage) {
       this.sessionManager.updateState(session.id, {
         rateLimitStatus: {
-          minute: usage.minute,
-          hour: usage.hour,
+          minute: { used: usage.minute.count, limit: usage.minute.limit },
+          hour: { used: usage.hour.count, limit: usage.hour.limit },
         },
       });
 
