@@ -7,6 +7,7 @@ Complete type definitions for `@nella-labs/core`.
 - [Task Types](#task-types)
 - [Result Types](#result-types)
 - [Agent Types](#agent-types)
+- [Context Types](#context-types)
 
 ---
 
@@ -149,6 +150,7 @@ interface RawTaskYaml {
 ```typescript
 import type {
   RunResult,
+  RunResultWithContext,
   CommandResult,
   ValidationResult,
   ConstraintResult,
@@ -158,6 +160,8 @@ import type {
   Artifacts,
   Plan,
   PlanStep,
+  AssumptionConflict,
+  DependencyDiff,
   LogEntry,
   LogEntryType
 } from '@nella-labs/core';
@@ -181,6 +185,19 @@ interface RunResult {
   passed: boolean;                 // Overall pass/fail
   artifacts: Artifacts | null;     // Generated artifact paths
   errors: string[];                // Any errors that occurred
+}
+```
+
+### `RunResultWithContext`
+
+Extended run result when context tracking is enabled.
+
+```typescript
+interface RunResultWithContext extends RunResult {
+  dependencyChanges?: DependencyDiff | null;
+  invalidatedAssumptions?: number;
+  assumptionConflicts?: AssumptionConflict[];
+  contextSummary?: string;
 }
 ```
 
@@ -324,7 +341,10 @@ type LogEntryType =
   | 'validation'
   | 'scope_check'
   | 'metrics'
-  | 'error';
+  | 'error'
+  | 'dependency_change'
+  | 'assumption_conflict'
+  | 'assumptions_invalidated';
 ```
 
 ---
@@ -381,5 +401,85 @@ Input for validation.
 interface Changes {
   files: FileChange[];             // Files that were modified
   diff?: string;                   // Git diff (optional, computed if missing)
+}
+```
+
+---
+
+## Context Types
+
+```typescript
+import type {
+  Session,
+  SessionMetadata,
+  ChangeRecord,
+  FileChangeHistory,
+  Assumption,
+  AssumptionType,
+  AssumptionCheckResult,
+  AssumptionConflict,
+  DependencySnapshot,
+  DependencyDiff
+} from '@nella-labs/core';
+```
+
+### `Session`
+
+```typescript
+interface Session {
+  id: string;
+  startedAt: string;
+  repoPath: string;
+  changes: ChangeRecord[];
+  assumptions: Assumption[];
+  dependencySnapshot: DependencySnapshot | null;
+  metadata: SessionMetadata;
+}
+```
+
+### `ChangeRecord`
+
+```typescript
+interface ChangeRecord {
+  id: string;
+  timestamp: string;
+  runId: string;
+  file: string;
+  operation: "create" | "modify" | "delete";
+  reason: string;
+  dependsOn: string[];
+  assumptionIds: string[];
+  contentHash?: string;
+}
+```
+
+### `Assumption`
+
+```typescript
+interface Assumption {
+  id: string;
+  createdAt: string;
+  description: string;
+  type: AssumptionType;
+  relatedFiles: string[];
+  valid: boolean;
+  invalidatedAt?: string;
+  invalidatedBy?: string;
+  invalidationReason?: string;
+  confidence: number;
+}
+```
+
+### `DependencyDiff`
+
+```typescript
+interface DependencyDiff {
+  hasChanges: boolean;
+  changes: Array<{
+    name: string;
+    from?: string;
+    to?: string;
+    type: "added" | "removed" | "updated";
+  }>;
 }
 ```
