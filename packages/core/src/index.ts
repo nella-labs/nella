@@ -280,24 +280,34 @@ export type {
 // =============================================================================
 
 export {
-  CloudSyncManager,
-  createCloudSyncManager,
-  DEFAULT_SYNC_CONFIG,
-} from "./cloud-sync";
+  SyncManager,
+  initSync,
+  getSyncStatus,
+  disconnectSync,
+  LocalSyncAdapter,
+  SupabaseSyncAdapter,
+  GCPSyncAdapter,
+  createLocalAdapter,
+  createSupabaseAdapter,
+  createGCPAdapter,
+} from "./sync";
 
 export type {
-  CloudSyncConfig,
-  ConflictStrategy,
-  SyncState,
+  SyncAdapter,
+  SyncConfig,
   SyncStatus,
-  SyncFileState,
-  FileSyncStatus,
-  PendingChange,
-  SyncError,
   SyncEvent,
-  SyncStats,
-  SyncEventHandler,
-} from "./cloud-sync";
+  Workspace as SyncWorkspace,
+  IndexedFile,
+  Chunk,
+  SearchResult as SyncSearchResult,
+  CreateWorkspaceParams,
+  UpsertFileParams,
+  UpsertChunkParams,
+  VectorSearchParams,
+  TextSearchParams,
+  HybridSearchParams,
+} from "./sync";
 
 // =============================================================================
 // MCP Tools
