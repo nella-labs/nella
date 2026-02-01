@@ -152,6 +152,7 @@ export interface SearchResult {
     lexical: number;
     combined: number;
     reranked?: number;
+    relevance?: number;  // Cohere relevance score
   };
   highlights?: string[];
 }

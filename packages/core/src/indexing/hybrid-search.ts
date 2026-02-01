@@ -2,7 +2,7 @@
  * Hybrid Search
  *
  * Combines semantic (vector) and lexical (BM25) search using
- * Reciprocal Rank Fusion (RRF) for optimal results.
+ * Reciprocal Rank Fusion (RRF) with optional Cohere reranking.
  */
 
 import type { CodeChunk, SearchQuery, SearchResult, SearchResponse, SearchFilter } from "./types";
@@ -22,6 +22,7 @@ export interface HybridSearchConfig {
   minScore: number;       // Minimum score threshold
   rerankEnabled: boolean;
   rerankTopK: number;     // How many to rerank
+  rerankModel: string;    // Cohere rerank model
 }
 
 interface RankedResult {
@@ -32,6 +33,23 @@ interface RankedResult {
   lexicalScore: number;
   rrfScore: number;
   rerankedScore?: number;
+  relevanceScore?: number;  // Cohere relevance score
+}
+
+// Cohere API types
+interface CohereRerankRequest {
+  model: string;
+  query: string;
+  documents: string[];
+  top_n?: number;
+  return_documents?: boolean;
+}
+
+interface CohereRerankResponse {
+  results: {
+    index: number;
+    relevance_score: number;
+  }[];
 }
 
 // =============================================================================
@@ -46,7 +64,146 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
   minScore: 0.0,
   rerankEnabled: false,
   rerankTopK: 20,
+  rerankModel: "rerank-english-v3.0",
 };
+
+// =============================================================================
+// Cohere Reranker
+// =============================================================================
+
+class CohereReranker {
+  private apiKey: string | null = null;
+  private available: boolean = false;
+
+  constructor() {
+    this.apiKey = process.env.COHERE_API_KEY || null;
+    this.available = !!this.apiKey;
+  }
+
+  isAvailable(): boolean {
+    return this.available;
+  }
+
+  setApiKey(key: string): void {
+    this.apiKey = key;
+    this.available = true;
+  }
+
+  async rerank(
+    query: string,
+    documents: { id: string; text: string }[],
+    model: string = "rerank-english-v3.0",
+    topN?: number
+  ): Promise<{ id: string; score: number }[]> {
+    if (!this.available || !this.apiKey) {
+      throw new Error("Cohere API key not set");
+    }
+
+    const request: CohereRerankRequest = {
+      model,
+      query,
+      documents: documents.map((d) => d.text),
+      top_n: topN ?? documents.length,
+      return_documents: false,
+    };
+
+    const response = await fetch("https://api.cohere.ai/v1/rerank", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+        "X-Client-Name": "nella-core",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Cohere API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json() as CohereRerankResponse;
+
+    return data.results.map((r) => ({
+      id: documents[r.index].id,
+      score: r.relevance_score,
+    }));
+  }
+}
+
+// =============================================================================
+// Local Fallback Reranker (Cross-encoder simulation)
+// =============================================================================
+
+class LocalReranker {
+  /**
+   * Simple term-overlap based reranking
+   * In production, this would use a local cross-encoder model
+   */
+  async rerank(
+    query: string,
+    documents: { id: string; text: string }[],
+    topN?: number
+  ): Promise<{ id: string; score: number }[]> {
+    const queryTerms = this.tokenize(query);
+    
+    const scored = documents.map((doc) => {
+      const docTerms = this.tokenize(doc.text);
+      const score = this.calculateRelevance(queryTerms, docTerms, doc.text);
+      return { id: doc.id, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    return topN ? scored.slice(0, topN) : scored;
+  }
+
+  private tokenize(text: string): Set<string> {
+    return new Set(
+      text
+        .toLowerCase()
+        .split(/[\s\.,;:!?\-_'"()\[\]{}|\\/<>@#$%^&*+=`~]+/)
+        .filter((t) => t.length > 2)
+    );
+  }
+
+  private calculateRelevance(queryTerms: Set<string>, docTerms: Set<string>, docText: string): number {
+    let score = 0;
+    const docLower = docText.toLowerCase();
+
+    // Term overlap score
+    let matchCount = 0;
+    for (const term of queryTerms) {
+      if (docTerms.has(term)) {
+        matchCount++;
+        // Boost for exact phrase matches
+        if (docLower.includes(term)) {
+          score += 0.1;
+        }
+      }
+    }
+
+    // Jaccard-like overlap
+    const unionSize = new Set([...queryTerms, ...docTerms]).size;
+    const overlapScore = unionSize > 0 ? matchCount / unionSize : 0;
+    score += overlapScore;
+
+    // Position boost - earlier matches are better
+    for (const term of queryTerms) {
+      const pos = docLower.indexOf(term);
+      if (pos !== -1) {
+        score += (1 - pos / docLower.length) * 0.1;
+      }
+    }
+
+    // Length normalization - prefer concise matches
+    const lengthPenalty = Math.max(0, 1 - (docText.length - 500) / 2000);
+    score *= (0.5 + lengthPenalty * 0.5);
+
+    return score;
+  }
+}
 
 // =============================================================================
 // Hybrid Searcher Class
@@ -58,6 +215,8 @@ export class HybridSearcher {
   private lexicalIndex: LexicalIndex;
   private embedder: Embedder;
   private chunks: Map<string, CodeChunk> = new Map();
+  private cohereReranker: CohereReranker;
+  private localReranker: LocalReranker;
 
   constructor(
     vectorStore: VectorStore,
@@ -69,6 +228,22 @@ export class HybridSearcher {
     this.lexicalIndex = lexicalIndex;
     this.embedder = embedder;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.cohereReranker = new CohereReranker();
+    this.localReranker = new LocalReranker();
+  }
+
+  /**
+   * Set Cohere API key for reranking
+   */
+  setCohereApiKey(key: string): void {
+    this.cohereReranker.setApiKey(key);
+  }
+
+  /**
+   * Check if Cohere reranking is available
+   */
+  isRerankingAvailable(): boolean {
+    return this.cohereReranker.isAvailable();
   }
 
   /**
@@ -149,7 +324,7 @@ export class HybridSearcher {
     // Apply minimum score threshold
     rankedResults = rankedResults.filter((r) => r.rrfScore >= this.config.minScore);
 
-    // Rerank if enabled (placeholder for Cohere integration)
+    // Rerank if enabled
     if (this.config.rerankEnabled && rankedResults.length > 0) {
       rankedResults = await this.rerank(query.query, rankedResults);
     }
@@ -170,6 +345,7 @@ export class HybridSearcher {
           lexical: r.lexicalScore,
           combined: r.rrfScore,
           reranked: r.rerankedScore,
+          relevance: r.relevanceScore,
         },
         highlights: lexicalResult?.highlights,
       };
@@ -302,36 +478,80 @@ export class HybridSearcher {
   }
 
   /**
-   * Rerank results using cross-encoder (placeholder)
+   * Rerank results using Cohere or local fallback
    */
   private async rerank(query: string, results: RankedResult[]): Promise<RankedResult[]> {
     // Take top N for reranking
     const toRerank = results.slice(0, this.config.rerankTopK);
     const rest = results.slice(this.config.rerankTopK);
 
-    // Placeholder: In production, call Cohere Rerank API
-    // For now, just add a small boost based on query term overlap
-    for (const result of toRerank) {
-      const chunk = this.chunks.get(result.chunkId);
-      if (!chunk) continue;
+    // Prepare documents for reranking
+    const documents = toRerank.map((r) => {
+      const chunk = this.chunks.get(r.chunkId);
+      return {
+        id: r.chunkId,
+        text: chunk ? this.prepareForRerank(chunk) : "",
+      };
+    }).filter((d) => d.text.length > 0);
 
-      const queryTerms = query.toLowerCase().split(/\s+/);
-      const contentLower = chunk.content.toLowerCase();
-      const symbolsLower = chunk.symbols.map((s) => s.name.toLowerCase());
-
-      let overlap = 0;
-      for (const term of queryTerms) {
-        if (contentLower.includes(term)) overlap++;
-        if (symbolsLower.some((s) => s.includes(term))) overlap += 2;
-      }
-
-      result.rerankedScore = result.rrfScore * (1 + overlap * 0.1);
+    if (documents.length === 0) {
+      return results;
     }
 
-    // Re-sort by reranked score
-    toRerank.sort((a, b) => (b.rerankedScore ?? 0) - (a.rerankedScore ?? 0));
+    try {
+      let reranked: { id: string; score: number }[];
 
-    return [...toRerank, ...rest];
+      if (this.cohereReranker.isAvailable()) {
+        // Use Cohere reranker
+        reranked = await this.cohereReranker.rerank(
+          query,
+          documents,
+          this.config.rerankModel
+        );
+      } else {
+        // Use local fallback reranker
+        reranked = await this.localReranker.rerank(query, documents);
+      }
+
+      // Update scores
+      const scoreMap = new Map(reranked.map((r) => [r.id, r.score]));
+      
+      for (const result of toRerank) {
+        const newScore = scoreMap.get(result.chunkId);
+        if (newScore !== undefined) {
+          result.relevanceScore = newScore;
+          // Combine RRF score with relevance score
+          result.rerankedScore = result.rrfScore * 0.3 + newScore * 0.7;
+        } else {
+          result.rerankedScore = result.rrfScore;
+        }
+      }
+
+      // Re-sort by reranked score
+      toRerank.sort((a, b) => (b.rerankedScore ?? 0) - (a.rerankedScore ?? 0));
+
+      return [...toRerank, ...rest];
+    } catch (error) {
+      console.warn("Reranking failed, using RRF scores:", error);
+      return results;
+    }
+  }
+
+  /**
+   * Prepare chunk content for reranking
+   */
+  private prepareForRerank(chunk: CodeChunk): string {
+    // Include symbols in the text for better reranking
+    const symbols = chunk.symbols.map((s) => s.name).join(", ");
+    const header = symbols ? `[${chunk.type}: ${symbols}]\n` : "";
+    
+    // Truncate content if too long (Cohere has limits)
+    const maxLength = 4000;
+    const content = chunk.content.length > maxLength
+      ? chunk.content.slice(0, maxLength) + "..."
+      : chunk.content;
+
+    return header + content;
   }
 
   /**
@@ -344,6 +564,7 @@ export class HybridSearcher {
     // 1. Top result score
     // 2. Score gap between top results
     // 3. Number of high-quality matches
+    // 4. Reranking confidence (if available)
 
     const topScore = results[0]?.score ?? 0;
     const secondScore = results[1]?.score ?? 0;
@@ -354,12 +575,16 @@ export class HybridSearcher {
     const highQualityCount = results.filter((r) => r.score >= threshold).length;
 
     // Normalize factors
-    const topScoreFactor = Math.min(topScore * 2, 1); // Assume max useful score is 0.5
-    const gapFactor = Math.min(scoreGap * 5, 1);      // Large gap = more confident
-    const countFactor = Math.min(highQualityCount / 5, 1); // More matches = better
+    const topScoreFactor = Math.min(topScore * 2, 1);
+    const gapFactor = Math.min(scoreGap * 5, 1);
+    const countFactor = Math.min(highQualityCount / 5, 1);
+
+    // Check if we have reranking scores
+    const hasReranking = results[0]?.scores?.relevance !== undefined;
+    const rerankBoost = hasReranking ? 0.1 : 0;
 
     // Weighted average
-    return topScoreFactor * 0.5 + gapFactor * 0.3 + countFactor * 0.2;
+    return Math.min(1, topScoreFactor * 0.5 + gapFactor * 0.3 + countFactor * 0.2 + rerankBoost);
   }
 
   /**
@@ -396,6 +621,21 @@ export class HybridSearcher {
    */
   getConfig(): HybridSearchConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Get search statistics
+   */
+  getStats(): {
+    chunksRegistered: number;
+    rerankingAvailable: boolean;
+    config: HybridSearchConfig;
+  } {
+    return {
+      chunksRegistered: this.chunks.size,
+      rerankingAvailable: this.cohereReranker.isAvailable(),
+      config: this.config,
+    };
   }
 }
 
