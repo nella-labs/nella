@@ -15,7 +15,7 @@ import {
   type RunResult,
   type ValidationResult,
   type FileChange,
-} from "@nella-labs/core";
+} from "@usenella/core";
 import type { ServerContext } from "../server";
 
 // =============================================================================
@@ -214,7 +214,7 @@ async function handleCheck(
   const results = checkConstraints(modifiedFiles, diff, constraints);
 
   const lines: string[] = [];
-  const allPassed = results.every(r => r.passed);
+  const allPassed = results.every((result: { passed: boolean }) => result.passed);
   
   lines.push(`## Constraint Check: ${allPassed ? "✅ PASSED" : "❌ FAILED"}`);
   lines.push("");
@@ -359,7 +359,7 @@ async function handleRun(
 
   // Constraint results
   if (result.constraints.length > 0) {
-    const allPassed = result.constraints.every(c => c.passed);
+    const allPassed = result.constraints.every((constraint: { passed: boolean }) => constraint.passed);
     lines.push(`### ${allPassed ? "✅" : "❌"} Constraints`);
     for (const c of result.constraints) {
       const status = c.passed ? "✅" : "❌";

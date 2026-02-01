@@ -134,19 +134,19 @@ export class McpToolHandler {
       let result: McpToolResult;
       switch (call.name) {
         case "nella_search":
-          result = await this.handleSearch(call.arguments as SearchToolArgs);
+          result = await this.handleSearch(call.arguments as unknown as SearchToolArgs);
           break;
         case "nella_verify":
-          result = await this.handleVerify(call.arguments as VerifyToolArgs);
+          result = await this.handleVerify(call.arguments as unknown as VerifyToolArgs);
           break;
         case "nella_index":
-          result = await this.handleIndex(call.arguments as IndexToolArgs);
+          result = await this.handleIndex(call.arguments as unknown as IndexToolArgs);
           break;
         case "nella_get_context":
-          result = await this.handleGetContext(call.arguments as GetContextToolArgs);
+          result = await this.handleGetContext(call.arguments as unknown as GetContextToolArgs);
           break;
         case "nella_set_context":
-          result = await this.handleSetContext(call.arguments as SetContextToolArgs);
+          result = await this.handleSetContext(call.arguments as unknown as SetContextToolArgs);
           break;
         case "nella_status":
           result = await this.handleStatus();
@@ -205,19 +205,24 @@ export class McpToolHandler {
     });
 
     if (response.results.length === 0) {
+      const suggestion = response.suggestion !== "use_results"
+        ? ` Suggestion: ${response.suggestion.replace("_", " ")}.`
+        : "";
       return {
         content: [{
           type: "text",
-          text: `No results found for "${args.query}". ${response.suggestions?.length ? `Suggestions: ${response.suggestions.join(", ")}` : ""}`,
+          text: `No results found for "${args.query}".${suggestion}`,
         }],
       };
     }
 
     const results = response.results.map((r, i) => {
-      const header = `## Result ${i + 1}: ${r.filePath}${r.startLine ? `:${r.startLine}` : ""}\n`;
-      const metadata = `Type: ${r.chunkType} | Score: ${(r.score * 100).toFixed(1)}%\n`;
-      const symbols = r.symbols?.length ? `Symbols: ${r.symbols.map((s) => s.name).join(", ")}\n` : "";
-      return `${header}${metadata}${symbols}\n\`\`\`${r.language || ""}\n${r.content}\n\`\`\``;
+      const chunk = r.chunk;
+      const startLine = chunk.lines?.[0];
+      const header = `## Result ${i + 1}: ${chunk.filePath}${startLine ? `:${startLine}` : ""}\n`;
+      const metadata = `Type: ${chunk.type} | Score: ${(r.score * 100).toFixed(1)}%\n`;
+      const symbols = chunk.symbols?.length ? `Symbols: ${chunk.symbols.map((s) => s.name).join(", ")}\n` : "";
+      return `${header}${metadata}${symbols}\n\`\`\`${chunk.language || ""}\n${chunk.content}\n\`\`\``;
     });
 
     return {
@@ -233,22 +238,15 @@ export class McpToolHandler {
   private async handleVerify(args: VerifyToolArgs): Promise<McpToolResult> {
     const result = await this.workspace.verify({
       code: args.code,
-      language: args.language || "typescript",
       checkImports: args.checkImports ?? true,
       checkSymbols: args.checkSymbols ?? true,
-      checkApiCalls: args.checkApi ?? true,
+      checkAPIs: args.checkApi ?? true,
     });
 
     let text: string;
 
     if (result.valid) {
       text = "✅ Code verification passed!\n\n";
-      if (result.verifiedSymbols.length > 0) {
-        text += `Verified symbols: ${result.verifiedSymbols.join(", ")}\n`;
-      }
-      if (result.verifiedImports.length > 0) {
-        text += `Verified imports: ${result.verifiedImports.join(", ")}\n`;
-      }
     } else {
       text = "❌ Code verification failed!\n\n";
       text += "Issues found:\n";
@@ -260,6 +258,10 @@ export class McpToolHandler {
         }
         text += "\n";
       }
+    }
+
+    if (result.suggestions.length > 0) {
+      text += `\nSuggestions: ${result.suggestions.join(", ")}\n`;
     }
 
     text += `\nConfidence: ${(result.confidence * 100).toFixed(0)}%`;

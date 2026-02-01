@@ -23,7 +23,7 @@ import {
   RawTaskYaml,
   Changes,
   FileChange,
-} from "@nella-labs/core";
+} from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
 
 // =============================================================================
@@ -175,6 +175,8 @@ function loadTask(taskPath: string): Task {
   const raw = yaml.load(content) as RawTaskYaml;
 
   // Transform snake_case to camelCase
+  const constraints = raw.constraints ?? [];
+
   return {
     id: raw.id,
     name: raw.name,
@@ -182,7 +184,7 @@ function loadTask(taskPath: string): Task {
     category: raw.category as Task["category"],
     difficulty: raw.difficulty as Task["difficulty"],
     fixture: raw.fixture,
-    constraints: (raw.constraints ?? []).map((c) => ({
+    constraints: constraints.map((c: RawTaskYaml["constraints"][number]) => ({
       id: c.id,
       description: c.description,
       rule: c.rule,
@@ -419,8 +421,8 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
     process.exit(1);
   }
 
-  const task = loadTask(args.taskPath);
-  const repoPath = path.resolve(args.repoPath);
+  const task = loadTask(args.taskPath!);
+  const repoPath = path.resolve(args.repoPath!);
 
   console.log("");
   console.log(`  ${theme.icons.arrow}  ${theme.muted("Checking task")} ${theme.primary.bold(task.id)}`);
@@ -461,9 +463,9 @@ async function runValidateCommand(args: CliArgs): Promise<void> {
     process.exit(1);
   }
 
-  const task = loadTask(args.taskPath);
-  const repoPath = path.resolve(args.repoPath);
-  const changes = loadChanges(args.changesPath);
+  const task = loadTask(args.taskPath!);
+  const repoPath = path.resolve(args.repoPath!);
+  const changes = loadChanges(args.changesPath!);
 
   console.log("");
   console.log(`  ${theme.icons.arrow}  ${theme.muted("Validating")} ${theme.primary.bold(task.id)}`);
@@ -489,8 +491,8 @@ async function runRunCommand(args: CliArgs): Promise<void> {
     process.exit(1);
   }
 
-  const task = loadTask(args.taskPath);
-  const repoPath = path.resolve(args.repoPath);
+  const task = loadTask(args.taskPath!);
+  const repoPath = path.resolve(args.repoPath!);
 
   console.log("");
   console.log(`  ${theme.icons.arrow}  ${theme.muted("Running")} ${theme.primary.bold(task.id)}`);

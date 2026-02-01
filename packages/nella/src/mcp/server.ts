@@ -18,7 +18,7 @@ import {
   type Tool,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ContextManager } from "@nella-labs/core";
+import { ContextManager } from "@usenella/core";
 import { parseWorkspaceArg } from "./utils/args";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
@@ -63,11 +63,13 @@ Example:
     process.exit(1);
   }
 
+  const workspacePath = args.workspace!;
+
   // Initialize context manager for stateful tracking
-  const contextManager = new ContextManager(args.workspace);
+  const contextManager = new ContextManager(workspacePath);
 
   const serverContext: ServerContext = {
-    workspacePath: args.workspace,
+    workspacePath,
     contextManager,
   };
 
@@ -97,56 +99,58 @@ Example:
   });
 
   // Handle tool calls
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    const { name, arguments: toolArgs } = request.params;
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request: { params: { name: string; arguments?: Record<string, unknown> } }): Promise<CallToolResult> => {
+      const { name, arguments: toolArgs } = request.params;
+      try {
+        // Try each tool category
+        const validationResult = await handleValidationTool(name, toolArgs || {}, serverContext);
+        if (validationResult !== null) {
+          return validationResult as CallToolResult;
+        }
 
-    try {
-      // Try each tool category
-      const validationResult = await handleValidationTool(name, toolArgs || {}, serverContext);
-      if (validationResult !== null) {
-        return validationResult as CallToolResult;
+        const safetyResult = await handleSafetyTool(name, toolArgs || {}, serverContext);
+        if (safetyResult !== null) {
+          return safetyResult as CallToolResult;
+        }
+
+        const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
+        if (contextResult !== null) {
+          return contextResult as CallToolResult;
+        }
+
+        // Unknown tool
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Unknown tool: ${name}`,
+            },
+          ],
+          isError: true,
+        } as CallToolResult;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error executing ${name}: ${message}`,
+            },
+          ],
+          isError: true,
+        } as CallToolResult;
       }
-
-      const safetyResult = await handleSafetyTool(name, toolArgs || {}, serverContext);
-      if (safetyResult !== null) {
-        return safetyResult as CallToolResult;
-      }
-
-      const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
-      if (contextResult !== null) {
-        return contextResult as CallToolResult;
-      }
-
-      // Unknown tool
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Unknown tool: ${name}`,
-          },
-        ],
-        isError: true,
-      } as CallToolResult;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error executing ${name}: ${message}`,
-          },
-        ],
-        isError: true,
-      } as CallToolResult;
     }
-  });
+  );
 
   // Connect via stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
   // Log to stderr (stdout is for MCP protocol)
-  console.error(`Nella MCP server started for workspace: ${args.workspace}`);
+  console.error(`Nella MCP server started for workspace: ${workspacePath}`);
 }
 
 // If run directly (for backward compatibility or standalone usage)
