@@ -112,4 +112,7 @@ export type WorkspaceEvent =
   | { type: "workspace:switched"; from: string | null; to: string }
   | { type: "workspace:index:start"; workspaceId: string }
   | { type: "workspace:index:complete"; workspaceId: string }
-  | { type: "workspace:index:error"; workspaceId: string; error: string };
+  | { type: "workspace:index:error"; workspaceId: string; error: string }
+  | { type: "workspace:watch:start"; workspaceId: string }
+  | { type: "workspace:watch:stop"; workspaceId: string }
+  | { type: "workspace:files:changed"; workspaceId: string; changes: Array<{ type: string; path: string }> };

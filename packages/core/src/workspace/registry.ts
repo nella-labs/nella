@@ -3,6 +3,12 @@
  *
  * Global registry for managing multiple workspaces.
  * Stores workspace metadata and provides CRUD operations.
+ *
+ * Features:
+ * - File locking for concurrent access safety
+ * - Automatic backup/restore
+ * - Schema migration support
+ * - Workspace validation
  */
 
 import * as fs from "fs";
@@ -18,12 +24,33 @@ import type {
   DEFAULT_WORKSPACE_CONFIG,
   DEFAULT_REGISTRY_SETTINGS,
 } from "./types";
+import { FileLock, withFileLock } from "./file-lock";
+import { RegistryBackupManager, type BackupInfo } from "./backup";
+import {
+  RegistryMigrationManager,
+  CURRENT_REGISTRY_VERSION,
+  type MigrationResult,
+} from "./migration";
+import {
+  WorkspaceValidator,
+  type BatchValidationResult,
+  type ValidationResult,
+} from "./validator";
 
 // =============================================================================
 // Types
 // =============================================================================
 
 export type WorkspaceEventHandler = (event: WorkspaceEvent) => void;
+
+export interface RegistryOptions {
+  storagePath?: string;
+  enableBackups?: boolean;
+  maxBackups?: number;
+  enableValidation?: boolean;
+  enableLocking?: boolean;
+  lockTimeout?: number;
+}
 
 // =============================================================================
 // Workspace Registry Class
@@ -35,8 +62,36 @@ export class WorkspaceRegistry {
   private storagePath: string;
   private eventHandlers: WorkspaceEventHandler[] = [];
 
-  constructor(storagePath?: string) {
-    this.storagePath = storagePath || path.join(os.homedir(), ".nella");
+  // New utilities
+  private fileLock: FileLock | null = null;
+  private backupManager: RegistryBackupManager | null = null;
+  private migrationManager: RegistryMigrationManager;
+  private validator: WorkspaceValidator;
+  private options: Required<RegistryOptions>;
+
+  constructor(storagePathOrOptions?: string | RegistryOptions) {
+    // Parse options
+    if (typeof storagePathOrOptions === "string") {
+      this.options = {
+        storagePath: storagePathOrOptions,
+        enableBackups: true,
+        maxBackups: 5,
+        enableValidation: true,
+        enableLocking: true,
+        lockTimeout: 5000,
+      };
+    } else {
+      this.options = {
+        storagePath: storagePathOrOptions?.storagePath || path.join(os.homedir(), ".nella"),
+        enableBackups: storagePathOrOptions?.enableBackups ?? true,
+        maxBackups: storagePathOrOptions?.maxBackups ?? 5,
+        enableValidation: storagePathOrOptions?.enableValidation ?? true,
+        enableLocking: storagePathOrOptions?.enableLocking ?? true,
+        lockTimeout: storagePathOrOptions?.lockTimeout ?? 5000,
+      };
+    }
+
+    this.storagePath = this.options.storagePath;
     this.registryPath = path.join(this.storagePath, "workspaces.json");
 
     // Ensure storage directory exists
@@ -44,7 +99,21 @@ export class WorkspaceRegistry {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }
 
-    // Load or create registry
+    // Initialize utilities
+    if (this.options.enableLocking) {
+      this.fileLock = new FileLock(this.registryPath);
+    }
+
+    if (this.options.enableBackups) {
+      this.backupManager = new RegistryBackupManager(this.storagePath, {
+        maxBackups: this.options.maxBackups,
+      });
+    }
+
+    this.migrationManager = new RegistryMigrationManager();
+    this.validator = new WorkspaceValidator();
+
+    // Load or create registry (with migration)
     this.registry = this.loadRegistry();
   }
 
@@ -275,6 +344,184 @@ export class WorkspaceRegistry {
   }
 
   // =============================================================================
+  // Validation Methods
+  // =============================================================================
+
+  /**
+   * Validate all workspaces
+   */
+  async validateWorkspaces(): Promise<BatchValidationResult> {
+    return this.validator.validateBatch(this.registry.workspaces);
+  }
+
+  /**
+   * Validate a single workspace
+   */
+  async validateWorkspace(workspaceId: string): Promise<ValidationResult | null> {
+    const workspace = this.get(workspaceId);
+    if (!workspace) return null;
+    return this.validator.validate(workspace);
+  }
+
+  /**
+   * Get stale workspace IDs (paths that no longer exist)
+   */
+  async getStaleWorkspaces(): Promise<string[]> {
+    return this.validator.getStaleWorkspaceIds(this.registry.workspaces);
+  }
+
+  /**
+   * Remove all stale workspaces
+   */
+  async removeStaleWorkspaces(): Promise<string[]> {
+    const staleIds = await this.getStaleWorkspaces();
+    for (const id of staleIds) {
+      this.remove(id);
+    }
+    return staleIds;
+  }
+
+  // =============================================================================
+  // Backup Methods
+  // =============================================================================
+
+  /**
+   * Create a backup of the registry
+   */
+  createBackup(label?: string): BackupInfo | null {
+    if (!this.backupManager) return null;
+    return this.backupManager.createBackup(this.registry, label);
+  }
+
+  /**
+   * List available backups
+   */
+  listBackups(): BackupInfo[] {
+    if (!this.backupManager) return [];
+    return this.backupManager.listBackups();
+  }
+
+  /**
+   * Restore from a specific backup
+   */
+  restoreFromBackup(backupPath: string): boolean {
+    if (!this.backupManager) return false;
+
+    try {
+      this.backupManager.restoreFromBackup(backupPath, this.registryPath);
+      // Reload registry after restore
+      this.registry = this.loadRegistry();
+      const active = this.getActive();
+      if (active) {
+        this.emit({ type: "workspace:updated", workspace: active });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Restore from latest backup
+   */
+  restoreLatestBackup(): boolean {
+    if (!this.backupManager) return false;
+
+    try {
+      const restored = this.backupManager.restoreLatest(this.registryPath);
+      if (restored) {
+        // Reload registry after restore
+        this.registry = this.loadRegistry();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // =============================================================================
+  // Migration Methods
+  // =============================================================================
+
+  /**
+   * Check if migration is needed
+   */
+  needsMigration(): boolean {
+    return this.migrationManager.needsMigration(this.registry);
+  }
+
+  /**
+   * Get current registry version
+   */
+  getVersion(): string {
+    return this.registry.version || "1.0.0";
+  }
+
+  /**
+   * Get target version
+   */
+  getTargetVersion(): string {
+    return CURRENT_REGISTRY_VERSION;
+  }
+
+  /**
+   * Manually run migration
+   */
+  runMigration(): MigrationResult {
+    const result = this.migrationManager.migrate(this.registry);
+    if (result.success) {
+      this.save();
+    }
+    return result;
+  }
+
+  // =============================================================================
+  // Import/Export Methods
+  // =============================================================================
+
+  /**
+   * Export registry to JSON string
+   */
+  export(): string {
+    return JSON.stringify(this.registry, null, 2);
+  }
+
+  /**
+   * Import registry from JSON string (merges with existing)
+   */
+  import(json: string, overwrite = false): { imported: number; skipped: number } {
+    const imported: IWorkspaceRegistry = JSON.parse(json);
+    let importCount = 0;
+    let skipCount = 0;
+
+    for (const workspace of imported.workspaces) {
+      const existing = this.findByPath(workspace.path);
+
+      if (existing && !overwrite) {
+        skipCount++;
+        continue;
+      }
+
+      if (existing && overwrite) {
+        // Update existing
+        Object.assign(existing, workspace);
+      } else {
+        // Add new
+        this.registry.workspaces.push(workspace);
+      }
+
+      importCount++;
+    }
+
+    if (importCount > 0) {
+      this.save();
+    }
+
+    return { imported: importCount, skipped: skipCount };
+  }
+
+  // =============================================================================
   // Private Methods
   // =============================================================================
 
@@ -290,9 +537,36 @@ export class WorkspaceRegistry {
           ...registry.settings,
         };
 
+        // Check and run migrations if needed
+        if (this.migrationManager.needsMigration(registry)) {
+          const result = this.migrationManager.migrate(registry);
+          if (result.success) {
+            console.log(
+              `Registry migrated from v${result.fromVersion} to v${result.toVersion}`
+            );
+            // Save migrated registry
+            fs.writeFileSync(
+              this.registryPath,
+              JSON.stringify(registry, null, 2)
+            );
+          } else {
+            console.error("Registry migration failed:", result.error);
+          }
+        }
+
         return registry;
-      } catch {
-        // Corrupted file, start fresh
+      } catch (error) {
+        // Corrupted file, try to restore from backup
+        if (this.backupManager) {
+          console.warn("Registry file corrupted, attempting restore from backup");
+          const restored = this.backupManager.restoreLatest();
+          if (restored) {
+            console.log("Registry restored from backup");
+            return this.loadRegistry(); // Reload after restore
+          }
+        }
+        // Start fresh if no backup available
+        console.warn("Starting with fresh registry");
       }
     }
 
@@ -307,7 +581,77 @@ export class WorkspaceRegistry {
 
   private save(): void {
     this.registry.updatedAt = new Date().toISOString();
-    fs.writeFileSync(this.registryPath, JSON.stringify(this.registry, null, 2));
+
+    const writeRegistry = () => {
+      // Create backup before save if enabled
+      if (this.backupManager) {
+        try {
+          this.backupManager.createBackup(this.registry);
+        } catch (error) {
+          console.warn("Failed to create backup:", error);
+        }
+      }
+
+      fs.writeFileSync(this.registryPath, JSON.stringify(this.registry, null, 2));
+    };
+
+    // Use file locking if enabled
+    if (this.fileLock) {
+      // For sync save, we need to run acquire/release around write
+      // Use the async method internally with a sync wrapper
+      this.fileLock
+        .acquire({ timeout: this.options.lockTimeout })
+        .then((acquired) => {
+          if (acquired) {
+            try {
+              writeRegistry();
+            } finally {
+              this.fileLock?.release();
+            }
+          } else {
+            // Fallback: write without lock (better than failing)
+            console.warn("Could not acquire file lock, saving without lock");
+            writeRegistry();
+          }
+        })
+        .catch(() => {
+          writeRegistry();
+        });
+    } else {
+      writeRegistry();
+    }
+  }
+
+  /**
+   * Save registry with async file locking (recommended)
+   */
+  async saveAsync(): Promise<void> {
+    this.registry.updatedAt = new Date().toISOString();
+
+    const writeRegistry = async () => {
+      // Create backup before save if enabled
+      if (this.backupManager) {
+        try {
+          this.backupManager.createBackup(this.registry);
+        } catch (error) {
+          console.warn("Failed to create backup:", error);
+        }
+      }
+
+      await fs.promises.writeFile(
+        this.registryPath,
+        JSON.stringify(this.registry, null, 2)
+      );
+    };
+
+    // Use file locking if enabled
+    if (this.fileLock) {
+      await withFileLock(this.registryPath, writeRegistry, {
+        timeout: this.options.lockTimeout,
+      });
+    } else {
+      await writeRegistry();
+    }
   }
 
   private getDefaultSettings(): RegistrySettings {
@@ -414,13 +758,38 @@ export class WorkspaceRegistry {
 
 let defaultRegistry: WorkspaceRegistry | null = null;
 
-export function getWorkspaceRegistry(storagePath?: string): WorkspaceRegistry {
-  if (!defaultRegistry || storagePath) {
-    defaultRegistry = new WorkspaceRegistry(storagePath);
+export function getWorkspaceRegistry(storagePathOrOptions?: string | RegistryOptions): WorkspaceRegistry {
+  if (!defaultRegistry || storagePathOrOptions) {
+    defaultRegistry = new WorkspaceRegistry(storagePathOrOptions);
   }
   return defaultRegistry;
 }
 
-export function createWorkspaceRegistry(storagePath?: string): WorkspaceRegistry {
-  return new WorkspaceRegistry(storagePath);
+export function createWorkspaceRegistry(storagePathOrOptions?: string | RegistryOptions): WorkspaceRegistry {
+  return new WorkspaceRegistry(storagePathOrOptions);
 }
+
+/**
+ * Reset the default registry instance (for testing)
+ */
+export function resetDefaultRegistry(): void {
+  defaultRegistry = null;
+}
+
+// Re-export utilities for direct access
+export { FileLock, withFileLock } from "./file-lock";
+export { RegistryBackupManager, type BackupInfo } from "./backup";
+export {
+  RegistryMigrationManager,
+  CURRENT_REGISTRY_VERSION,
+  type Migration,
+  type MigrationResult,
+} from "./migration";
+export {
+  WorkspaceValidator,
+  ValidationCodes,
+  type ValidationResult,
+  type BatchValidationResult,
+  type ValidationIssue,
+  type ValidationWarning,
+} from "./validator";
