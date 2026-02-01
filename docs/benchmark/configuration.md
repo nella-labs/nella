@@ -1,6 +1,6 @@
 # Configuration
 
-Configuration options for `@nella-labs/benchmark`.
+Configuration options for `@usenella/benchmark`.
 
 ## Table of Contents
 

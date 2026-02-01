@@ -1,6 +1,6 @@
 # Configuration
 
-Configuration options and task definition schema for `@nella-labs/core`.
+Configuration options and task definition schema for `@usenella/core`.
 
 ## Table of Contents
 
@@ -49,7 +49,7 @@ interface RunTaskOptions {
 ### Example Usage
 
 ```typescript
-import { runTask } from '@nella-labs/core';
+import { runTask } from '@usenella/core';
 
 // Full validation (default)
 const result1 = await runTask('/path/to/repo', task, changes);

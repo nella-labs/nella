@@ -1,6 +1,6 @@
 # Examples
 
-Practical code examples for `@nella-labs/core`.
+Practical code examples for `@usenella/core`.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Practical code examples for `@nella-labs/core`.
 Complete example showing the typical validation workflow:
 
 ```typescript
-import { runTask, check, Task, Changes } from '@nella-labs/core';
+import { runTask, check, Task, Changes } from '@usenella/core';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
 
@@ -137,7 +137,7 @@ import {
   checkConstraints, 
   getViolatedConstraints,
   Constraint 
-} from '@nella-labs/core';
+} from '@usenella/core';
 
 // Define custom constraints
 const constraints: Constraint[] = [
@@ -246,7 +246,7 @@ import {
   detectRefusalInResponse,
   checkPrerequisites,
   RISK_PATTERNS 
-} from '@nella-labs/core';
+} from '@usenella/core';
 
 // Check if a prompt is risky
 function analyzePrompt(prompt: string) {
@@ -344,7 +344,7 @@ import {
   RunLogger, 
   generateRunId, 
   createNellaDir 
-} from '@nella-labs/core';
+} from '@usenella/core';
 
 async function runWithLogging(repoPath: string) {
   // 1. Generate run ID and create directory
@@ -427,7 +427,7 @@ import {
   runValidation,
   cleanupTempWorkspace,
   FileChange
-} from '@nella-labs/core';
+} from '@usenella/core';
 
 async function testChangesInIsolation(
   originalRepo: string,
@@ -503,7 +503,7 @@ import {
   Task, 
   Changes,
   FileChange 
-} from '@nella-labs/core';
+} from '@usenella/core';
 
 interface AgentResult {
   action: 'edit' | 'refuse';
