@@ -171,8 +171,6 @@ export type {
   IWorkspaceRegistry,
   RegistrySettings,
   WorkspaceEvent,
-  EmbedderConfig,
-  SearchConfig,
   // Options
   WorkspaceOptions,
   SharedContext,

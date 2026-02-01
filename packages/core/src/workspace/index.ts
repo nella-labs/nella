@@ -12,8 +12,6 @@ export type {
   WorkspaceRegistry as IWorkspaceRegistry,
   RegistrySettings,
   WorkspaceEvent,
-  EmbedderConfig,
-  SearchConfig,
 } from "./types";
 
 export {
