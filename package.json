@@ -11,9 +11,13 @@
     "nella": "workspace:nella",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "dev": "pnpm -r dev"
+    "dev": "pnpm -r dev",
+    "sync-docs": "tsx scripts/sync-docs.ts",
+    "sync-docs:dry": "tsx scripts/sync-docs.ts --dry-run",
+    "sync-docs:watch": "tsx scripts/sync-docs.ts --watch"
   },
   "devDependencies": {
+    "tsx": "^4.21.0",
     "typescript": "^5.3.0"
   }
 }
