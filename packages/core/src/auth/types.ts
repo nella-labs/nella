@@ -321,3 +321,320 @@ export const DEFAULT_KEY_STORE_SETTINGS: KeyStoreSettings = {
   logAuthRequests: true,
   encryptionEnabled: false,
 };
+
+// =============================================================================
+// Audit Log Types
+// =============================================================================
+
+/**
+ * Audit log entry
+ */
+export interface AuditEntry {
+  /** Unique entry ID */
+  id: string;
+  
+  /** Timestamp ISO string */
+  timestamp: string;
+  
+  /** Audit action category */
+  category: AuditCategory;
+  
+  /** Specific action performed */
+  action: string;
+  
+  /** Actor who performed the action */
+  actor: {
+    type: "key" | "agent" | "system" | "user";
+    id: string;
+    name?: string;
+    ip?: string;
+  };
+  
+  /** Target of the action */
+  target?: {
+    type: "key" | "agent" | "workspace" | "context";
+    id: string;
+    name?: string;
+  };
+  
+  /** Action outcome */
+  outcome: "success" | "failure" | "denied";
+  
+  /** Additional details */
+  details?: Record<string, unknown>;
+  
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Audit categories
+ */
+export type AuditCategory =
+  | "authentication"
+  | "authorization"
+  | "key_management"
+  | "agent_management"
+  | "configuration"
+  | "data_access";
+
+/**
+ * Audit log configuration
+ */
+export interface AuditLogConfig {
+  /** Enable audit logging */
+  enabled: boolean;
+  
+  /** Log file path (relative to storage) */
+  logPath: string;
+  
+  /** Maximum log file size in bytes before rotation */
+  maxFileSize: number;
+  
+  /** Number of rotated files to keep */
+  maxFiles: number;
+  
+  /** Categories to log (empty = all) */
+  categories: AuditCategory[];
+  
+  /** Minimum severity to log */
+  minSeverity: "info" | "warn" | "error";
+}
+
+export const DEFAULT_AUDIT_CONFIG: AuditLogConfig = {
+  enabled: true,
+  logPath: "audit.log",
+  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxFiles: 5,
+  categories: [],
+  minSeverity: "info",
+};
+
+// =============================================================================
+// JWT Token Types
+// =============================================================================
+
+/**
+ * JWT payload for session tokens
+ */
+export interface JWTPayload {
+  /** Subject (key ID or agent ID) */
+  sub: string;
+  
+  /** Issuer */
+  iss: string;
+  
+  /** Audience */
+  aud: string;
+  
+  /** Issued at (Unix timestamp) */
+  iat: number;
+  
+  /** Expiration (Unix timestamp) */
+  exp: number;
+  
+  /** Not before (Unix timestamp) */
+  nbf?: number;
+  
+  /** JWT ID */
+  jti: string;
+  
+  /** Custom claims */
+  claims: {
+    /** Key prefix for identification */
+    keyPrefix?: string;
+    
+    /** Workspace ID */
+    workspaceId?: string | null;
+    
+    /** Agent ID */
+    agentId?: string | null;
+    
+    /** Permissions snapshot */
+    permissions: ApiKeyPermissions;
+    
+    /** Session metadata */
+    session?: {
+      ip?: string;
+      userAgent?: string;
+      origin?: string;
+    };
+  };
+}
+
+/**
+ * JWT configuration
+ */
+export interface JWTConfig {
+  /** JWT signing secret (from env) */
+  secret: string;
+  
+  /** Issuer name */
+  issuer: string;
+  
+  /** Audience */
+  audience: string;
+  
+  /** Token expiry (e.g., "24h", "7d") */
+  expiresIn: string;
+  
+  /** Algorithm */
+  algorithm: "HS256" | "HS384" | "HS512";
+}
+
+export const DEFAULT_JWT_CONFIG: Omit<JWTConfig, "secret"> = {
+  issuer: "nella",
+  audience: "nella-api",
+  expiresIn: "24h",
+  algorithm: "HS256",
+};
+
+// =============================================================================
+// Key Rotation Types
+// =============================================================================
+
+/**
+ * Key rotation policy
+ */
+export interface RotationPolicy {
+  /** Enable automatic rotation */
+  enabled: boolean;
+  
+  /** Rotation interval in days */
+  intervalDays: number;
+  
+  /** Overlap period in hours (old key remains valid) */
+  overlapHours: number;
+  
+  /** Notify before rotation (hours) */
+  notifyBeforeHours: number;
+  
+  /** Auto-revoke old key after overlap */
+  autoRevokeOld: boolean;
+}
+
+export const DEFAULT_ROTATION_POLICY: RotationPolicy = {
+  enabled: false,
+  intervalDays: 90,
+  overlapHours: 24,
+  notifyBeforeHours: 72,
+  autoRevokeOld: true,
+};
+
+/**
+ * Rotation event
+ */
+export interface RotationEvent {
+  /** Old key ID */
+  oldKeyId: string;
+  
+  /** New key ID */
+  newKeyId: string;
+  
+  /** Rotation timestamp */
+  rotatedAt: string;
+  
+  /** When old key will be revoked */
+  oldKeyExpiresAt: string;
+  
+  /** Reason for rotation */
+  reason: "scheduled" | "manual" | "compromised";
+}
+
+// =============================================================================
+// IP Whitelist Types
+// =============================================================================
+
+/**
+ * IP whitelist configuration
+ */
+export interface IPWhitelistConfig {
+  /** Enable IP whitelisting */
+  enabled: boolean;
+  
+  /** Whitelist mode */
+  mode: "allow" | "deny";
+  
+  /** IP addresses or CIDR ranges */
+  addresses: string[];
+  
+  /** Allow localhost bypass in development */
+  allowLocalhost: boolean;
+}
+
+export const DEFAULT_IP_WHITELIST: IPWhitelistConfig = {
+  enabled: false,
+  mode: "allow",
+  addresses: [],
+  allowLocalhost: true,
+};
+
+// =============================================================================
+// Request Signing Types
+// =============================================================================
+
+/**
+ * Request signing configuration
+ */
+export interface RequestSigningConfig {
+  /** Enable request signing */
+  enabled: boolean;
+  
+  /** Signing algorithm */
+  algorithm: "hmac-sha256" | "hmac-sha512";
+  
+  /** Headers to include in signature */
+  signedHeaders: string[];
+  
+  /** Maximum timestamp drift in seconds */
+  timestampTolerance: number;
+}
+
+export const DEFAULT_REQUEST_SIGNING: RequestSigningConfig = {
+  enabled: false,
+  algorithm: "hmac-sha256",
+  signedHeaders: ["host", "date", "content-type"],
+  timestampTolerance: 300, // 5 minutes
+};
+
+/**
+ * Signed request headers
+ */
+export interface SignedRequestHeaders {
+  /** Key ID used for signing */
+  "x-nella-key-id": string;
+  
+  /** Timestamp of request */
+  "x-nella-timestamp": string;
+  
+  /** Request nonce */
+  "x-nella-nonce"?: string;
+  
+  /** Signature */
+  "x-nella-signature": string;
+  
+  /** Body hash (optional) */
+  "x-nella-body-hash"?: string;
+}
+
+// =============================================================================
+// Extended Auth Events
+// =============================================================================
+
+/**
+ * Extended auth events (includes new Phase 3 events)
+ */
+export type ExtendedAuthEvent =
+  | AuthEvent
+  | { type: "key:rotated"; event: RotationEvent }
+  | { type: "key:rotation_scheduled"; keyId: string; scheduledAt: string }
+  | { type: "key:encrypted"; keyId: string }
+  | { type: "key:decrypted"; keyId: string }
+  | { type: "token:issued"; jti: string; keyId: string; expiresAt: string }
+  | { type: "token:revoked"; jti: string; reason: string }
+  | { type: "token:expired"; jti: string }
+  | { type: "ip:blocked"; ip: string; reason: string }
+  | { type: "ip:allowed"; ip: string }
+  | { type: "signature:valid"; keyId: string }
+  | { type: "signature:invalid"; keyId: string; reason: string }
+  | { type: "audit:logged"; entryId: string; category: AuditCategory };
