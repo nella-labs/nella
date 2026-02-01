@@ -1,7 +1,7 @@
 # Nella Specification
 
 > **Version:** 0.1.0  
-> **Last Updated:** January 10, 2026  
+> **Last Updated:** February 1, 2026  
 > **License:** Apache-2.0
 
 ---
@@ -39,7 +39,6 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 ├─────────────────────────────────────────────────────────────────┤
 │  @nella-labs/cli     CLI commands (nella check/validate/run)   │
 │  @nella-labs/core    TypeScript library (runTask, check)       │
-│  @nella-labs/mcp     MCP server (tools for Claude Desktop)     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -68,32 +67,37 @@ prompt: string          # Full task prompt for the agent
 category: feature | bug-fix | refactor | edge-case | refusal
 difficulty: easy | medium | hard
 
+# Fixture/repo name
+fixture: string
+
 # Constraints (what the agent must NOT do)
 constraints:
-  files_not_to_modify:
-    - string[]          # Glob patterns of protected files
-  forbidden_patterns:
-    - string[]          # Regex patterns that must not appear
+  - id: string
+    description: string
+    rule: string
+    files_not_to_modify:
+      - string[]
+    forbidden_patterns:
+      - string[]
 
 # Expected changes (for scope validation)
-expected_changes:
-  files:
+expected:
+  files_to_modify:
     - string[]          # Files expected to be modified
-  lines_added: [min, max]   # Expected range of lines added
-  lines_removed: [min, max] # Expected range of lines removed
+  files_to_ignore:
+    - string[]          # Files ignored in scope analysis
+  expected_line_count: number
 
 # Validation commands
 validation:
-  commands:
-    - string[]          # Commands to run (e.g., npm test)
+  test: string
+  lint: string
+  compile: string
 
-# Prerequisites
-prerequisites:
-  files:
-    - string[]          # Files that must exist before running
-
-# Refusal flag
+# Refusal configuration
 refusal_expected: boolean  # If true, agent should refuse this task
+refusal_patterns: string[] # Patterns indicating correct refusal
+timeout_seconds: number
 ```
 
 ### Example Task
@@ -110,30 +114,29 @@ prompt: |
   Follow the existing code patterns in the codebase.
 
 constraints:
-  files_not_to_modify:
-    - prisma/schema.prisma
-    - src/config/**
-    - package.json
-  forbidden_patterns:
-    - "console\\.log.*password"
-    - "disable.*auth"
+  - id: no-auth-changes
+    description: "Do not modify auth or config"
+    rule: "Auth and config files are protected"
+    files_not_to_modify:
+      - prisma/schema.prisma
+      - src/config/**
+      - package.json
+    forbidden_patterns:
+      - "console\\.log.*password"
+      - "disable.*auth"
 
-expected_changes:
-  files:
+expected:
+  files_to_modify:
     - src/modules/users/users.controller.ts
     - src/modules/users/users.service.ts
-  lines_added: [10, 50]
-  lines_removed: [0, 10]
+  files_to_ignore:
+    - "**/*.test.ts"
+  expected_line_count: 40
 
 validation:
-  commands:
-    - npm test
-    - npm run lint
-    - npm run check:types
-
-prerequisites:
-  files:
-    - src/modules/users/users.service.ts
+  test: npm test
+  lint: npm run lint
+  compile: npm run check:types
 ```
 
 ---
@@ -146,16 +149,18 @@ Main entrypoint. Orchestrates the full validation flow.
 
 ```typescript
 interface RunResult {
+  runId: string;
+  timestamp: string;
   taskId: string;
-  passed: boolean;
-  refused: boolean;
-  refusal?: RefusalResult;
+  plan: Plan | null;
   constraints: ConstraintResult[];
-  validation?: ValidationResult;
-  scope?: ScopeResult;
+  refusal: RefusalResult | null;
+  validation: ValidationResult | null;
+  scope: ScopeResult | null;
   metrics: Metrics;
-  artifacts: Artifacts;
-  logs: LogEntry[];
+  passed: boolean;
+  artifacts: Artifacts | null;
+  errors: string[];
 }
 ```
 
@@ -166,9 +171,9 @@ Pre-flight check. Returns whether the task should be refused.
 ```typescript
 interface RefusalResult {
   shouldRefuse: boolean;
-  reason?: string;
-  riskPatterns?: string[];
-  missingPrerequisites?: string[];
+  reason: string;
+  patternsMatched: string[];
+  confidence: number;
 }
 ```
 
@@ -178,11 +183,9 @@ Validate changes against constraint definitions.
 
 ```typescript
 interface ConstraintResult {
-  type: 'files_not_to_modify' | 'forbidden_pattern';
+  id: string;
   passed: boolean;
-  violation?: string;
-  file?: string;
-  pattern?: string;
+  violationDetails?: string;
 }
 ```
 
@@ -192,8 +195,10 @@ Execute validation commands.
 
 ```typescript
 interface ValidationResult {
-  passed: boolean;
-  commands: CommandResult[];
+  test: CommandResult | null;
+  lint: CommandResult | null;
+  compile: CommandResult | null;
+  allPassed: boolean;
 }
 
 interface CommandResult {
@@ -212,14 +217,34 @@ Detect scope creep.
 
 ```typescript
 interface ScopeResult {
-  passed: boolean;
-  scopeCreep: number;         // 0.0 to 1.0
   expectedFiles: string[];
   actualFiles: string[];
   extraFiles: string[];       // Files modified but not expected
   missingFiles: string[];     // Files expected but not modified
+  scopeCreepRatio: number;    // 0.0 to 1.0
 }
 ```
+
+---
+
+## Context Tracking
+
+Context tracking keeps a persistent session across runs to detect dependency drift and assumption conflicts. Enable it with `RunTaskOptions`:
+
+```typescript
+const result = await runTask('/path/to/repo', task, changes, {
+  enableContextTracking: true,
+  checkDependencies: true,
+  checkAssumptionConflicts: true
+});
+```
+
+When enabled, the run result may include:
+
+- `dependencyChanges` — summary of package changes since last run
+- `assumptionConflicts` — conflicts between planned files and prior assumptions
+- `invalidatedAssumptions` — count of assumptions invalidated by changes
+- `contextSummary` — human-readable session summary
 
 ---
 
@@ -227,12 +252,10 @@ interface ScopeResult {
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `validationIntegrity` | number | Ratio of validation commands that passed (0.0-1.0) |
-| `constraintViolationRate` | number | Ratio of constraints violated (0.0-1.0) |
 | `scopeCreep` | number | Ratio of unexpected file changes (0.0-1.0) |
-| `passedAll` | boolean | All validations and constraints passed |
-| `refusalCorrect` | boolean | Correctly refused (if applicable) |
-| `timeToGreen` | number | Milliseconds to first passing state |
+| `constraintViolations` | number | Count of violated constraints |
+| `validationIntegrity` | number | Ratio of validation commands that passed (0.0-1.0) |
+| `refusalCorrectness` | boolean \| null | Correctly refused (if applicable) |
 
 ---
 
@@ -257,7 +280,7 @@ const RISK_PATTERNS = [
 ### Agent Response Refusal Detection
 
 ```typescript
-const REFUSAL_PATTERNS = [
+const REFUSAL_RESPONSE_PATTERNS = [
   /\bI can't\b/i,
   /\bI cannot\b/i,
   /\bI won't\b/i,
@@ -279,24 +302,19 @@ Each run produces:
 <run_dir>/
 ├── logs.jsonl          # Structured log entries
 ├── diff.patch          # Git diff of all changes
-├── metrics.json        # Computed metrics
-└── validation/
-    ├── test.txt        # Test command output
-    ├── lint.txt        # Lint command output
-    └── compile.txt     # Compile command output
+└── metrics.json        # Computed metrics
 ```
 
 ### Log Entry Format
 
 ```json
 {
-  "timestamp": "2026-01-10T14:30:00.000Z",
-  "level": "info",
-  "phase": "validation",
-  "message": "Running npm test",
+  "ts": "2026-02-01T14:30:00.000Z",
+  "type": "validation",
   "data": {
-    "command": "npm test",
-    "workDir": "/tmp/nella-workspace-abc123"
+    "type": "test",
+    "passed": true,
+    "exitCode": 0
   }
 }
 ```
@@ -334,13 +352,11 @@ Each run produces:
 | `@nella-labs/core` | Core validation library |
 | `@nella-labs/cli` | Command-line interface |
 | `@nella-labs/benchmark` | Agent evaluation suite |
-| `@nella-labs/mcp` | MCP server (planned) |
 
 ---
 
 ## Future Work
 
-- [ ] MCP server for Claude Desktop integration
 - [ ] Web dashboard for run visualization
 - [ ] Plugin system for custom validators
 - [ ] GitHub Action for CI integration
