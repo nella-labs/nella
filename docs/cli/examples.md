@@ -1,6 +1,6 @@
 # CLI Examples
 
-Practical examples for using `@nella-labs/nella`.
+Practical examples for using `@usenella/nella`.
 
 ## Table of Contents
 
@@ -72,7 +72,7 @@ jobs:
         run: npm ci
       
       - name: Install Nella CLI
-        run: npm install -g @nella-labs/nella
+        run: npm install -g @usenella/nella
       
       - name: Pre-flight check
         run: nella check -t ./task.yaml -r .
@@ -104,7 +104,7 @@ validate-changes:
   image: node:20
   script:
     - npm ci
-    - npm install -g @nella-labs/nella
+    - npm install -g @usenella/nella
     - nella check -t ./task.yaml -r . --json
     - nella validate -t ./task.yaml -r . -c changes.json
   artifacts:
@@ -146,7 +146,7 @@ Add Nella as an MCP server in Claude Desktop for AI-assisted validation:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "C:/path/to/your/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "C:/path/to/your/project"]
     }
   }
 }
@@ -158,7 +158,7 @@ Add Nella as an MCP server in Claude Desktop for AI-assisted validation:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/your/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -173,11 +173,11 @@ Configure multiple workspaces for different projects:
   "mcpServers": {
     "nella-project-a": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "-w", "/projects/project-a"]
+      "args": ["@usenella/nella", "mcp", "-w", "/projects/project-a"]
     },
     "nella-project-b": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "-w", "/projects/project-b"]
+      "args": ["@usenella/nella", "mcp", "-w", "/projects/project-b"]
     }
   }
 }

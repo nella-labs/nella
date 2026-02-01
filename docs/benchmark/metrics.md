@@ -1,6 +1,6 @@
 # Metrics Reference
 
-Detailed documentation of benchmark metrics for `@nella-labs/benchmark`.
+Detailed documentation of benchmark metrics for `@usenella/benchmark`.
 
 ## Table of Contents
 

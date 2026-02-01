@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@nella-labs/benchmark`.
+Complete API documentation for `@usenella/benchmark`.
 
 ## Table of Contents
 
@@ -70,7 +70,7 @@ OPENAI_API_KEY=sk-...         # Required for OpenAI models
 Main class for running benchmarks.
 
 ```typescript
-import { BenchmarkRunner } from '@nella-labs/benchmark';
+import { BenchmarkRunner } from '@usenella/benchmark';
 
 const runner = new BenchmarkRunner(config);
 const results = await runner.runAll(tasks);
@@ -115,7 +115,7 @@ const result = await runner.runTask(task, 'claude-sonnet');
 ### Task Loading
 
 ```typescript
-import { loadAllTasks } from '@nella-labs/benchmark';
+import { loadAllTasks } from '@usenella/benchmark';
 
 const { tasks, errors } = await loadAllTasks('./tasks');
 
@@ -129,7 +129,7 @@ console.log(`Loaded ${tasks.length} tasks`);
 ### Report Generation
 
 ```typescript
-import { writeDashboard, writeSummary } from '@nella-labs/benchmark';
+import { writeDashboard, writeSummary } from '@usenella/benchmark';
 
 // Generate HTML dashboard
 await writeDashboard(outputDir);
@@ -166,7 +166,7 @@ interface AgentInvocationResult {
 ### Anthropic Adapter
 
 ```typescript
-import { AnthropicAdapter } from '@nella-labs/benchmark';
+import { AnthropicAdapter } from '@usenella/benchmark';
 
 const adapter = new AnthropicAdapter({
   provider: 'anthropic',
@@ -181,7 +181,7 @@ const result = await adapter.invoke(prompt, context);
 ### OpenAI Adapter
 
 ```typescript
-import { OpenAIAdapter } from '@nella-labs/benchmark';
+import { OpenAIAdapter } from '@usenella/benchmark';
 
 const adapter = new OpenAIAdapter({
   provider: 'openai',
@@ -198,7 +198,7 @@ const result = await adapter.invoke(prompt, context);
 Create custom adapters for other providers:
 
 ```typescript
-import { BaseAdapter, AgentConfig } from '@nella-labs/benchmark';
+import { BaseAdapter, AgentConfig } from '@usenella/benchmark';
 
 class CustomAdapter extends BaseAdapter {
   constructor(config: AgentConfig) {

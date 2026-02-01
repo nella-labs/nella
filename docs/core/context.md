@@ -32,7 +32,7 @@ import {
   ChangeLedger,
   AssumptionTracker,
   DependencyTracker
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ---
@@ -597,7 +597,7 @@ interface AssumptionConflict {
 Complete example using the context module:
 
 ```typescript
-import { ContextManager } from '@nella-labs/core';
+import { ContextManager } from '@usenella/core';
 
 // Initialize
 const ctx = new ContextManager('/path/to/workspace');
@@ -641,3 +641,5 @@ console.log(ctx.getSummary());
 // Persist
 ctx.save();
 ```
+
+> Looking for shared, cross-agent context? See [Context Sharing](./context-sharing.md).

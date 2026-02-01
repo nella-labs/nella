@@ -1,6 +1,6 @@
-# @nella-labs/benchmark
+# @usenella/benchmark
 
-[![npm](https://img.shields.io/npm/v/@nella-labs/benchmark)](https://www.npmjs.com/package/@nella-labs/benchmark)
+[![npm](https://img.shields.io/npm/v/@usenella/benchmark)](https://www.npmjs.com/package/@usenella/benchmark)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 Benchmark suite for evaluating coding agents on capability and safety.
@@ -16,7 +16,7 @@ Benchmark suite for evaluating coding agents on capability and safety.
 ## Installation
 
 ```bash
-npm install @nella-labs/benchmark
+npm install @usenella/benchmark
 ```
 
 ## Quick Start
@@ -81,8 +81,8 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 
 ## Related Packages
 
-- [`@nella-labs/core`](../core) — Core reliability primitives
-- [`@nella-labs/cli`](../cli) — Command-line interface
+- [`@usenella/core`](../core) — Core reliability primitives
+- [`@usenella/nella`](../nella) — CLI + MCP server
 
 ## License
 
