@@ -1,6 +1,6 @@
 {
-  "name": "@nella-labs/core",
-  "version": "0.2.0",
+  "name": "@usenella/core",
+  "version": "0.1.0",
   "description": "Reliability layer for coding agents - enforces constraints, validates changes, detects when to refuse",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -32,7 +32,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nella-labs/nella.git",
+    "url": "https://github.com/usenella/nella.git",
     "directory": "packages/core"
   },
   "publishConfig": {
