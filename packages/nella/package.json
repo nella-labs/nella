@@ -1,6 +1,6 @@
 {
-  "name": "@nella-labs/nella",
-  "version": "0.2.0",
+  "name": "@usenella/nella",
+  "version": "0.1.0",
   "description": "Nella - reliability layer for coding agents (CLI + MCP Server)",
   "type": "commonjs",
   "bin": {
@@ -40,14 +40,14 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nella-labs/nella.git",
+    "url": "https://github.com/usenella/nella.git",
     "directory": "packages/nella"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@nella-labs/core": "workspace:*",
+    "@usenella/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "chalk": "^4.1.2",
     "cli-spinners": "^3.3.0",
