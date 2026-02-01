@@ -3,6 +3,11 @@
  *
  * Individual workspace management with integrated IndexManager.
  * Each workspace has isolated index, sessions, and context.
+ *
+ * Features:
+ * - Automatic file watching for incremental indexing
+ * - Lazy loading of resources
+ * - Memory management
  */
 
 import * as fs from "fs";
@@ -16,6 +21,7 @@ import { DEFAULT_WORKSPACE_CONFIG } from "./types";
 import { WorkspaceRegistry, getWorkspaceRegistry } from "./registry";
 import { IndexManager, type IndexManagerConfig } from "../indexing";
 import type { SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
+import { FileWatcher, type BatchChangeEvent, type WatcherOptions } from "./file-watcher";
 
 // =============================================================================
 // Types
@@ -24,6 +30,8 @@ import type { SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult }
 export interface WorkspaceOptions {
   registry?: WorkspaceRegistry;
   autoLoad?: boolean;
+  watchEnabled?: boolean;
+  watchOptions?: Omit<WatcherOptions, "include" | "exclude">;
 }
 
 export interface SharedContext {
@@ -56,9 +64,16 @@ export class Workspace {
   private indexManager: IndexManager | null = null;
   private sharedContext: SharedContext | null = null;
   private eventHandlers: WorkspaceEventHandler[] = [];
+  private fileWatcher: FileWatcher | null = null;
+  private watchEnabled: boolean;
+  private watchOptions: Omit<WatcherOptions, "include" | "exclude">;
+  private indexingInProgress = false;
+  private pendingReindex = false;
 
   constructor(workspaceId: string, options: WorkspaceOptions = {}) {
     this.registry = options.registry || getWorkspaceRegistry();
+    this.watchEnabled = options.watchEnabled ?? false;
+    this.watchOptions = options.watchOptions ?? {};
 
     const entry = this.registry.get(workspaceId);
     if (!entry) {
@@ -69,6 +84,11 @@ export class Workspace {
 
     if (options.autoLoad !== false) {
       this.loadSharedContext();
+    }
+
+    // Start file watching if enabled
+    if (this.watchEnabled) {
+      this.startWatching();
     }
   }
 
@@ -505,6 +525,7 @@ export class Workspace {
     isActive: boolean;
     createdAt: string;
     lastAccessed: string;
+    watchEnabled: boolean;
   } {
     return {
       id: this.entry.id,
@@ -515,6 +536,127 @@ export class Workspace {
       isActive: this.registry.getActiveId() === this.entry.id,
       createdAt: this.entry.createdAt,
       lastAccessed: this.entry.lastAccessed,
+      watchEnabled: this.fileWatcher?.isRunning() ?? false,
     };
+  }
+
+  // =============================================================================
+  // File Watching
+  // =============================================================================
+
+  /**
+   * Start watching for file changes
+   */
+  startWatching(): void {
+    if (this.fileWatcher?.isRunning()) return;
+
+    const config = this.entry.config || DEFAULT_WORKSPACE_CONFIG;
+
+    this.fileWatcher = new FileWatcher(this.entry.path, {
+      ...this.watchOptions,
+      include: config.include,
+      exclude: config.exclude,
+    });
+
+    this.fileWatcher.onChange(async (event: BatchChangeEvent) => {
+      await this.handleFileChanges(event);
+    });
+
+    this.fileWatcher.start();
+    this.emit({ type: "workspace:watch:start", workspaceId: this.entry.id });
+  }
+
+  /**
+   * Stop watching for file changes
+   */
+  stopWatching(): void {
+    if (!this.fileWatcher) return;
+
+    this.fileWatcher.stop();
+    this.fileWatcher = null;
+    this.emit({ type: "workspace:watch:stop", workspaceId: this.entry.id });
+  }
+
+  /**
+   * Check if watching is enabled
+   */
+  isWatching(): boolean {
+    return this.fileWatcher?.isRunning() ?? false;
+  }
+
+  /**
+   * Get watch statistics
+   */
+  getWatchStats(): { watchedDirectories: number; pendingChanges: number } | null {
+    return this.fileWatcher?.getStats() ?? null;
+  }
+
+  /**
+   * Handle file change events
+   */
+  private async handleFileChanges(event: BatchChangeEvent): Promise<void> {
+    // Skip if indexing is already in progress
+    if (this.indexingInProgress) {
+      this.pendingReindex = true;
+      return;
+    }
+
+    // Only trigger re-index if config allows
+    const config = this.entry.config;
+    if (!config?.indexOnChange) return;
+
+    // Emit change event
+    this.emit({
+      type: "workspace:files:changed",
+      workspaceId: this.entry.id,
+      changes: event.changes.map((c) => ({
+        type: c.type,
+        path: c.relativePath,
+      })),
+    });
+
+    // Mark index as stale
+    this.registry.updateIndexStatus(this.entry.id, "stale");
+    this.entry = this.registry.get(this.entry.id)!;
+
+    // Trigger incremental re-index
+    try {
+      this.indexingInProgress = true;
+      await this.index({ incremental: true });
+    } finally {
+      this.indexingInProgress = false;
+
+      // Check if more changes came in while we were indexing
+      if (this.pendingReindex) {
+        this.pendingReindex = false;
+        // Schedule another re-index after a short delay
+        setTimeout(() => {
+          this.index({ incremental: true }).catch((err) => {
+            console.error("Pending re-index failed:", err);
+          });
+        }, 500);
+      }
+    }
+  }
+
+  // =============================================================================
+  // Lifecycle
+  // =============================================================================
+
+  /**
+   * Dispose workspace resources
+   */
+  dispose(): void {
+    // Stop watching
+    this.stopWatching();
+
+    // Clear index manager
+    this.indexManager = null;
+
+    // Clear context (don't save - it's already saved on each change)
+    this.sharedContext = null;
+
+    // Clear event handlers
+    this.eventHandlers = [];
   }
 }
