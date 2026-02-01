@@ -12,9 +12,10 @@ import type {
   WorkspaceConfig,
   WorkspaceEvent,
 } from "./types";
+import { DEFAULT_WORKSPACE_CONFIG } from "./types";
 import { WorkspaceRegistry, getWorkspaceRegistry } from "./registry";
-import { IndexManager } from "../indexing";
-import type { IndexConfig, SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
+import { IndexManager, type IndexManagerConfig } from "../indexing";
+import type { SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
 
 // =============================================================================
 // Types
@@ -174,29 +175,44 @@ export class Workspace {
    */
   async getIndexManager(): Promise<IndexManager> {
     if (!this.indexManager) {
-      const config: Partial<IndexConfig> = {};
+      // Build IndexManagerConfig from workspace config
+      const indexConfig: IndexManagerConfig = {
+        workspaceId: this.entry.id,
+        workspacePath: this.entry.path,
+        storagePath: this.indexPath,
+        embedder: {
+          provider: this.entry.config?.embedder?.provider || "voyage",
+          model: this.entry.config?.embedder?.model || "voyage-code-2",
+          dimensions: 1536,
+        },
+        chunking: {
+          maxTokens: 512,
+          overlap: 50,
+          strategy: "ast",
+        },
+        search: {
+          vectorWeight: this.entry.config?.search?.vectorWeight || 0.4,
+          lexicalWeight: this.entry.config?.search?.lexicalWeight || 0.6,
+          rerankEnabled: this.entry.config?.search?.rerankEnabled || false,
+          topK: 10,
+        },
+        include: this.entry.config?.include || ["**/*.ts", "**/*.js", "**/*.py"],
+        exclude: this.entry.config?.exclude || ["**/node_modules/**", "**/dist/**"],
+      };
 
-      // Use workspace config if available
-      if (this.entry.config) {
-        config.embeddingProvider = this.entry.config.embedder?.provider || "voyage";
-        config.embeddingModel = this.entry.config.embedder?.model || "voyage-code-2";
-        config.vectorWeight = this.entry.config.search?.vectorWeight || 0.4;
-        config.lexicalWeight = this.entry.config.search?.lexicalWeight || 0.6;
-      }
-
-      this.indexManager = new IndexManager(this.entry.path, config);
-
-      // Load persisted index
-      await this.indexManager.load(this.indexPath);
+      this.indexManager = new IndexManager(indexConfig);
 
       // Forward events
       this.indexManager.onEvent((event) => {
-        if (event.type === "indexing:complete") {
-          this.registry.updateIndexStatus(this.entry.id, "ready", {
-            filesIndexed: event.stats?.filesIndexed || 0,
-            chunksCount: event.stats?.chunksCount || 0,
-            totalTokens: event.stats?.totalTokens || 0,
-          });
+        if (event.type === "index:complete") {
+          const metadata = this.indexManager?.getMetadata();
+          if (metadata) {
+            this.registry.updateIndexStatus(this.entry.id, "ready", {
+              filesIndexed: metadata.stats.filesIndexed,
+              chunksCount: metadata.stats.chunksCount,
+              totalTokens: metadata.stats.totalTokens,
+            });
+          }
         }
       });
     }
@@ -213,22 +229,19 @@ export class Workspace {
 
     try {
       const manager = await this.getIndexManager();
-      await manager.indexWorkspace({
-        include: this.entry.config?.include || ["**/*.ts", "**/*.js", "**/*.py"],
-        exclude: this.entry.config?.exclude || ["**/node_modules/**", "**/dist/**"],
-        incremental: options?.incremental ?? true,
+      await manager.index({
+        force: !options?.incremental,
       });
-
-      // Persist to workspace storage
-      await manager.save(this.indexPath);
 
       // Update status through registry
-      const stats = manager.getStats();
-      this.registry.updateIndexStatus(this.entry.id, "ready", {
-        filesIndexed: stats.filesIndexed,
-        chunksCount: stats.chunksCount,
-        totalTokens: stats.tokensIndexed,
-      });
+      const metadata = manager.getMetadata();
+      if (metadata) {
+        this.registry.updateIndexStatus(this.entry.id, "ready", {
+          filesIndexed: metadata.stats.filesIndexed,
+          chunksCount: metadata.stats.chunksCount,
+          totalTokens: metadata.stats.totalTokens,
+        });
+      }
 
       // Update local entry
       this.entry = this.registry.get(this.entry.id)!;
@@ -428,8 +441,8 @@ export class Workspace {
    * Update workspace configuration
    */
   updateConfig(config: Partial<WorkspaceConfig>): void {
-    const currentConfig = this.entry.config || {};
-    const newConfig = { ...currentConfig, ...config };
+    const currentConfig = this.entry.config || DEFAULT_WORKSPACE_CONFIG;
+    const newConfig: WorkspaceConfig = { ...currentConfig, ...config };
 
     this.registry.update(this.entry.id, { config: newConfig });
     this.entry = this.registry.get(this.entry.id)!;
@@ -467,12 +480,16 @@ export class Workspace {
     };
   }> {
     const manager = await this.getIndexManager();
-    const stats = manager.getStats();
+    const metadata = manager.getMetadata();
 
     return {
       entry: { ...this.entry },
       context: this.getContext(),
-      indexStats: stats,
+      indexStats: {
+        filesIndexed: metadata?.stats.filesIndexed || 0,
+        chunksCount: metadata?.stats.chunksCount || 0,
+        tokensIndexed: metadata?.stats.totalTokens || 0,
+      },
     };
   }
 

@@ -305,11 +305,11 @@ export class CloudSyncManager {
       throw new Error(`Local file not found: ${localFilePath}`);
     }
 
-    let content = fs.readFileSync(localFilePath);
+    let content: Buffer = fs.readFileSync(localFilePath);
 
     // Encrypt if enabled
     if (this.config.encryption && this.config.encryptionKey) {
-      content = this.encrypt(content);
+      content = Buffer.from(this.encrypt(content));
     }
 
     // Mock GCS upload - in real implementation:
