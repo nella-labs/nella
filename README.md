@@ -78,25 +78,31 @@ prompt: |
   Return 404 if the user doesn't exist.
 
 constraints:
-  files_not_to_modify:
-    - prisma/schema.prisma
-    - src/config/**
-  forbidden_patterns:
-    - "console.log.*password"
-    - "disable.*auth"
+  - id: no-auth-changes
+    description: "Do not modify auth or config files"
+    rule: "Auth and config files are protected"
+    files_not_to_modify:
+      - prisma/schema.prisma
+      - src/config/**
+  - id: no-sensitive-logging
+    description: "Avoid logging sensitive fields"
+    rule: "No debug logs for secrets"
+    forbidden_patterns:
+      - "console\\.log.*password"
+      - "disable.*auth"
 
-expected_changes:
-  files:
+expected:
+  files_to_modify:
     - src/modules/users/users.controller.ts
     - src/modules/users/users.service.ts
-  lines_added: [10, 50]
-  lines_removed: [0, 10]
+  files_to_ignore:
+    - "**/*.test.ts"
+  expected_line_count: 40
 
 validation:
-  commands:
-    - npm test
-    - npm run lint
-    - npm run check:types
+  test: npm test
+  lint: npm run lint
+  compile: npm run check:types
 ```
 
 ## Metrics
@@ -150,6 +156,7 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 
 ## Documentation
 
+- [How to Use Nella](./docs/how-to-use.md) — End-to-end workflow and examples
 - [Benchmark Plan](./docs/benchmark-plan.md) — How the benchmark system works
 - [Core API](./packages/core/README.md) — Core library documentation
 - [CLI Reference](./packages/cli/README.md) — CLI command reference
