@@ -8,12 +8,13 @@ Complete API documentation for `@nella-labs/core`.
 - [Validators](#validators)
 - [Safety](#safety)
 - [Utilities](#utilities)
+- [Context Tracking](#context-tracking)
 
 ---
 
 ## Main API
 
-### `runTask(repoPath, task, changes?, options?) → Promise<RunResult>`
+### `runTask(repoPath, task, changes?, options?) → Promise<RunResult | RunResultWithContext>`
 
 Main entrypoint that orchestrates the full validation flow.
 
@@ -58,10 +59,19 @@ interface RunTaskOptions {
   
   /** Pre-declared plan from agent for logging */
   plan?: Plan;
+
+  /** Enable context tracking (session, assumptions, dependencies) */
+  enableContextTracking?: boolean;
+
+  /** Check for dependency changes (default: true when context tracking) */
+  checkDependencies?: boolean;
+
+  /** Check for assumption conflicts (default: true when context tracking) */
+  checkAssumptionConflicts?: boolean;
 }
 ```
 
-**Returns:** `Promise<RunResult>` — Complete validation result with metrics and artifacts.
+**Returns:** `Promise<RunResult | RunResultWithContext>` — Complete validation result with metrics and artifacts. When `enableContextTracking` is `true`, the result includes context fields like `dependencyChanges`, `assumptionConflicts`, and `contextSummary`.
 
 ---
 
@@ -489,3 +499,57 @@ Write run artifacts (diff.patch, metrics.json).
 #### `cleanupTempWorkspace(tempPath) → void`
 
 Remove a temporary workspace.
+
+---
+
+## Context Tracking
+
+Context tracking keeps a persistent session across runs to detect dependency drift and assumption conflicts.
+
+```typescript
+import {
+  ContextManager,
+  SessionStore,
+  DependencyTracker,
+  AssumptionTracker,
+  ChangeLedger
+} from '@nella-labs/core';
+```
+
+### `ContextManager`
+
+High-level coordinator for session tracking.
+
+```typescript
+const manager = new ContextManager('/path/to/repo');
+const summary = manager.getSummary();
+```
+
+### `SessionStore`
+
+Load and persist session data to disk.
+
+```typescript
+const store = new SessionStore('/path/to/repo');
+const session = store.loadOrCreate();
+```
+
+### `DependencyTracker`
+
+Snapshot dependencies and detect changes between runs.
+
+```typescript
+const diff = manager.checkDependencies('/path/to/repo');
+```
+
+### `AssumptionTracker`
+
+Record assumptions and detect conflicts with planned changes.
+
+```typescript
+const conflicts = manager.assumptions.getConflicts(['src/users.ts']);
+```
+
+### `ChangeLedger`
+
+Store file change history across runs.

@@ -34,6 +34,15 @@ interface RunTaskOptions {
   
   /** Pre-declared plan from agent for logging */
   plan?: Plan;
+
+  /** Enable context tracking across runs */
+  enableContextTracking?: boolean;
+
+  /** Check for dependency changes (default: true when context tracking) */
+  checkDependencies?: boolean;
+
+  /** Check for assumption conflicts (default: true when context tracking) */
+  checkAssumptionConflicts?: boolean;
 }
 ```
 
@@ -63,6 +72,13 @@ const result4 = await runTask('/path/to/repo', task, changes, {
 // Don't write artifacts (for dry runs)
 const result5 = await runTask('/path/to/repo', task, changes, {
   skipArtifacts: true
+});
+
+// Enable context tracking
+const result6 = await runTask('/path/to/repo', task, changes, {
+  enableContextTracking: true,
+  checkDependencies: true,
+  checkAssumptionConflicts: true
 });
 ```
 

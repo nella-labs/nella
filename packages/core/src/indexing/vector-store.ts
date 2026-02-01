@@ -2,13 +2,13 @@
  * Vector Store
  *
  * HNSW-based vector storage for semantic search.
- * Uses usearch or hnswlib-node for efficient approximate nearest neighbor search.
+ * Uses usearch for efficient approximate nearest neighbor search
+ * with fallback to brute-force for environments without native deps.
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import type { CodeChunk } from "./types";
-import { Embedder } from "./embedder";
 
 // =============================================================================
 // Types
@@ -20,6 +20,8 @@ export interface VectorStoreConfig {
   efConstruction: number;  // Build-time parameter (higher = better recall, slower build)
   efSearch: number;        // Query-time parameter (higher = better recall, slower query)
   M: number;               // Number of connections per element
+  backend: "hnsw" | "brute-force" | "auto";  // Backend selection
+  metric: "cosine" | "l2" | "ip";  // Distance metric
 }
 
 interface VectorEntry {
@@ -35,6 +37,226 @@ interface VectorStoreData {
 }
 
 // =============================================================================
+// Vector Backend Interface
+// =============================================================================
+
+export interface VectorBackend {
+  add(id: number, vector: Float32Array): void;
+  addBatch(startId: number, vectors: Float32Array[]): void;
+  search(query: Float32Array, limit: number): { id: number; distance: number }[];
+  remove(id: number): boolean;
+  size: number;
+  save(path: string): void;
+  load(path: string): void;
+  clear(): void;
+}
+
+// =============================================================================
+// HNSW Backend (using usearch)
+// =============================================================================
+
+class HNSWBackend implements VectorBackend {
+  private index: any;  // usearch.Index type
+  private config: VectorStoreConfig;
+  private count: number = 0;
+
+  constructor(config: VectorStoreConfig) {
+    this.config = config;
+    this.initIndex();
+  }
+
+  private initIndex(): void {
+    try {
+      // Dynamic import to handle environments without native deps
+      const usearch = require("usearch");
+      
+      this.index = new usearch.Index({
+        metric: this.config.metric === "cosine" ? "cos" : 
+                this.config.metric === "ip" ? "ip" : "l2sq",
+        connectivity: this.config.M,
+        dimensions: this.config.dimensions,
+        quantization: "f32",
+      });
+      
+      // Reserve capacity
+      this.index.reserve(this.config.maxElements);
+    } catch (error) {
+      throw new Error(`Failed to initialize HNSW: ${error}`);
+    }
+  }
+
+  add(id: number, vector: Float32Array): void {
+    this.index.add(BigInt(id), vector);
+    this.count++;
+  }
+
+  addBatch(startId: number, vectors: Float32Array[]): void {
+    for (let i = 0; i < vectors.length; i++) {
+      this.add(startId + i, vectors[i]);
+    }
+  }
+
+  search(query: Float32Array, limit: number): { id: number; distance: number }[] {
+    const results = this.index.search(query, Math.min(limit, this.count));
+    
+    return Array.from({ length: results.count }, (_, i) => ({
+      id: Number(results.keys[i]),
+      distance: results.distances[i],
+    }));
+  }
+
+  remove(id: number): boolean {
+    try {
+      this.index.remove(BigInt(id));
+      this.count--;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  get size(): number {
+    return this.count;
+  }
+
+  save(filepath: string): void {
+    this.index.save(filepath);
+  }
+
+  load(filepath: string): void {
+    if (fs.existsSync(filepath)) {
+      this.index.load(filepath);
+      this.count = this.index.size();
+    }
+  }
+
+  clear(): void {
+    this.initIndex();
+    this.count = 0;
+  }
+}
+
+// =============================================================================
+// Brute-Force Backend (fallback)
+// =============================================================================
+
+class BruteForceBackend implements VectorBackend {
+  private vectors: Map<number, Float32Array> = new Map();
+  private config: VectorStoreConfig;
+
+  constructor(config: VectorStoreConfig) {
+    this.config = config;
+  }
+
+  add(id: number, vector: Float32Array): void {
+    this.vectors.set(id, vector);
+  }
+
+  addBatch(startId: number, vectors: Float32Array[]): void {
+    for (let i = 0; i < vectors.length; i++) {
+      this.add(startId + i, vectors[i]);
+    }
+  }
+
+  search(query: Float32Array, limit: number): { id: number; distance: number }[] {
+    const results: { id: number; distance: number }[] = [];
+
+    for (const [id, vector] of this.vectors) {
+      const distance = this.computeDistance(query, vector);
+      results.push({ id, distance });
+    }
+
+    // Sort by distance (ascending for l2, descending for similarity)
+    results.sort((a, b) => {
+      if (this.config.metric === "cosine" || this.config.metric === "ip") {
+        return b.distance - a.distance;  // Higher similarity is better
+      }
+      return a.distance - b.distance;  // Lower distance is better
+    });
+
+    return results.slice(0, limit);
+  }
+
+  private computeDistance(a: Float32Array, b: Float32Array): number {
+    if (this.config.metric === "cosine") {
+      return this.cosineSimilarity(a, b);
+    } else if (this.config.metric === "ip") {
+      return this.innerProduct(a, b);
+    } else {
+      return this.l2Distance(a, b);
+    }
+  }
+
+  private cosineSimilarity(a: Float32Array, b: Float32Array): number {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+
+    const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+    return magnitude === 0 ? 0 : dotProduct / magnitude;
+  }
+
+  private innerProduct(a: Float32Array, b: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+      sum += a[i] * b[i];
+    }
+    return sum;
+  }
+
+  private l2Distance(a: Float32Array, b: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+      const diff = a[i] - b[i];
+      sum += diff * diff;
+    }
+    return Math.sqrt(sum);
+  }
+
+  remove(id: number): boolean {
+    return this.vectors.delete(id);
+  }
+
+  get size(): number {
+    return this.vectors.size;
+  }
+
+  save(filepath: string): void {
+    const data = {
+      vectors: Array.from(this.vectors.entries()).map(([id, vec]) => ({
+        id,
+        vector: Array.from(vec),
+      })),
+    };
+    fs.writeFileSync(filepath, JSON.stringify(data));
+  }
+
+  load(filepath: string): void {
+    if (!fs.existsSync(filepath)) return;
+    
+    try {
+      const data = JSON.parse(fs.readFileSync(filepath, "utf-8"));
+      this.vectors.clear();
+      for (const entry of data.vectors) {
+        this.vectors.set(entry.id, new Float32Array(entry.vector));
+      }
+    } catch {
+      // Ignore load errors
+    }
+  }
+
+  clear(): void {
+    this.vectors.clear();
+  }
+}
+
+// =============================================================================
 // Default Configuration
 // =============================================================================
 
@@ -44,6 +266,8 @@ const DEFAULT_CONFIG: VectorStoreConfig = {
   efConstruction: 200,
   efSearch: 100,
   M: 16,
+  backend: "auto",
+  metric: "cosine",
 };
 
 // =============================================================================
@@ -52,12 +276,43 @@ const DEFAULT_CONFIG: VectorStoreConfig = {
 
 export class VectorStore {
   private config: VectorStoreConfig;
+  private backend: VectorBackend;
   private entries: Map<string, VectorEntry> = new Map();
   private chunkIdToVectorId: Map<string, string> = new Map();
+  private idToNumericId: Map<string, number> = new Map();
+  private numericIdToId: Map<number, string> = new Map();
+  private nextNumericId: number = 0;
   private persistPath: string | null = null;
+  private metadataPath: string | null = null;
 
   constructor(config: Partial<VectorStoreConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.backend = this.createBackend();
+  }
+
+  private createBackend(): VectorBackend {
+    if (this.config.backend === "brute-force") {
+      return new BruteForceBackend(this.config);
+    }
+
+    if (this.config.backend === "hnsw") {
+      return new HNSWBackend(this.config);
+    }
+
+    // Auto-detect: try HNSW, fallback to brute-force
+    try {
+      return new HNSWBackend(this.config);
+    } catch {
+      console.warn("HNSW backend unavailable, using brute-force fallback");
+      return new BruteForceBackend(this.config);
+    }
+  }
+
+  /**
+   * Get the current backend type
+   */
+  getBackendType(): "hnsw" | "brute-force" {
+    return this.backend instanceof HNSWBackend ? "hnsw" : "brute-force";
   }
 
   /**
@@ -65,6 +320,7 @@ export class VectorStore {
    */
   initPersistence(storePath: string): void {
     this.persistPath = storePath;
+    this.metadataPath = storePath + ".meta.json";
     this.load();
   }
 
@@ -78,6 +334,7 @@ export class VectorStore {
 
     // Generate unique vector ID
     const id = `vec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const numericId = this.nextNumericId++;
 
     const entry: VectorEntry = {
       id,
@@ -85,8 +342,14 @@ export class VectorStore {
       vector,
     };
 
+    // Add to backend
+    this.backend.add(numericId, new Float32Array(vector));
+
+    // Store mappings
     this.entries.set(id, entry);
     this.chunkIdToVectorId.set(chunkId, id);
+    this.idToNumericId.set(id, numericId);
+    this.numericIdToId.set(numericId, id);
 
     return id;
   }
@@ -105,6 +368,13 @@ export class VectorStore {
     const vectorId = this.chunkIdToVectorId.get(chunkId);
     if (!vectorId) return false;
 
+    const numericId = this.idToNumericId.get(vectorId);
+    if (numericId !== undefined) {
+      this.backend.remove(numericId);
+      this.idToNumericId.delete(vectorId);
+      this.numericIdToId.delete(numericId);
+    }
+
     this.entries.delete(vectorId);
     this.chunkIdToVectorId.delete(chunkId);
     return true;
@@ -118,18 +388,36 @@ export class VectorStore {
       throw new Error(`Query vector dimension mismatch: expected ${this.config.dimensions}, got ${queryVector.length}`);
     }
 
-    // Brute-force search with cosine similarity
-    // In production, this would use HNSW via usearch/hnswlib-node
+    if (this.backend.size === 0) {
+      return [];
+    }
+
+    const query = new Float32Array(queryVector);
+    const rawResults = this.backend.search(query, limit);
+
+    // Convert results
     const results: { chunkId: string; score: number }[] = [];
 
-    for (const entry of this.entries.values()) {
-      const score = this.cosineSimilarity(queryVector, entry.vector);
+    for (const result of rawResults) {
+      const vectorId = this.numericIdToId.get(result.id);
+      if (!vectorId) continue;
+
+      const entry = this.entries.get(vectorId);
+      if (!entry) continue;
+
+      // Convert distance to score
+      let score: number;
+      if (this.config.metric === "cosine" || this.config.metric === "ip") {
+        score = result.distance;  // Already similarity
+      } else {
+        // Convert L2 distance to similarity
+        score = 1 / (1 + result.distance);
+      }
+
       results.push({ chunkId: entry.chunkId, score });
     }
 
-    // Sort by score descending and take top k
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, limit);
+    return results;
   }
 
   /**
@@ -161,71 +449,96 @@ export class VectorStore {
    * Clear all vectors
    */
   clear(): void {
+    this.backend.clear();
     this.entries.clear();
     this.chunkIdToVectorId.clear();
+    this.idToNumericId.clear();
+    this.numericIdToId.clear();
+    this.nextNumericId = 0;
   }
 
   /**
    * Save to disk
    */
   save(): void {
-    if (!this.persistPath) return;
+    if (!this.persistPath || !this.metadataPath) return;
 
     const dir = path.dirname(this.persistPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    const data: VectorStoreData = {
+    // Save HNSW index
+    this.backend.save(this.persistPath);
+
+    // Save metadata
+    const metadata: VectorStoreData = {
       config: this.config,
       entries: Array.from(this.entries.values()),
-      version: "1.0.0",
+      version: "2.0.0",
     };
 
-    fs.writeFileSync(this.persistPath, JSON.stringify(data));
+    fs.writeFileSync(this.metadataPath, JSON.stringify(metadata));
   }
 
   /**
    * Load from disk
    */
   load(): void {
-    if (!this.persistPath || !fs.existsSync(this.persistPath)) return;
+    if (!this.persistPath || !this.metadataPath) return;
 
-    try {
-      const content = fs.readFileSync(this.persistPath, "utf-8");
-      const data: VectorStoreData = JSON.parse(content);
+    // Load metadata first
+    if (fs.existsSync(this.metadataPath)) {
+      try {
+        const content = fs.readFileSync(this.metadataPath, "utf-8");
+        const data: VectorStoreData = JSON.parse(content);
 
-      this.config = { ...this.config, ...data.config };
-      this.entries.clear();
-      this.chunkIdToVectorId.clear();
+        this.config = { ...this.config, ...data.config };
+        this.entries.clear();
+        this.chunkIdToVectorId.clear();
+        this.idToNumericId.clear();
+        this.numericIdToId.clear();
 
-      for (const entry of data.entries) {
-        this.entries.set(entry.id, entry);
-        this.chunkIdToVectorId.set(entry.chunkId, entry.id);
+        // Rebuild mappings
+        let maxNumericId = 0;
+        for (let i = 0; i < data.entries.length; i++) {
+          const entry = data.entries[i];
+          this.entries.set(entry.id, entry);
+          this.chunkIdToVectorId.set(entry.chunkId, entry.id);
+          this.idToNumericId.set(entry.id, i);
+          this.numericIdToId.set(i, entry.id);
+          maxNumericId = Math.max(maxNumericId, i);
+        }
+        this.nextNumericId = maxNumericId + 1;
+      } catch (error) {
+        console.error("Failed to load vector store metadata:", error);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to load vector store:", error);
+    }
+
+    // Load HNSW index
+    if (fs.existsSync(this.persistPath)) {
+      try {
+        this.backend.load(this.persistPath);
+      } catch (error) {
+        console.error("Failed to load vector index:", error);
+        // Rebuild index from entries if load fails
+        this.rebuildIndex();
+      }
     }
   }
 
   /**
-   * Calculate cosine similarity between two vectors
+   * Rebuild index from stored entries
    */
-  private cosineSimilarity(a: number[], b: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
+  private rebuildIndex(): void {
+    this.backend.clear();
+    for (const [id, entry] of this.entries) {
+      const numericId = this.idToNumericId.get(id);
+      if (numericId !== undefined) {
+        this.backend.add(numericId, new Float32Array(entry.vector));
+      }
     }
-
-    const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-    if (magnitude === 0) return 0;
-
-    return dotProduct / magnitude;
   }
 
   /**
@@ -235,6 +548,7 @@ export class VectorStore {
     totalVectors: number;
     dimensions: number;
     memoryEstimate: string;
+    backend: string;
   } {
     const bytesPerVector = this.config.dimensions * 4; // Float32
     const totalBytes = this.entries.size * bytesPerVector;
@@ -244,6 +558,7 @@ export class VectorStore {
       totalVectors: this.entries.size,
       dimensions: this.config.dimensions,
       memoryEstimate: `${memoryMB.toFixed(2)} MB`,
+      backend: this.getBackendType(),
     };
   }
 }

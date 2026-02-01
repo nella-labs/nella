@@ -1,7 +1,7 @@
 /**
  * Lexical Index
  *
- * BM25-based full-text search using MiniSearch.
+ * BM25-based full-text search with Porter stemming and fuzzy matching.
  * Optimized for code identifiers and exact matches.
  */
 
@@ -19,6 +19,8 @@ export interface LexicalIndexConfig {
   boost: Record<string, number>; // Field boost weights
   fuzzy: number;              // Fuzzy matching threshold (0-1)
   prefix: boolean;            // Enable prefix search
+  stemming: boolean;          // Enable Porter stemming
+  stopWords: boolean;         // Filter stop words
 }
 
 interface IndexedDocument {
@@ -50,6 +52,8 @@ const DEFAULT_CONFIG: LexicalIndexConfig = {
   },
   fuzzy: 0.2,
   prefix: true,
+  stemming: true,
+  stopWords: true,
 };
 
 // =============================================================================
@@ -67,6 +71,147 @@ const DEFAULT_BM25: BM25Params = {
 };
 
 // =============================================================================
+// Porter Stemmer (built-in fallback)
+// =============================================================================
+
+class PorterStemmer {
+  private naturalStemmer: any = null;
+
+  constructor() {
+    try {
+      const natural = require("natural");
+      this.naturalStemmer = natural.PorterStemmer;
+    } catch {
+      // Use built-in simplified stemmer
+    }
+  }
+
+  stem(word: string): string {
+    if (this.naturalStemmer) {
+      return this.naturalStemmer.stem(word);
+    }
+    return this.simpleStem(word);
+  }
+
+  /**
+   * Simplified stemmer fallback (handles common cases)
+   */
+  private simpleStem(word: string): string {
+    const lower = word.toLowerCase();
+    
+    // Common suffix removal
+    if (lower.endsWith("ing")) {
+      if (lower.length > 4) {
+        const base = lower.slice(0, -3);
+        // Double consonant check
+        if (base.endsWith(base[base.length - 1]) && !"aeiou".includes(base[base.length - 1])) {
+          return base.slice(0, -1);
+        }
+        return base;
+      }
+    }
+    if (lower.endsWith("ed")) {
+      if (lower.length > 3) {
+        return lower.slice(0, -2);
+      }
+    }
+    if (lower.endsWith("s") && !lower.endsWith("ss")) {
+      if (lower.length > 2) {
+        if (lower.endsWith("ies")) {
+          return lower.slice(0, -3) + "y";
+        }
+        if (lower.endsWith("es")) {
+          return lower.slice(0, -2);
+        }
+        return lower.slice(0, -1);
+      }
+    }
+    if (lower.endsWith("ly")) {
+      if (lower.length > 3) {
+        return lower.slice(0, -2);
+      }
+    }
+    if (lower.endsWith("tion")) {
+      return lower.slice(0, -4) + "t";
+    }
+    if (lower.endsWith("ment")) {
+      return lower.slice(0, -4);
+    }
+    if (lower.endsWith("ness")) {
+      return lower.slice(0, -4);
+    }
+    if (lower.endsWith("able") || lower.endsWith("ible")) {
+      return lower.slice(0, -4);
+    }
+    
+    return lower;
+  }
+
+  tokenizeAndStem(text: string): string[] {
+    if (this.naturalStemmer) {
+      const natural = require("natural");
+      return natural.PorterStemmer.tokenizeAndStem(text);
+    }
+    
+    // Fallback tokenization
+    const tokens = text
+      .toLowerCase()
+      .split(/[\s\.,;:!?\-_'"()\[\]{}|\\/<>@#$%^&*+=`~]+/)
+      .filter((t) => t.length > 1);
+    
+    return tokens.map((t) => this.stem(t));
+  }
+}
+
+// =============================================================================
+// Stop Words
+// =============================================================================
+
+const STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+  "has", "he", "in", "is", "it", "its", "of", "on", "or", "that",
+  "the", "to", "was", "were", "will", "with",
+  // Code-specific stop words
+  "var", "let", "const", "function", "class", "return", "if", "else",
+  "this", "new", "true", "false", "null", "undefined",
+]);
+
+// =============================================================================
+// Fuzzy Matching (Levenshtein Distance)
+// =============================================================================
+
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= a.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= b.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // Deletion
+        matrix[i][j - 1] + 1,      // Insertion
+        matrix[i - 1][j - 1] + cost // Substitution
+      );
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+function fuzzyMatch(query: string, target: string, threshold: number): boolean {
+  const distance = levenshteinDistance(query.toLowerCase(), target.toLowerCase());
+  const maxLen = Math.max(query.length, target.length);
+  const similarity = 1 - distance / maxLen;
+  return similarity >= (1 - threshold);
+}
+
+// =============================================================================
 // Lexical Index Class
 // =============================================================================
 
@@ -78,6 +223,9 @@ export class LexicalIndex {
   // Inverted index: term -> { docId -> termFrequency }
   private invertedIndex: Map<string, Map<string, number>> = new Map();
 
+  // Also keep unstemmed index for exact matches
+  private unstemmedIndex: Map<string, Map<string, number>> = new Map();
+
   // Document stats
   private docLengths: Map<string, number> = new Map();
   private avgDocLength: number = 0;
@@ -85,9 +233,11 @@ export class LexicalIndex {
 
   private persistPath: string | null = null;
   private bm25: BM25Params = DEFAULT_BM25;
+  private stemmer: PorterStemmer;
 
   constructor(config: Partial<LexicalIndexConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.stemmer = new PorterStemmer();
   }
 
   /**
@@ -150,9 +300,12 @@ export class LexicalIndex {
    * Search the index
    */
   search(query: string, limit: number = 10): { chunkId: string; score: number; highlights: string[] }[] {
-    const queryTerms = this.tokenize(query);
+    const rawTerms = this.tokenize(query);
+    const stemmedTerms = this.config.stemming
+      ? rawTerms.map((t) => this.stemmer.stem(t))
+      : rawTerms;
 
-    if (queryTerms.length === 0) {
+    if (rawTerms.length === 0) {
       return [];
     }
 
@@ -160,13 +313,18 @@ export class LexicalIndex {
     const scores: Map<string, number> = new Map();
     const highlights: Map<string, Set<string>> = new Map();
 
-    for (const term of queryTerms) {
-      const matchingTerms = this.config.prefix
-        ? this.getPrefixMatches(term)
-        : [term];
+    // Search both stemmed and unstemmed indexes
+    const searchTerms = [
+      ...stemmedTerms.map((t) => ({ term: t, stemmed: true })),
+      ...rawTerms.map((t) => ({ term: t, stemmed: false })),
+    ];
+
+    for (const { term, stemmed } of searchTerms) {
+      const matchingTerms = this.getMatchingTerms(term, stemmed);
 
       for (const matchTerm of matchingTerms) {
-        const postings = this.invertedIndex.get(matchTerm);
+        const index = stemmed ? this.invertedIndex : this.unstemmedIndex;
+        const postings = index.get(matchTerm);
         if (!postings) continue;
 
         const idf = this.calculateIDF(postings.size);
@@ -179,9 +337,15 @@ export class LexicalIndex {
           const doc = this.documents.get(docId);
           let boost = 1.0;
           if (doc) {
-            if (doc.symbols.toLowerCase().includes(term.toLowerCase())) {
+            const lowerTerm = term.toLowerCase();
+            if (doc.symbols.toLowerCase().includes(lowerTerm)) {
               boost = this.config.boost.symbols || 1.0;
             }
+          }
+
+          // Exact match bonus (unstemmed match)
+          if (!stemmed) {
+            boost *= 1.5;
           }
 
           const currentScore = scores.get(docId) || 0;
@@ -233,6 +397,7 @@ export class LexicalIndex {
     this.documents.clear();
     this.chunkIdToDocId.clear();
     this.invertedIndex.clear();
+    this.unstemmedIndex.clear();
     this.docLengths.clear();
     this.avgDocLength = 0;
     this.totalDocs = 0;
@@ -252,7 +417,7 @@ export class LexicalIndex {
     const data: LexicalIndexData = {
       documents: Array.from(this.documents.values()),
       config: this.config,
-      version: "1.0.0",
+      version: "2.0.0",
     };
 
     fs.writeFileSync(this.persistPath, JSON.stringify(data));
@@ -289,39 +454,78 @@ export class LexicalIndex {
   private indexDocument(doc: IndexedDocument): void {
     // Combine all text fields
     const text = [doc.content, doc.symbols, doc.filePath].join(" ");
-    const terms = this.tokenize(text);
+    const rawTerms = this.tokenize(text);
 
-    // Count term frequencies
-    const termFreqs: Map<string, number> = new Map();
-    for (const term of terms) {
-      termFreqs.set(term, (termFreqs.get(term) || 0) + 1);
+    // Filter stop words if enabled
+    const filteredTerms = this.config.stopWords
+      ? rawTerms.filter((t) => !STOP_WORDS.has(t.toLowerCase()))
+      : rawTerms;
+
+    // Stem terms if enabled
+    const stemmedTerms = this.config.stemming
+      ? filteredTerms.map((t) => this.stemmer.stem(t))
+      : filteredTerms;
+
+    // Count term frequencies for stemmed index
+    const stemmedFreqs: Map<string, number> = new Map();
+    for (const term of stemmedTerms) {
+      stemmedFreqs.set(term, (stemmedFreqs.get(term) || 0) + 1);
     }
 
-    // Add to inverted index
-    for (const [term, freq] of termFreqs) {
+    // Count term frequencies for unstemmed index
+    const unstemmedFreqs: Map<string, number> = new Map();
+    for (const term of filteredTerms) {
+      const lower = term.toLowerCase();
+      unstemmedFreqs.set(lower, (unstemmedFreqs.get(lower) || 0) + 1);
+    }
+
+    // Add to stemmed inverted index
+    for (const [term, freq] of stemmedFreqs) {
       if (!this.invertedIndex.has(term)) {
         this.invertedIndex.set(term, new Map());
       }
       this.invertedIndex.get(term)!.set(doc.id, freq);
     }
 
+    // Add to unstemmed inverted index
+    for (const [term, freq] of unstemmedFreqs) {
+      if (!this.unstemmedIndex.has(term)) {
+        this.unstemmedIndex.set(term, new Map());
+      }
+      this.unstemmedIndex.get(term)!.set(doc.id, freq);
+    }
+
     // Update document stats
-    this.docLengths.set(doc.id, terms.length);
+    this.docLengths.set(doc.id, stemmedTerms.length);
     this.totalDocs++;
     this.updateAvgDocLength();
   }
 
   private removeFromIndex(doc: IndexedDocument): void {
     const text = [doc.content, doc.symbols, doc.filePath].join(" ");
-    const terms = this.tokenize(text);
+    const rawTerms = this.tokenize(text);
+    const stemmedTerms = this.config.stemming
+      ? rawTerms.map((t) => this.stemmer.stem(t))
+      : rawTerms;
 
-    // Remove from inverted index
-    for (const term of new Set(terms)) {
+    // Remove from stemmed index
+    for (const term of new Set(stemmedTerms)) {
       const postings = this.invertedIndex.get(term);
       if (postings) {
         postings.delete(doc.id);
         if (postings.size === 0) {
           this.invertedIndex.delete(term);
+        }
+      }
+    }
+
+    // Remove from unstemmed index
+    for (const term of new Set(rawTerms.map((t) => t.toLowerCase()))) {
+      const postings = this.unstemmedIndex.get(term);
+      if (postings) {
+        postings.delete(doc.id);
+        if (postings.size === 0) {
+          this.unstemmedIndex.delete(term);
         }
       }
     }
@@ -346,24 +550,41 @@ export class LexicalIndex {
   }
 
   private tokenize(text: string): string[] {
-    // Split on whitespace and punctuation, lowercase
+    // Split on whitespace and punctuation, keep case for unstemmed
     return text
-      .toLowerCase()
       .split(/[\s\.,;:!?\-_'"()\[\]{}|\\/<>@#$%^&*+=`~]+/)
       .filter((token) => token.length > 1);
   }
 
-  private getPrefixMatches(prefix: string): string[] {
+  private getMatchingTerms(term: string, useStemmed: boolean): string[] {
+    const index = useStemmed ? this.invertedIndex : this.unstemmedIndex;
     const matches: string[] = [];
-    const lowerPrefix = prefix.toLowerCase();
+    const lowerTerm = term.toLowerCase();
 
-    for (const term of this.invertedIndex.keys()) {
-      if (term.startsWith(lowerPrefix)) {
-        matches.push(term);
+    // Exact match
+    if (index.has(lowerTerm)) {
+      matches.push(lowerTerm);
+    }
+
+    // Prefix matching
+    if (this.config.prefix) {
+      for (const indexTerm of index.keys()) {
+        if (indexTerm.startsWith(lowerTerm) && indexTerm !== lowerTerm) {
+          matches.push(indexTerm);
+        }
       }
     }
 
-    return matches.length > 0 ? matches : [prefix];
+    // Fuzzy matching (only if no exact/prefix matches and threshold > 0)
+    if (matches.length === 0 && this.config.fuzzy > 0) {
+      for (const indexTerm of index.keys()) {
+        if (fuzzyMatch(lowerTerm, indexTerm, this.config.fuzzy)) {
+          matches.push(indexTerm);
+        }
+      }
+    }
+
+    return matches.length > 0 ? matches : [lowerTerm];
   }
 
   private calculateIDF(docFreq: number): number {
@@ -390,12 +611,16 @@ export class LexicalIndex {
   getStats(): {
     totalDocuments: number;
     uniqueTerms: number;
+    uniqueUnstemmedTerms: number;
     avgDocLength: number;
+    stemmingEnabled: boolean;
   } {
     return {
       totalDocuments: this.totalDocs,
       uniqueTerms: this.invertedIndex.size,
+      uniqueUnstemmedTerms: this.unstemmedIndex.size,
       avgDocLength: this.avgDocLength,
+      stemmingEnabled: this.config.stemming,
     };
   }
 }
