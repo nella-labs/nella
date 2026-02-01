@@ -12,7 +12,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { 
   AssumptionType,
   DependencyChange,
-} from "@nella-labs/core";
+} from "@usenella/core";
 import type { ServerContext } from "../server";
 
 // =============================================================================
@@ -346,7 +346,7 @@ async function handleCheckAssumptions(
   lines.push("");
 
   lines.push("### By Type");
-  for (const [type, count] of Object.entries(summary.byType)) {
+  for (const [type, count] of Object.entries(summary.byType) as Array<[string, number]>) {
     if (count > 0) {
       lines.push(`- ${type}: ${count}`);
     }

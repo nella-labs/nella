@@ -5,7 +5,7 @@
  */
 
 // Re-export core functionality
-export * from "@nella-labs/core";
+export * from "@usenella/core";
 
 // Export MCP server functionality
 export { startMcpServer, type ServerContext } from "./mcp/server";
