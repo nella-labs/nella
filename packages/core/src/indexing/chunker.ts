@@ -1,7 +1,7 @@
 /**
  * Code Chunker
  *
- * AST-aware chunking for TypeScript/JavaScript code.
+ * Real AST-aware chunking for TypeScript/JavaScript using @typescript-eslint/parser.
  * Falls back to recursive splitting for other file types.
  */
 
@@ -19,6 +19,8 @@ export interface ChunkerConfig {
   minTokens: number;
   overlap: number;
   strategy: "ast" | "recursive" | "fixed";
+  includeComments: boolean;
+  includeJSDoc: boolean;
 }
 
 const DEFAULT_CONFIG: ChunkerConfig = {
@@ -26,10 +28,87 @@ const DEFAULT_CONFIG: ChunkerConfig = {
   minTokens: 50,
   overlap: 50,
   strategy: "ast",
+  includeComments: true,
+  includeJSDoc: true,
 };
 
 // Rough token estimate: ~4 chars per token
 const CHARS_PER_TOKEN = 4;
+
+// =============================================================================
+// AST Node Types we care about
+// =============================================================================
+
+type ASTNode = {
+  type: string;
+  loc?: { start: { line: number }; end: { line: number } };
+  range?: [number, number];
+  id?: { name: string } | null;
+  key?: { name?: string; value?: string };
+  name?: string;
+  body?: ASTNode | ASTNode[];
+  declaration?: ASTNode;
+  declarations?: ASTNode[];
+  init?: ASTNode;
+  exported?: boolean;
+  async?: boolean;
+  params?: ASTNode[];
+  leadingComments?: ASTComment[];
+  comments?: ASTComment[];
+};
+
+type ASTComment = {
+  type: string;
+  value: string;
+  loc?: { start: { line: number }; end: { line: number } };
+};
+
+// =============================================================================
+// TypeScript AST Parser Wrapper
+// =============================================================================
+
+class TypeScriptASTParser {
+  private parser: any = null;
+  private available: boolean = false;
+
+  constructor() {
+    try {
+      this.parser = require("@typescript-eslint/typescript-estree");
+      this.available = true;
+    } catch {
+      // Parser not available, will use fallback
+    }
+  }
+
+  isAvailable(): boolean {
+    return this.available;
+  }
+
+  parse(code: string, isTypeScript: boolean): { ast: ASTNode; comments: ASTComment[] } | null {
+    if (!this.available || !this.parser) {
+      return null;
+    }
+
+    try {
+      const ast = this.parser.parse(code, {
+        loc: true,
+        range: true,
+        comment: true,
+        jsx: true,
+        errorOnUnknownASTType: false,
+        useJSXTextNode: true,
+      });
+
+      return {
+        ast: ast as ASTNode,
+        comments: (ast.comments || []) as ASTComment[],
+      };
+    } catch (error) {
+      // Parse error - return null to trigger fallback
+      return null;
+    }
+  }
+}
 
 // =============================================================================
 // Chunker Class
@@ -38,9 +117,11 @@ const CHARS_PER_TOKEN = 4;
 export class Chunker {
   private config: ChunkerConfig;
   private chunkCounter: number = 0;
+  private astParser: TypeScriptASTParser;
 
   constructor(config: Partial<ChunkerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.astParser = new TypeScriptASTParser();
   }
 
   /**
@@ -52,7 +133,12 @@ export class Chunker {
 
     // Choose strategy based on language and config
     if (this.config.strategy === "ast" && this.supportsAST(language)) {
-      return this.astChunk(filePath, fileContent, language);
+      const astChunks = this.astChunk(filePath, fileContent, language);
+      if (astChunks.length > 0) {
+        return astChunks;
+      }
+      // Fallback if AST parsing fails
+      return this.recursiveChunk(filePath, fileContent, language);
     } else if (this.config.strategy === "recursive" || language === "markdown") {
       return this.recursiveChunk(filePath, fileContent, language);
     } else {
@@ -61,14 +147,365 @@ export class Chunker {
   }
 
   /**
-   * AST-based chunking for TypeScript/JavaScript
+   * Real AST-based chunking for TypeScript/JavaScript
    */
-  private async astChunk(filePath: string, content: string, language: string): Promise<CodeChunk[]> {
+  private astChunk(filePath: string, content: string, language: string): CodeChunk[] {
+    const isTypeScript = language === "typescript";
+    const parseResult = this.astParser.parse(content, isTypeScript);
+
+    if (!parseResult) {
+      // Parser not available or parse error - use fallback
+      return this.regexAstChunk(filePath, content, language);
+    }
+
+    const { ast, comments } = parseResult;
+    const lines = content.split("\n");
+    const chunks: CodeChunk[] = [];
+
+    // Build comment map (line -> comments)
+    const commentsByLine = new Map<number, ASTComment[]>();
+    for (const comment of comments) {
+      if (comment.loc) {
+        const line = comment.loc.start.line;
+        if (!commentsByLine.has(line)) {
+          commentsByLine.set(line, []);
+        }
+        commentsByLine.get(line)!.push(comment);
+      }
+    }
+
+    // Extract top-level declarations
+    const body = Array.isArray(ast.body) ? ast.body : [ast.body].filter(Boolean);
+
+    for (const node of body) {
+      if (!node) continue;
+
+      const extracted = this.extractChunkFromNode(node, lines, commentsByLine, filePath, language);
+      if (extracted) {
+        chunks.push(...extracted);
+      }
+    }
+
+    // Handle remaining code (imports grouped, etc.)
+    const coveredLines = new Set<number>();
+    for (const chunk of chunks) {
+      for (let i = chunk.lines[0]; i <= chunk.lines[1]; i++) {
+        coveredLines.add(i);
+      }
+    }
+
+    // Extract uncovered imports as a single chunk
+    const importLines: number[] = [];
+    for (const node of body) {
+      if (node && node.type === "ImportDeclaration" && node.loc) {
+        for (let i = node.loc.start.line; i <= node.loc.end.line; i++) {
+          if (!coveredLines.has(i)) {
+            importLines.push(i);
+          }
+        }
+      }
+    }
+
+    if (importLines.length > 0) {
+      const startLine = Math.min(...importLines);
+      const endLine = Math.max(...importLines);
+      const importContent = lines.slice(startLine - 1, endLine).join("\n");
+      chunks.unshift(this.createChunkFromText(filePath, importContent, language, startLine, endLine, "module", []));
+    }
+
+    // Merge small chunks and return
+    return this.mergeSmallChunks(chunks);
+  }
+
+  /**
+   * Extract chunk(s) from an AST node
+   */
+  private extractChunkFromNode(
+    node: ASTNode,
+    lines: string[],
+    commentsByLine: Map<number, ASTComment[]>,
+    filePath: string,
+    language: string
+  ): CodeChunk[] | null {
+    if (!node.loc) return null;
+
+    const startLine = node.loc.start.line;
+    const endLine = node.loc.end.line;
+    const chunks: CodeChunk[] = [];
+
+    // Determine chunk type and extract symbols
+    let chunkType: ChunkType = "other";
+    const symbols: CodeSymbol[] = [];
+    let isExported = false;
+
+    switch (node.type) {
+      case "FunctionDeclaration":
+        chunkType = "function";
+        if (node.id?.name) {
+          symbols.push({
+            name: node.id.name,
+            kind: "function",
+            signature: this.getFunctionSignature(node, lines),
+            exported: false,
+          });
+        }
+        break;
+
+      case "ClassDeclaration":
+        chunkType = "class";
+        if (node.id?.name) {
+          symbols.push({
+            name: node.id.name,
+            kind: "class",
+            exported: false,
+          });
+        }
+        // Extract class methods as separate chunks if class is large
+        const classChunks = this.extractClassMembers(node, lines, commentsByLine, filePath, language);
+        if (classChunks.length > 0) {
+          chunks.push(...classChunks);
+          return chunks;
+        }
+        break;
+
+      case "TSInterfaceDeclaration":
+        chunkType = "interface";
+        if (node.id?.name) {
+          symbols.push({
+            name: node.id.name,
+            kind: "interface",
+            exported: false,
+          });
+        }
+        break;
+
+      case "TSTypeAliasDeclaration":
+        chunkType = "type";
+        if (node.id?.name) {
+          symbols.push({
+            name: node.id.name,
+            kind: "type",
+            exported: false,
+          });
+        }
+        break;
+
+      case "VariableDeclaration":
+        // Check if it's an arrow function or object
+        if (node.declarations && node.declarations.length > 0) {
+          const decl = node.declarations[0];
+          if (decl.init) {
+            if (decl.init.type === "ArrowFunctionExpression" || decl.init.type === "FunctionExpression") {
+              chunkType = "function";
+              if (decl.id && "name" in decl.id) {
+                symbols.push({
+                  name: decl.id.name as string,
+                  kind: "function",
+                  signature: this.getArrowSignature(decl, lines),
+                  exported: false,
+                });
+              }
+            } else if (decl.init.type === "ObjectExpression") {
+              chunkType = "other";
+              if (decl.id && "name" in decl.id) {
+                symbols.push({
+                  name: decl.id.name as string,
+                  kind: "variable",
+                  exported: false,
+                });
+              }
+            }
+          }
+        }
+        break;
+
+      case "ExportNamedDeclaration":
+      case "ExportDefaultDeclaration":
+        isExported = true;
+        if (node.declaration) {
+          const innerChunks = this.extractChunkFromNode(
+            { ...node.declaration, exported: true } as ASTNode,
+            lines,
+            commentsByLine,
+            filePath,
+            language
+          );
+          if (innerChunks) {
+            for (const chunk of innerChunks) {
+              chunk.symbols = chunk.symbols.map((s) => ({ ...s, exported: true }));
+            }
+            return innerChunks;
+          }
+        }
+        return null;
+
+      case "ImportDeclaration":
+        // Skip - handled separately
+        return null;
+
+      default:
+        // Skip other node types
+        return null;
+    }
+
+    // Get leading JSDoc comment
+    let actualStartLine = startLine;
+    if (this.config.includeJSDoc) {
+      const leadingComments = commentsByLine.get(startLine - 1) || [];
+      for (const comment of leadingComments) {
+        if (comment.type === "Block" && comment.value.startsWith("*") && comment.loc) {
+          actualStartLine = Math.min(actualStartLine, comment.loc.start.line);
+        }
+      }
+      // Check a few lines above for JSDoc
+      for (let i = startLine - 1; i >= Math.max(1, startLine - 10); i--) {
+        const lineComments = commentsByLine.get(i);
+        if (lineComments) {
+          for (const comment of lineComments) {
+            if (comment.type === "Block" && comment.value.startsWith("*") && comment.loc) {
+              actualStartLine = Math.min(actualStartLine, comment.loc.start.line);
+            }
+          }
+        }
+      }
+    }
+
+    // Extract content
+    const chunkContent = lines.slice(actualStartLine - 1, endLine).join("\n");
+
+    // Check if too large - split if needed
+    const tokens = this.estimateTokens(chunkContent);
+    if (tokens > this.config.maxTokens && chunkType === "class") {
+      // Split large classes
+      return this.extractClassMembers(node, lines, commentsByLine, filePath, language);
+    }
+
+    chunks.push(this.createChunkFromText(
+      filePath,
+      chunkContent,
+      language,
+      actualStartLine,
+      endLine,
+      chunkType,
+      symbols.map((s) => ({ ...s, exported: isExported || s.exported }))
+    ));
+
+    return chunks;
+  }
+
+  /**
+   * Extract class members as separate chunks
+   */
+  private extractClassMembers(
+    node: ASTNode,
+    lines: string[],
+    commentsByLine: Map<number, ASTComment[]>,
+    filePath: string,
+    language: string
+  ): CodeChunk[] {
+    const chunks: CodeChunk[] = [];
+
+    if (!node.body || !("body" in node.body) || !Array.isArray((node.body as any).body)) {
+      return chunks;
+    }
+
+    const classBody = (node.body as any).body as ASTNode[];
+    const className = node.id?.name || "AnonymousClass";
+
+    for (const member of classBody) {
+      if (!member.loc) continue;
+
+      let memberName = "";
+      let memberKind: CodeSymbol["kind"] = "method";
+
+      if (member.type === "MethodDefinition" || member.type === "TSMethodSignature") {
+        memberKind = "method";
+        if (member.key) {
+          memberName = member.key.name || member.key.value || "";
+        }
+      } else if (member.type === "PropertyDefinition" || member.type === "TSPropertySignature") {
+        memberKind = "property";
+        if (member.key) {
+          memberName = member.key.name || member.key.value || "";
+        }
+      } else {
+        continue;
+      }
+
+      const startLine = member.loc.start.line;
+      const endLine = member.loc.end.line;
+
+      // Include leading JSDoc
+      let actualStartLine = startLine;
+      for (let i = startLine - 1; i >= Math.max(1, startLine - 10); i--) {
+        const lineContent = lines[i - 1]?.trim();
+        if (lineContent?.startsWith("/**") || lineContent?.startsWith("*") || lineContent?.endsWith("*/")) {
+          actualStartLine = i;
+        } else if (lineContent && !lineContent.startsWith("//")) {
+          break;
+        }
+      }
+
+      const memberContent = lines.slice(actualStartLine - 1, endLine).join("\n");
+
+      chunks.push(this.createChunkFromText(
+        filePath,
+        memberContent,
+        language,
+        actualStartLine,
+        endLine,
+        memberKind === "method" ? "function" : "other",
+        [{
+          name: `${className}.${memberName}`,
+          kind: memberKind,
+          exported: false,
+        }]
+      ));
+    }
+
+    // If no members extracted, return class as single chunk
+    if (chunks.length === 0 && node.loc) {
+      const content = lines.slice(node.loc.start.line - 1, node.loc.end.line).join("\n");
+      chunks.push(this.createChunkFromText(
+        filePath,
+        content,
+        language,
+        node.loc.start.line,
+        node.loc.end.line,
+        "class",
+        [{ name: className, kind: "class", exported: false }]
+      ));
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Get function signature from AST node
+   */
+  private getFunctionSignature(node: ASTNode, lines: string[]): string {
+    if (!node.loc) return "";
+    const firstLine = lines[node.loc.start.line - 1];
+    const match = firstLine.match(/^.*?function\s+\w+\s*\([^)]*\)/);
+    return match ? match[0].trim() : firstLine.trim();
+  }
+
+  /**
+   * Get arrow function signature
+   */
+  private getArrowSignature(decl: ASTNode, lines: string[]): string {
+    if (!decl || !("id" in decl) || !decl.id || !("loc" in decl) || !decl.loc) return "";
+    const firstLine = lines[(decl.loc as any).start.line - 1];
+    const match = firstLine.match(/^.*?(?:const|let|var)\s+\w+\s*(?::\s*[^=]+)?\s*=\s*(?:async\s*)?\([^)]*\)/);
+    return match ? match[0].trim() : firstLine.trim();
+  }
+
+  /**
+   * Fallback regex-based AST-like parsing (original implementation)
+   */
+  private regexAstChunk(filePath: string, content: string, language: string): CodeChunk[] {
     const chunks: CodeChunk[] = [];
     const lines = content.split("\n");
-
-    // Simple AST-like parsing without external dependencies
-    // Extracts functions, classes, interfaces, types
     const patterns = this.getLanguagePatterns(language);
 
     let currentChunk: {
@@ -94,7 +531,6 @@ export class Chunker {
         inMultiLineComment = false;
       }
 
-      // Skip if in multi-line comment
       if (inMultiLineComment) {
         if (currentChunk) {
           currentChunk.content.push(line);
@@ -107,12 +543,10 @@ export class Chunker {
       for (const pattern of patterns) {
         const match = trimmed.match(pattern.regex);
         if (match) {
-          // Save previous chunk if exists
           if (currentChunk && currentChunk.content.length > 0) {
             chunks.push(this.createChunk(filePath, currentChunk, language));
           }
 
-          // Start new chunk
           currentChunk = {
             startLine: i + 1,
             endLine: i + 1,
@@ -133,21 +567,16 @@ export class Chunker {
       }
 
       if (!matched && currentChunk) {
-        // Continue current chunk
         currentChunk.content.push(line);
         currentChunk.endLine = i + 1;
-
-        // Track brace depth
         braceDepth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
 
-        // End chunk when braces close
         if (braceDepth <= 0 && currentChunk.content.length > 1) {
           chunks.push(this.createChunk(filePath, currentChunk, language));
           currentChunk = null;
           braceDepth = 0;
         }
       } else if (!matched && !currentChunk) {
-        // Handle standalone code (imports, top-level statements)
         if (trimmed && !trimmed.startsWith("//") && !trimmed.startsWith("*")) {
           currentChunk = {
             startLine: i + 1,
@@ -159,7 +588,6 @@ export class Chunker {
         }
       }
 
-      // Check if chunk is too large
       if (currentChunk) {
         const tokens = this.estimateTokens(currentChunk.content.join("\n"));
         if (tokens > this.config.maxTokens) {
@@ -170,12 +598,10 @@ export class Chunker {
       }
     }
 
-    // Save final chunk
     if (currentChunk && currentChunk.content.length > 0) {
       chunks.push(this.createChunk(filePath, currentChunk, language));
     }
 
-    // Merge small chunks
     return this.mergeSmallChunks(chunks);
   }
 
@@ -190,7 +616,6 @@ export class Chunker {
 
     const splitRecursive = (text: string, splitterIndex: number, startLine: number): void => {
       if (splitterIndex >= splitters.length) {
-        // Final split by line
         const lines = text.split("\n");
         let currentLines: string[] = [];
         let currentStartLine = startLine;
@@ -260,7 +685,7 @@ export class Chunker {
   private fixedChunk(filePath: string, content: string, language: string): CodeChunk[] {
     const chunks: CodeChunk[] = [];
     const lines = content.split("\n");
-    const maxLines = Math.floor((this.config.maxTokens * CHARS_PER_TOKEN) / 80); // Assume 80 chars/line
+    const maxLines = Math.floor((this.config.maxTokens * CHARS_PER_TOKEN) / 80);
     const overlapLines = Math.floor((this.config.overlap * CHARS_PER_TOKEN) / 80);
 
     for (let i = 0; i < lines.length; i += maxLines - overlapLines) {
@@ -321,7 +746,9 @@ export class Chunker {
     content: string,
     language: string,
     startLine: number,
-    endLine: number
+    endLine: number,
+    type?: ChunkType,
+    symbols?: CodeSymbol[]
   ): CodeChunk {
     const id = `chunk_${this.chunkCounter++}_${crypto.createHash("md5").update(content).digest("hex").slice(0, 8)}`;
 
@@ -330,9 +757,9 @@ export class Chunker {
       filePath,
       content,
       lines: [startLine, endLine],
-      type: this.detectChunkType(content),
+      type: type || this.detectChunkType(content),
       language,
-      symbols: this.extractSymbols(content),
+      symbols: symbols || this.extractSymbols(content),
       imports: this.extractImports(content),
       exports: this.extractExports(content),
       hash: crypto.createHash("sha256").update(content).digest("hex"),
@@ -352,16 +779,20 @@ export class Chunker {
     for (const chunk of chunks) {
       if (chunk.tokens < this.config.minTokens) {
         if (buffer) {
-          // Merge with buffer
+          const mergedContent: string = buffer.content + "\n\n" + chunk.content;
           buffer = {
-            ...buffer,
-            content: buffer.content + "\n\n" + chunk.content,
+            id: buffer.id,
+            filePath: buffer.filePath,
+            content: mergedContent,
             lines: [buffer.lines[0], chunk.lines[1]],
+            type: buffer.type,
+            language: buffer.language,
             symbols: [...buffer.symbols, ...chunk.symbols],
             imports: [...(buffer.imports || []), ...(chunk.imports || [])],
             exports: [...(buffer.exports || []), ...(chunk.exports || [])],
-            hash: crypto.createHash("sha256").update(buffer.content + "\n\n" + chunk.content).digest("hex"),
-            tokens: this.estimateTokens(buffer.content + "\n\n" + chunk.content),
+            hash: crypto.createHash("sha256").update(mergedContent).digest("hex"),
+            tokens: this.estimateTokens(mergedContent),
+            createdAt: buffer.createdAt,
             updatedAt: new Date().toISOString(),
           };
         } else {
@@ -375,7 +806,6 @@ export class Chunker {
         merged.push(chunk);
       }
 
-      // Flush buffer if it's large enough
       if (buffer && buffer.tokens >= this.config.minTokens) {
         merged.push(buffer);
         buffer = null;
@@ -400,6 +830,8 @@ export class Chunker {
       ".tsx": "typescript",
       ".js": "javascript",
       ".jsx": "javascript",
+      ".mjs": "javascript",
+      ".cjs": "javascript",
       ".py": "python",
       ".java": "java",
       ".go": "go",
@@ -427,7 +859,7 @@ export class Chunker {
         { regex: /^(?:export\s+)?class\s+(\w+)/, type: "class", symbolKind: "class" },
         { regex: /^(?:export\s+)?interface\s+(\w+)/, type: "interface", symbolKind: "interface" },
         { regex: /^(?:export\s+)?type\s+(\w+)/, type: "type", symbolKind: "type" },
-        { regex: /^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\(/, type: "function", symbolKind: "function" },
+        { regex: /^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s*)?\(/, type: "function", symbolKind: "function" },
         { regex: /^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?function/, type: "function", symbolKind: "function" },
       ];
     }
@@ -453,31 +885,26 @@ export class Chunker {
     for (const line of lines) {
       const trimmed = line.trim();
 
-      // Function
       const funcMatch = trimmed.match(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)/);
       if (funcMatch) {
         symbols.push({ name: funcMatch[1], kind: "function", exported: trimmed.startsWith("export") });
       }
 
-      // Class
       const classMatch = trimmed.match(/^(?:export\s+)?class\s+(\w+)/);
       if (classMatch) {
         symbols.push({ name: classMatch[1], kind: "class", exported: trimmed.startsWith("export") });
       }
 
-      // Interface
       const interfaceMatch = trimmed.match(/^(?:export\s+)?interface\s+(\w+)/);
       if (interfaceMatch) {
         symbols.push({ name: interfaceMatch[1], kind: "interface", exported: trimmed.startsWith("export") });
       }
 
-      // Type
       const typeMatch = trimmed.match(/^(?:export\s+)?type\s+(\w+)/);
       if (typeMatch) {
         symbols.push({ name: typeMatch[1], kind: "type", exported: trimmed.startsWith("export") });
       }
 
-      // Const function
       const constFuncMatch = trimmed.match(/^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?(?:\(|function)/);
       if (constFuncMatch) {
         symbols.push({ name: constFuncMatch[1], kind: "function", exported: trimmed.startsWith("export") });
