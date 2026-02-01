@@ -13,8 +13,9 @@ import type {
   AuthAction,
   AuthEvent,
   ApiKeyPermissions,
+  ExtendedAuthEvent,
 } from "./types";
-import { KeyManager } from "./key-manager";
+import { KeyManager, KeyManagerOptions } from "./key-manager";
 import { AgentManager } from "./agent-manager";
 
 // =============================================================================
@@ -23,7 +24,8 @@ import { AgentManager } from "./agent-manager";
 
 export interface AuthenticatorOptions {
   storagePath: string;
-  onEvent?: (event: AuthEvent) => void;
+  encryptionKey?: string;
+  onEvent?: (event: ExtendedAuthEvent) => void;
 }
 
 // Action to permission mapping
@@ -44,20 +46,24 @@ const ACTION_PERMISSIONS: Record<AuthAction, keyof ApiKeyPermissions> = {
 export class Authenticator {
   private keyManager: KeyManager;
   private agentManager: AgentManager;
-  private onEvent?: (event: AuthEvent) => void;
+  private onEventHandler?: (event: ExtendedAuthEvent) => void;
 
   constructor(options: AuthenticatorOptions) {
-    this.keyManager = new KeyManager(options.storagePath);
+    const keyManagerOptions: KeyManagerOptions = {
+      storagePath: options.storagePath,
+      encryptionKey: options.encryptionKey,
+    };
+    this.keyManager = new KeyManager(keyManagerOptions);
     this.agentManager = new AgentManager(options.storagePath);
-    this.onEvent = options.onEvent;
+    this.onEventHandler = options.onEvent;
 
     // Forward events
     this.keyManager.onEvent((event) => this.emit(event));
-    this.agentManager.onEvent((event) => this.emit(event));
+    this.agentManager.onEvent((event) => this.emit(event as ExtendedAuthEvent));
   }
 
-  private emit(event: AuthEvent): void {
-    this.onEvent?.(event);
+  private emit(event: ExtendedAuthEvent): void {
+    this.onEventHandler?.(event);
   }
 
   // =============================================================================
@@ -256,6 +262,10 @@ export class Authenticator {
 // Factory
 // =============================================================================
 
-export function createAuthenticator(storagePath: string, onEvent?: (event: AuthEvent) => void): Authenticator {
-  return new Authenticator({ storagePath, onEvent });
+export function createAuthenticator(
+  storagePath: string,
+  onEvent?: (event: ExtendedAuthEvent) => void,
+  encryptionKey?: string
+): Authenticator {
+  return new Authenticator({ storagePath, onEvent, encryptionKey });
 }
