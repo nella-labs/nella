@@ -1,0 +1,536 @@
+/**
+ * Index Manager
+ *
+ * Main orchestrator for the RAG indexing system.
+ * Manages document loading, chunking, embedding, and search.
+ */
+
+import * as fs from "fs";
+import * as path from "path";
+import { minimatch } from "minimatch";
+import type {
+  CodeChunk,
+  IndexMetadata,
+  IndexConfig,
+  DEFAULT_INDEX_CONFIG,
+  SearchQuery,
+  SearchResponse,
+  VerifyCodeRequest,
+  VerifyCodeResult,
+  IndexEvent,
+} from "./types";
+import { Chunker, createChunker } from "./chunker";
+import { Embedder, createEmbedder } from "./embedder";
+import { VectorStore, createVectorStore } from "./vector-store";
+import { LexicalIndex, createLexicalIndex } from "./lexical-index";
+import { HybridSearcher, createHybridSearcher } from "./hybrid-search";
+import { CodeVerifier, createCodeVerifier } from "./verifier";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface IndexManagerConfig extends IndexConfig {
+  workspaceId: string;
+  workspacePath: string;
+  storagePath: string;  // Where to store index files
+}
+
+export type IndexEventHandler = (event: IndexEvent) => void;
+
+// =============================================================================
+// Index Manager Class
+// =============================================================================
+
+export class IndexManager {
+  private config: IndexManagerConfig;
+  private metadata: IndexMetadata | null = null;
+
+  // Components
+  private chunker: Chunker;
+  private embedder: Embedder;
+  private vectorStore: VectorStore;
+  private lexicalIndex: LexicalIndex;
+  private hybridSearcher: HybridSearcher;
+  private verifier: CodeVerifier;
+
+  // State
+  private chunks: Map<string, CodeChunk> = new Map();
+  private fileHashes: Map<string, string> = new Map();
+  private eventHandlers: IndexEventHandler[] = [];
+
+  constructor(config: IndexManagerConfig) {
+    this.config = config;
+
+    // Initialize components
+    this.chunker = createChunker({
+      maxTokens: config.chunking.maxTokens,
+      overlap: config.chunking.overlap,
+      strategy: config.chunking.strategy,
+    });
+
+    this.embedder = createEmbedder({
+      provider: config.embedder.provider,
+      model: config.embedder.model,
+      dimensions: config.embedder.dimensions,
+    });
+
+    this.vectorStore = createVectorStore({
+      dimensions: config.embedder.dimensions,
+    });
+
+    this.lexicalIndex = createLexicalIndex();
+
+    this.hybridSearcher = createHybridSearcher(
+      this.vectorStore,
+      this.lexicalIndex,
+      this.embedder,
+      {
+        vectorWeight: config.search.vectorWeight,
+        lexicalWeight: config.search.lexicalWeight,
+        topK: config.search.topK,
+        rerankEnabled: config.search.rerankEnabled,
+      }
+    );
+
+    this.verifier = createCodeVerifier(this.lexicalIndex);
+
+    // Initialize persistence
+    this.initPersistence();
+  }
+
+  /**
+   * Initialize persistence paths
+   */
+  private initPersistence(): void {
+    const storagePath = this.config.storagePath;
+
+    // Create storage directory
+    if (!fs.existsSync(storagePath)) {
+      fs.mkdirSync(storagePath, { recursive: true });
+    }
+
+    // Initialize component persistence
+    this.embedder.initCache(path.join(storagePath, "embeddings.cache.json"));
+    this.vectorStore.initPersistence(path.join(storagePath, "vectors.json"));
+    this.lexicalIndex.initPersistence(path.join(storagePath, "lexical.json"));
+
+    // Load existing metadata
+    this.loadMetadata();
+  }
+
+  /**
+   * Add event handler
+   */
+  onEvent(handler: IndexEventHandler): void {
+    this.eventHandlers.push(handler);
+  }
+
+  /**
+   * Emit event to all handlers
+   */
+  private emit(event: IndexEvent): void {
+    for (const handler of this.eventHandlers) {
+      try {
+        handler(event);
+      } catch (error) {
+        console.error("Event handler error:", error);
+      }
+    }
+  }
+
+  /**
+   * Index the workspace
+   */
+  async index(options: { force?: boolean; paths?: string[] } = {}): Promise<IndexMetadata> {
+    const { force = false, paths } = options;
+    const workspacePath = this.config.workspacePath;
+
+    // Get files to index
+    const files = paths
+      ? paths.map((p) => path.resolve(workspacePath, p))
+      : this.getFilesToIndex(workspacePath);
+
+    this.emit({
+      type: "index:start",
+      workspaceId: this.config.workspaceId,
+      totalFiles: files.length,
+    });
+
+    let totalChunks = 0;
+    let totalTokens = 0;
+    let totalCost = 0;
+    const startTime = Date.now();
+
+    // Process files
+    for (let i = 0; i < files.length; i++) {
+      const filePath = files[i];
+
+      try {
+        // Check if file needs reindexing
+        const fileHash = this.computeFileHash(filePath);
+        const existingHash = this.fileHashes.get(filePath);
+
+        if (!force && existingHash === fileHash) {
+          continue; // Skip unchanged files
+        }
+
+        this.emit({
+          type: "index:progress",
+          workspaceId: this.config.workspaceId,
+          processed: i + 1,
+          total: files.length,
+          currentFile: path.relative(workspacePath, filePath),
+        });
+
+        // Remove old chunks for this file
+        this.removeChunksForFile(filePath);
+
+        // Chunk the file
+        const fileChunks = await this.chunker.chunkFile(filePath);
+
+        // Add chunks to indexes
+        for (const chunk of fileChunks) {
+          this.chunks.set(chunk.id, chunk);
+          this.lexicalIndex.add(chunk);
+          this.hybridSearcher.registerChunk(chunk);
+          this.verifier.registerChunk(chunk);
+
+          this.emit({
+            type: "index:chunk",
+            workspaceId: this.config.workspaceId,
+            chunkId: chunk.id,
+            filePath: path.relative(workspacePath, filePath),
+          });
+
+          totalChunks++;
+          totalTokens += chunk.tokens;
+        }
+
+        // Update file hash
+        this.fileHashes.set(filePath, fileHash);
+
+      } catch (error) {
+        this.emit({
+          type: "index:error",
+          workspaceId: this.config.workspaceId,
+          error: error instanceof Error ? error.message : String(error),
+          filePath: path.relative(workspacePath, filePath),
+        });
+      }
+    }
+
+    // Generate embeddings for all chunks
+    const chunksToEmbed = Array.from(this.chunks.values()).filter((c) => !c.embedding);
+
+    if (chunksToEmbed.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < chunksToEmbed.length; i += batchSize) {
+        const batch = chunksToEmbed.slice(i, i + batchSize);
+        const texts = batch.map((c) => c.content);
+
+        const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
+        totalCost += cost;
+
+        this.emit({
+          type: "index:embed",
+          workspaceId: this.config.workspaceId,
+          batchSize: batch.length,
+          tokensUsed,
+          cost,
+        });
+
+        // Store embeddings
+        for (let j = 0; j < batch.length; j++) {
+          const chunk = batch[j];
+          chunk.embedding = embeddings[j];
+          this.vectorStore.add(chunk.id, embeddings[j]);
+        }
+      }
+    }
+
+    // Save all indexes
+    this.vectorStore.save();
+    this.lexicalIndex.save();
+    this.saveChunks();
+    this.saveFileHashes();
+
+    // Update metadata
+    const duration = Date.now() - startTime;
+    this.metadata = {
+      workspaceId: this.config.workspaceId,
+      workspacePath: this.config.workspacePath,
+      createdAt: this.metadata?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: "1.0.0",
+      stats: {
+        filesIndexed: files.length,
+        chunksCount: this.chunks.size,
+        totalTokens,
+        embeddingsCount: this.vectorStore.size,
+      },
+      config: this.config,
+    };
+    this.saveMetadata();
+
+    this.emit({
+      type: "index:complete",
+      workspaceId: this.config.workspaceId,
+      stats: this.metadata.stats,
+      duration,
+    });
+
+    return this.metadata;
+  }
+
+  /**
+   * Search the index
+   */
+  async search(query: SearchQuery): Promise<SearchResponse> {
+    const startTime = Date.now();
+    const response = await this.hybridSearcher.search(query);
+
+    this.emit({
+      type: "search:query",
+      query: query.query,
+      resultsCount: response.results.length,
+      searchTime: Date.now() - startTime,
+    });
+
+    if (response.tokensUsed > 0) {
+      this.emit({
+        type: "search:embed",
+        tokensUsed: response.tokensUsed,
+        cost: response.cost,
+      });
+    }
+
+    return response;
+  }
+
+  /**
+   * Verify code against the index
+   */
+  verify(request: VerifyCodeRequest): VerifyCodeResult {
+    const result = this.verifier.verify(request);
+
+    this.emit({
+      type: "verify:check",
+      filePath: request.filePath || "unknown",
+      valid: result.valid,
+      issuesCount: result.issues.length,
+    });
+
+    return result;
+  }
+
+  /**
+   * Get a chunk by ID
+   */
+  getChunk(chunkId: string): CodeChunk | null {
+    return this.chunks.get(chunkId) || null;
+  }
+
+  /**
+   * Get all chunks for a file
+   */
+  getChunksForFile(filePath: string): CodeChunk[] {
+    const normalizedPath = path.normalize(filePath);
+    return Array.from(this.chunks.values()).filter(
+      (c) => path.normalize(c.filePath) === normalizedPath
+    );
+  }
+
+  /**
+   * Get index metadata
+   */
+  getMetadata(): IndexMetadata | null {
+    return this.metadata;
+  }
+
+  /**
+   * Get index status
+   */
+  getStatus(): {
+    ready: boolean;
+    stats: IndexMetadata["stats"] | null;
+    lastUpdated: string | null;
+  } {
+    return {
+      ready: this.chunks.size > 0,
+      stats: this.metadata?.stats || null,
+      lastUpdated: this.metadata?.updatedAt || null,
+    };
+  }
+
+  /**
+   * Clear the index
+   */
+  clear(): void {
+    this.chunks.clear();
+    this.fileHashes.clear();
+    this.vectorStore.clear();
+    this.lexicalIndex.clear();
+    this.metadata = null;
+
+    // Clear persisted files
+    const files = [
+      "chunks.json",
+      "vectors.json",
+      "lexical.json",
+      "metadata.json",
+      "file-hashes.json",
+    ];
+    for (const file of files) {
+      const filePath = path.join(this.config.storagePath, file);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  }
+
+  // =============================================================================
+  // Private Methods
+  // =============================================================================
+
+  private getFilesToIndex(rootPath: string): string[] {
+    const files: string[] = [];
+
+    const walk = (dir: string): void => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relativePath = path.relative(rootPath, fullPath);
+
+        // Check excludes
+        const excluded = this.config.exclude.some((pattern) =>
+          minimatch(relativePath, pattern, { dot: true })
+        );
+        if (excluded) continue;
+
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (entry.isFile()) {
+          // Check includes
+          const included = this.config.include.some((pattern) =>
+            minimatch(relativePath, pattern, { dot: true })
+          );
+          if (included) {
+            files.push(fullPath);
+          }
+        }
+      }
+    };
+
+    walk(rootPath);
+    return files;
+  }
+
+  private computeFileHash(filePath: string): string {
+    const content = fs.readFileSync(filePath);
+    const crypto = require("crypto");
+    return crypto.createHash("sha256").update(content).digest("hex");
+  }
+
+  private removeChunksForFile(filePath: string): void {
+    const normalizedPath = path.normalize(filePath);
+    const chunksToRemove = Array.from(this.chunks.entries()).filter(
+      ([, chunk]) => path.normalize(chunk.filePath) === normalizedPath
+    );
+
+    for (const [chunkId] of chunksToRemove) {
+      this.chunks.delete(chunkId);
+      this.vectorStore.remove(chunkId);
+      this.lexicalIndex.remove(chunkId);
+    }
+  }
+
+  private loadMetadata(): void {
+    const metadataPath = path.join(this.config.storagePath, "metadata.json");
+    if (fs.existsSync(metadataPath)) {
+      try {
+        const content = fs.readFileSync(metadataPath, "utf-8");
+        this.metadata = JSON.parse(content);
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    // Load chunks
+    this.loadChunks();
+    this.loadFileHashes();
+  }
+
+  private saveMetadata(): void {
+    const metadataPath = path.join(this.config.storagePath, "metadata.json");
+    fs.writeFileSync(metadataPath, JSON.stringify(this.metadata, null, 2));
+  }
+
+  private loadChunks(): void {
+    const chunksPath = path.join(this.config.storagePath, "chunks.json");
+    if (fs.existsSync(chunksPath)) {
+      try {
+        const content = fs.readFileSync(chunksPath, "utf-8");
+        const chunks: CodeChunk[] = JSON.parse(content);
+        for (const chunk of chunks) {
+          this.chunks.set(chunk.id, chunk);
+          this.hybridSearcher.registerChunk(chunk);
+          this.verifier.registerChunk(chunk);
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+  }
+
+  private saveChunks(): void {
+    const chunksPath = path.join(this.config.storagePath, "chunks.json");
+    const chunks = Array.from(this.chunks.values());
+    fs.writeFileSync(chunksPath, JSON.stringify(chunks, null, 2));
+  }
+
+  private loadFileHashes(): void {
+    const hashesPath = path.join(this.config.storagePath, "file-hashes.json");
+    if (fs.existsSync(hashesPath)) {
+      try {
+        const content = fs.readFileSync(hashesPath, "utf-8");
+        const hashes: Record<string, string> = JSON.parse(content);
+        for (const [file, hash] of Object.entries(hashes)) {
+          this.fileHashes.set(file, hash);
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+  }
+
+  private saveFileHashes(): void {
+    const hashesPath = path.join(this.config.storagePath, "file-hashes.json");
+    const hashes: Record<string, string> = {};
+    for (const [file, hash] of this.fileHashes) {
+      hashes[file] = hash;
+    }
+    fs.writeFileSync(hashesPath, JSON.stringify(hashes, null, 2));
+  }
+}
+
+// =============================================================================
+// Factory
+// =============================================================================
+
+export function createIndexManager(config: IndexManagerConfig): IndexManager {
+  return new IndexManager(config);
+}
+
+// =============================================================================
+// Re-exports
+// =============================================================================
+
+export { Chunker, createChunker } from "./chunker";
+export { Embedder, createEmbedder, EmbeddingCacheManager } from "./embedder";
+export { VectorStore, createVectorStore } from "./vector-store";
+export { LexicalIndex, createLexicalIndex } from "./lexical-index";
+export { HybridSearcher, createHybridSearcher } from "./hybrid-search";
+export { CodeVerifier, createCodeVerifier } from "./verifier";
+export * from "./types";
