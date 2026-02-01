@@ -16,14 +16,14 @@ How to set up and configure the Nella MCP Server with various clients.
 
 ### Installation
 
-The Nella MCP Server is included in the main `@nella-labs/nella` package:
+The Nella MCP Server is included in the main `@usenella/nella` package:
 
 ```bash
 # Global installation
-npm install -g @nella-labs/nella
+npm install -g @usenella/nella
 
 # Or use npx (downloads on first use)
-npx @nella-labs/nella mcp --help
+npx @usenella/nella mcp --help
 ```
 
 ### Configuration File Location
@@ -42,7 +42,7 @@ npx @nella-labs/nella mcp --help
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/your/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -54,7 +54,7 @@ npx @nella-labs/nella mcp --help
   "mcpServers": {
     "nella": {
       "command": "npx.cmd",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "C:\\path\\to\\your\\project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "C:\\path\\to\\your\\project"]
     }
   }
 }
@@ -117,11 +117,11 @@ You can configure multiple Nella servers for different projects:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/frontend"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/frontend"]
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/backend"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/backend"]
     }
   }
 }
@@ -148,7 +148,7 @@ Claude Code uses the same MCP configuration format. Add to your Claude Code sett
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "."]
+      "args": ["@usenella/nella", "mcp", "--workspace", "."]
     }
   }
 }
@@ -165,7 +165,7 @@ For Claude Code, you might want the workspace to follow your current directory:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "${workspaceFolder}"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "${workspaceFolder}"]
     }
   }
 }
@@ -182,7 +182,7 @@ The MCP server uses stdio transport:
 ```typescript
 import { spawn } from 'child_process';
 
-const server = spawn('npx', ['@nella-labs/nella', 'mcp', '--workspace', '/path/to/project'], {
+const server = spawn('npx', ['@usenella/nella', 'mcp', '--workspace', '/path/to/project'], {
   stdio: ['pipe', 'pipe', 'inherit']
 });
 
@@ -275,7 +275,7 @@ The workspace should have:
 
 **Debug**: Run the server manually to see errors:
 ```bash
-npx @nella-labs/nella mcp --workspace /path/to/project
+npx @usenella/nella mcp --workspace /path/to/project
 ```
 
 ### Prerequisites Failing
@@ -342,7 +342,7 @@ To debug MCP messages, you can intercept stdio:
 # Create a debug wrapper script
 cat > debug-nella.sh << 'EOF'
 #!/bin/bash
-tee /tmp/nella-in.log | npx @nella-labs/nella mcp "$@" | tee /tmp/nella-out.log
+tee /tmp/nella-in.log | npx @usenella/nella mcp "$@" | tee /tmp/nella-out.log
 EOF
 chmod +x debug-nella.sh
 ```

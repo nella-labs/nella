@@ -1,6 +1,6 @@
 # Types Reference
 
-Complete type definitions for `@nella-labs/core`.
+Complete type definitions for `@usenella/core`.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ import type {
   ValidationConfig,
   ExpectedChanges,
   RawTaskYaml
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `Task`
@@ -164,7 +164,7 @@ import type {
   DependencyDiff,
   LogEntry,
   LogEntryType
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `RunResult`
@@ -356,7 +356,7 @@ import type {
   FileChange,
   AgentResponse,
   Changes
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `FileChange`
@@ -420,7 +420,7 @@ import type {
   AssumptionConflict,
   DependencySnapshot,
   DependencyDiff
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `Session`
