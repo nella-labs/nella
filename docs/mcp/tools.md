@@ -2,6 +2,8 @@
 
 Complete reference for all tools exposed by the Nella MCP Server.
 
+> **Note:** This documentation is automatically synced to the website. Last updated: February 2026.
+
 ## Table of Contents
 
 - [Validation Tools](#validation-tools)
