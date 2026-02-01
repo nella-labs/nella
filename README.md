@@ -18,9 +18,9 @@ Nella is a framework that sits between AI coding agents and your codebase. It en
 
 | Package | Description | npm |
 |---------|-------------|-----|
-| [@nella-labs/nella](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@nella-labs/nella)](https://www.npmjs.com/package/@nella-labs/nella) |
-| [@nella-labs/core](./packages/core) | Core validation library | [![npm](https://img.shields.io/npm/v/@nella-labs/core)](https://www.npmjs.com/package/@nella-labs/core) |
-| [@nella-labs/benchmark](./packages/benchmark) | Agent evaluation suite | [![npm](https://img.shields.io/npm/v/@nella-labs/benchmark)](https://www.npmjs.com/package/@nella-labs/benchmark) |
+| [@usenella/nella](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@usenella/nella)](https://www.npmjs.com/package/@usenella/nella) |
+| [@usenella/core](./packages/core) | Core validation library | [![npm](https://img.shields.io/npm/v/@usenella/core)](https://www.npmjs.com/package/@usenella/core) |
+| [@usenella/benchmark](./packages/benchmark) | Agent evaluation suite | [![npm](https://img.shields.io/npm/v/@usenella/benchmark)](https://www.npmjs.com/package/@usenella/benchmark) |
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ Nella is a framework that sits between AI coding agents and your codebase. It en
 
 ```bash
 # Install globally
-npm install -g @nella-labs/nella
+npm install -g @usenella/nella
 
 # Check if a task can proceed (pre-flight)
 nella check --task tasks/get-user-by-id --repo ./my-project
@@ -43,7 +43,7 @@ nella run --task tasks/get-user-by-id --repo ./my-project --changes changes.json
 ### Using the Core Library
 
 ```typescript
-import { runTask, check, Task } from '@nella-labs/core';
+import { runTask, check, Task } from '@usenella/core';
 
 // Pre-flight check: can this task proceed?
 const refusal = check(task, '/path/to/repo');
@@ -130,11 +130,25 @@ Nella computes quality metrics for each run:
 
 Nella Core is **agent-agnostic**. The agent calls Core (via MCP, CLI, or library), not the other way around.
 
+## What’s New in Core
+
+Nella Core now ships additional modules you can adopt as you scale agent workflows:
+
+- **Indexing & search** — Create vector + lexical indexes for RAG workflows.
+- **Workspace management** — Register and switch between multiple workspaces.
+- **Authentication & rate limiting** — API key management and per-agent throttling.
+- **Context sharing** — Share decisions, snippets, and assumptions across agents.
+- **Cloud sync** — Push/pull run artifacts to Google Cloud Storage.
+- **Export tooling** — Bundle logs/searches/verifications in JSON/CSV/HTML/Markdown.
+- **Playground server** — Run a local, real-time playground with cost tracking.
+
+See [Core Modules](./docs/core/modules.md) for setup guides and examples.
+
 ## Development
 
 ```bash
 # Clone the repo
-git clone https://github.com/nella-labs/nella.git
+git clone https://github.com/usenella/nella.git
 cd nella
 
 # Install dependencies
@@ -152,7 +166,7 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 
 - [Benchmark Plan](./docs/benchmark-plan.md) — How the benchmark system works
 - [Core API](./packages/core/README.md) — Core library documentation
-- [CLI Reference](./packages/cli/README.md) — CLI command reference
+- [CLI + MCP Reference](./packages/nella/README.md) — CLI command reference and MCP setup
 
 ## License
 
@@ -160,4 +174,4 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 
 ---
 
-Built by [Nella Labs](https://github.com/nella-labs)
+Built by [Nella Labs](https://github.com/usenella)

@@ -1,6 +1,6 @@
-# @nella-labs/core
+# @usenella/core
 
-[![npm](https://img.shields.io/npm/v/@nella-labs/core)](https://www.npmjs.com/package/@nella-labs/core)
+[![npm](https://img.shields.io/npm/v/@usenella/core)](https://www.npmjs.com/package/@usenella/core)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 
@@ -14,16 +14,24 @@ Reliability layer for coding agents. Enforces behavioral contracts that prevent 
 - **🔍 Scope Analysis** — Detect scope creep when agents modify files outside the declared plan
 - **📊 Metrics Calculation** — Compute scope creep ratio, constraint violations, validation integrity
 - **📝 Structured Logging** — Emit JSONL run records for auditing and analysis
-<<<<<<< HEAD
-- **🧠 Context Management** — Track assumptions, changes, and dependencies across sessions
-=======
 - **🧠 Context Tracking** — Track assumptions, dependency drift, and change history across runs
->>>>>>> 59e088f74adc17e5a490dbc42eb7f95f979ca9ea
+
+## Advanced Modules
+
+Nella Core ships additional modules for larger agent systems:
+
+- **Indexing & search** — Hybrid vector + lexical search for RAG workflows
+- **Workspace management** — Multi-workspace registry and switcher utilities
+- **Auth + rate limiting** — API key issuance and per-agent quotas
+- **Context sharing** — Cross-agent memory with visibility controls
+- **Cloud sync** — Sync run artifacts to Google Cloud Storage
+- **Export manager** — JSON/CSV/HTML/Markdown/OpenTelemetry exports
+- **Playground server** — Real-time playground with session telemetry
 
 ## Installation
 
 ```bash
-npm install @nella-labs/core
+npm install @usenella/core
 ```
 
 **Prerequisites:** Target repository must have `package.json` and `node_modules` installed.
@@ -31,7 +39,7 @@ npm install @nella-labs/core
 ## Quick Start
 
 ```typescript
-import { runTask, check, Task, Changes } from '@nella-labs/core';
+import { runTask, check, Task, Changes } from '@usenella/core';
 
 // 1. Pre-flight check: should this task be refused?
 const refusal = check(task, '/path/to/repo');
@@ -116,6 +124,15 @@ console.log('Metrics:', result.metrics);
 - [Types Reference](../../docs/core/types.md) — All TypeScript interfaces
 - [Configuration](../../docs/core/configuration.md) — Task YAML schema and options
 - [Context Management](../../docs/core/context.md) — Session tracking and assumptions
+- [Core Modules](../../docs/core/modules.md) — Indexing, workspace, auth, export, and more
+- [Indexing & Search](../../docs/core/indexing.md) — Hybrid RAG indexing guide
+- [Workspace Management](../../docs/core/workspace.md) — Register and switch workspaces
+- [Auth & Rate Limiting](../../docs/core/auth.md) — API keys and quotas
+- [Context Sharing](../../docs/core/context-sharing.md) — Shared memory across agents
+- [Cloud Sync](../../docs/core/cloud-sync.md) — Google Cloud Storage sync
+- [Export Manager](../../docs/core/export.md) — Bundle and export run data
+- [Playground Server](../../docs/core/playground.md) — Local playground runtime
+- [MCP Tool Handler](../../docs/core/mcp-tools.md) — Embed Nella MCP tools
 - [Examples](../../docs/core/examples.md) — Practical code examples
 
 ## Development
@@ -133,5 +150,5 @@ pnpm test       # Run tests
 ## See Also
 
 - [Nella Specification](../../docs/spec.md) — Architecture and design
-- [@nella-labs/cli](../cli/README.md) — Command-line interface
-- [@nella-labs/benchmark](../benchmark/README.md) — Benchmarking tools
+- [@usenella/nella](../nella/README.md) — CLI + MCP server
+- [@usenella/benchmark](../benchmark/README.md) — Benchmarking tools

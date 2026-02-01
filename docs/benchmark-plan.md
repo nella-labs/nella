@@ -3,7 +3,7 @@
 > **Created:** January 5, 2026  
 > **Last Updated:** January 10, 2026  
 > **Status:** ✅ Implemented  
-> **Package:** [@nella-labs/benchmark](https://www.npmjs.com/package/@nella-labs/benchmark)
+> **Package:** [@usenella/benchmark](https://www.npmjs.com/package/@usenella/benchmark)
 
 ---
 

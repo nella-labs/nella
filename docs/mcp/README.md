@@ -4,7 +4,7 @@ The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude 
 
 ## Overview
 
-The `@nella-labs/nella` package provides both a CLI and an MCP server that allows AI agents to:
+The `@usenella/nella` package provides both a CLI and an MCP server that allows AI agents to:
 
 - **Validate changes** against constraints before/after making them
 - **Detect risks** in proposed code modifications
@@ -25,9 +25,9 @@ The `@nella-labs/nella` package provides both a CLI and an MCP server that allow
 ### 1. Install
 
 ```bash
-npm install -g @nella-labs/nella
+npm install -g @usenella/nella
 # or use npx without installing
-npx @nella-labs/nella mcp --help
+npx @usenella/nella mcp --help
 ```
 
 ### 2. Configure Claude Desktop
@@ -39,7 +39,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -92,7 +92,7 @@ Track state across sessions:
                     MCP Protocol (stdio)
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                     @nella-labs/mcp                          │
+│                     @usenella/nella                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ Validation  │  │   Safety    │  │      Context        │  │
 │  │   Tools     │  │   Tools     │  │       Tools         │  │
@@ -100,7 +100,7 @@ Track state across sessions:
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                     @nella-labs/core                         │
+│                     @usenella/core                         │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
 │  │Validators│  │  Safety  │  │  Utils   │  │   Context   │  │
 │  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
@@ -123,6 +123,6 @@ This allows context to survive across multiple conversations with Claude.
 
 ## Related Packages
 
-- [@nella-labs/core](../core/) — Core reliability engine
-- [@nella-labs/cli](../cli/) — Command-line interface
-- [@nella-labs/benchmark](../benchmark/) — Benchmarking tools
+- [@usenella/core](../core/) — Core reliability engine
+- [@usenella/nella](../../packages/nella/README.md) — CLI + MCP server
+- [@usenella/benchmark](../benchmark/) — Benchmarking tools

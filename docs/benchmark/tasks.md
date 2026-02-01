@@ -1,6 +1,6 @@
 # Tasks Reference
 
-Guide to creating and managing benchmark tasks for `@nella-labs/benchmark`.
+Guide to creating and managing benchmark tasks for `@usenella/benchmark`.
 
 ## Table of Contents
 
