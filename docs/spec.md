@@ -37,8 +37,8 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Integration Points                          │
 ├─────────────────────────────────────────────────────────────────┤
-│  @nella-labs/cli     CLI commands (nella check/validate/run)   │
-│  @nella-labs/core    TypeScript library (runTask, check)       │
+│  @usenella/nella     CLI commands (nella check/validate/run)   │
+│  @usenella/core    TypeScript library (runTask, check)       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -349,9 +349,9 @@ Each run produces:
 
 | Package | Purpose |
 |---------|---------|
-| `@nella-labs/core` | Core validation library |
-| `@nella-labs/cli` | Command-line interface |
-| `@nella-labs/benchmark` | Agent evaluation suite |
+| `@usenella/core` | Core validation library |
+| `@usenella/nella` | Command-line interface |
+| `@usenella/benchmark` | Agent evaluation suite |
 
 ---
 

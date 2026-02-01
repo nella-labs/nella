@@ -1,8 +1,8 @@
-# @nella-labs/nella
+# @usenella/nella
 
 > Unified CLI and MCP Server for AI agent validation
 
-[![npm version](https://img.shields.io/npm/v/@nella-labs/nella.svg)](https://www.npmjs.com/package/@nella-labs/nella)
+[![npm version](https://img.shields.io/npm/v/@usenella/nella.svg)](https://www.npmjs.com/package/@usenella/nella)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Nella is a complete validation toolkit for AI coding agents. It provides both a CLI for direct use and an MCP (Model Context Protocol) server for integration with AI assistants like Claude.
@@ -11,13 +11,13 @@ Nella is a complete validation toolkit for AI coding agents. It provides both a 
 
 ```bash
 # Global installation
-npm install -g @nella-labs/nella
+npm install -g @usenella/nella
 
 # Or use with npx
-npx @nella-labs/nella --help
+npx @usenella/nella --help
 
 # As a dev dependency
-npm install -D @nella-labs/nella
+npm install -D @usenella/nella
 ```
 
 ## Quick Start
@@ -104,7 +104,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "C:/path/to/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "C:/path/to/project"]
     }
   }
 }
@@ -117,7 +117,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@nella-labs/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -163,15 +163,29 @@ import {
   validate,
   checkConstraints,
   detectRiskPatterns,
-} from '@nella-labs/nella';
+} from '@usenella/nella';
 
 // MCP server
-import { startMcpServer } from '@nella-labs/nella/mcp';
+import { startMcpServer } from '@usenella/nella/mcp';
 
 // Example: Run validation programmatically
 const result = await runTask(repoPath, task, changes);
 console.log(result.passed ? 'Validation passed!' : 'Validation failed');
 ```
+
+## Core Modules (Re-exported)
+
+`@usenella/nella` re-exports everything from `@usenella/core`, including advanced modules:
+
+- Indexing & search (RAG)
+- Workspace management
+- Auth + rate limiting
+- Context sharing
+- Cloud sync (GCS)
+- Export manager
+- Playground server
+
+See the [Core Modules guide](../../docs/core/modules.md) for examples.
 
 ## Task YAML Format
 
@@ -225,8 +239,8 @@ expected:
 
 ## Related Packages
 
-- [`@nella-labs/core`](https://www.npmjs.com/package/@nella-labs/core) - Core validation library
-- [`@nella-labs/benchmark`](https://www.npmjs.com/package/@nella-labs/benchmark) - Benchmarking tools
+- [`@usenella/core`](https://www.npmjs.com/package/@usenella/core) - Core validation library
+- [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) - Benchmarking tools
 
 ## Documentation
 
@@ -235,7 +249,8 @@ Full documentation available at:
 - [CLI Examples](../../docs/cli/examples.md)
 - [MCP Integration](../../docs/mcp/integration.md)
 - [Core API Reference](../../docs/core/api-reference.md)
+- [Core Modules](../../docs/core/modules.md)
 
 ## License
 
-MIT © [Nella Labs](https://github.com/nella-labs)
+MIT © [Nella Labs](https://github.com/usenella)

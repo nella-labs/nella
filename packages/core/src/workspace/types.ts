@@ -33,17 +33,30 @@ export interface WorkspaceConfig {
   exclude: string[];
   
   // Embedding settings
-  embedder: {
-    provider: "voyage" | "openai" | "local";
-    model: string;
+  embedder: EmbedderConfig;
+  
+  // Chunking settings
+  chunking?: {
+    maxTokens: number;
+    overlap: number;
+    strategy: "ast" | "recursive" | "fixed";
   };
   
   // Search settings
-  search: {
-    vectorWeight: number;
-    lexicalWeight: number;
-    rerankEnabled: boolean;
-  };
+  search: SearchConfig;
+}
+
+export interface EmbedderConfig {
+  provider: "voyage" | "openai" | "local";
+  model: string;
+  dimensions?: number;
+}
+
+export interface SearchConfig {
+  vectorWeight: number;
+  lexicalWeight: number;
+  rerankEnabled: boolean;
+  topK?: number;
 }
 
 export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
@@ -67,11 +80,13 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   embedder: {
     provider: "voyage",
     model: "voyage-code-2",
+    dimensions: 1536,
   },
   search: {
     vectorWeight: 0.4,
     lexicalWeight: 0.6,
     rerankEnabled: false,
+    topK: 10,
   },
 };
 

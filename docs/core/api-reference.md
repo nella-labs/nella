@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API documentation for `@nella-labs/core`.
+Complete API documentation for `@usenella/core`.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Complete API documentation for `@nella-labs/core`.
 Main entrypoint that orchestrates the full validation flow.
 
 ```typescript
-import { runTask, Task, Changes, RunTaskOptions } from '@nella-labs/core';
+import { runTask, Task, Changes, RunTaskOptions } from '@usenella/core';
 
 const result = await runTask(
   '/path/to/repo',
@@ -80,7 +80,7 @@ interface RunTaskOptions {
 Pre-flight check to determine if a task should be refused.
 
 ```typescript
-import { check, Task } from '@nella-labs/core';
+import { check, Task } from '@usenella/core';
 
 const result = check(task, '/path/to/repo');
 
@@ -112,7 +112,7 @@ if (result.shouldRefuse) {
 Validate changes without the full `runTask` flow. Useful for incremental validation.
 
 ```typescript
-import { validate, Task, Changes } from '@nella-labs/core';
+import { validate, Task, Changes } from '@usenella/core';
 
 const result = await validate(task, '/path/to/repo', changes);
 
@@ -146,7 +146,7 @@ import {
   checkForbiddenPatterns,
   getViolatedConstraints,
   countViolations
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 #### `checkConstraints(modifiedFiles, diff, constraints) → ConstraintResult[]`
@@ -201,7 +201,7 @@ Count the number of constraint violations.
 ### Scope Checking
 
 ```typescript
-import { checkScope } from '@nella-labs/core';
+import { checkScope } from '@usenella/core';
 ```
 
 #### `checkScope(modifiedFiles, expected) → ScopeResult`
@@ -245,7 +245,7 @@ import {
   runValidation,
   getValidationErrors,
   calculateValidationIntegrity
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 #### `runCommand(command, workDir, timeoutMs?) → CommandResult`
@@ -315,7 +315,7 @@ import {
   checkRefusalCorrectness,
   RISK_PATTERNS,
   REFUSAL_RESPONSE_PATTERNS
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `shouldRefuse(task, workspacePath, options?) → RefusalResult`
@@ -405,7 +405,7 @@ Built-in array of RegExp patterns indicating agent refusal:
 ### Logging
 
 ```typescript
-import { RunLogger, generateRunId } from '@nella-labs/core';
+import { RunLogger, generateRunId } from '@usenella/core';
 ```
 
 #### `RunLogger`
@@ -454,7 +454,7 @@ import {
   createNellaDir,
   writeArtifacts,
   cleanupTempWorkspace
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 #### `createTempWorkspace(sourcePath) → string`
@@ -513,7 +513,7 @@ import {
   DependencyTracker,
   AssumptionTracker,
   ChangeLedger
-} from '@nella-labs/core';
+} from '@usenella/core';
 ```
 
 ### `ContextManager`
@@ -553,3 +553,16 @@ const conflicts = manager.assumptions.getConflicts(['src/users.ts']);
 ### `ChangeLedger`
 
 Store file change history across runs.
+
+## Advanced Modules
+
+Nella Core also ships additional modules for indexing, workspace management, auth, and export workflows:
+
+- [Indexing & Search](./indexing.md)
+- [Workspace Management](./workspace.md)
+- [Auth & Rate Limiting](./auth.md)
+- [Context Sharing](./context-sharing.md)
+- [Cloud Sync](./cloud-sync.md)
+- [Export Manager](./export.md)
+- [Playground Server](./playground.md)
+- [MCP Tool Handler](./mcp-tools.md)

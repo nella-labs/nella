@@ -205,19 +205,24 @@ export class McpToolHandler {
     });
 
     if (response.results.length === 0) {
+      const suggestion = response.suggestion !== "use_results"
+        ? ` Suggestion: ${response.suggestion.replace("_", " ")}.`
+        : "";
       return {
         content: [{
           type: "text",
-          text: `No results found for "${args.query}". ${response.suggestion !== "use_results" ? `Suggestion: ${response.suggestion}` : ""}`,
+          text: `No results found for "${args.query}".${suggestion}`,
         }],
       };
     }
 
     const results = response.results.map((r, i) => {
-      const header = `## Result ${i + 1}: ${r.chunk.filePath}${r.chunk.lines?.[0] ? `:${r.chunk.lines[0]}` : ""}\n`;
-      const metadata = `Type: ${r.chunk.type} | Score: ${(r.score * 100).toFixed(1)}%\n`;
-      const symbols = r.chunk.symbols?.length ? `Symbols: ${r.chunk.symbols.map((s: { name: string }) => s.name).join(", ")}\n` : "";
-      return `${header}${metadata}${symbols}\n\`\`\`${r.chunk.language || ""}\n${r.chunk.content}\n\`\`\``;
+      const chunk = r.chunk;
+      const startLine = chunk.lines?.[0];
+      const header = `## Result ${i + 1}: ${chunk.filePath}${startLine ? `:${startLine}` : ""}\n`;
+      const metadata = `Type: ${chunk.type} | Score: ${(r.score * 100).toFixed(1)}%\n`;
+      const symbols = chunk.symbols?.length ? `Symbols: ${chunk.symbols.map((s) => s.name).join(", ")}\n` : "";
+      return `${header}${metadata}${symbols}\n\`\`\`${chunk.language || ""}\n${chunk.content}\n\`\`\``;
     });
 
     return {
@@ -242,10 +247,6 @@ export class McpToolHandler {
 
     if (result.valid) {
       text = "✅ Code verification passed!\n\n";
-      if (result.suggestions.length > 0) {
-        text += `Suggestions: ${result.suggestions.join(", ")}\n`;
-      }
-      text += `Confidence: ${(result.confidence * 100).toFixed(0)}%\n`;
     } else {
       text = "❌ Code verification failed!\n\n";
       text += "Issues found:\n";
@@ -257,6 +258,10 @@ export class McpToolHandler {
         }
         text += "\n";
       }
+    }
+
+    if (result.suggestions.length > 0) {
+      text += `\nSuggestions: ${result.suggestions.join(", ")}\n`;
     }
 
     text += `\nConfidence: ${(result.confidence * 100).toFixed(0)}%`;

@@ -7,13 +7,13 @@ An end-to-end guide for using Nella to validate agent changes with the CLI or th
 ### CLI
 
 ```bash
-npm install -g @nella-labs/cli
+npm install -g @usenella/nella
 ```
 
 ### Core library
 
 ```bash
-npm install @nella-labs/core
+npm install @usenella/core
 ```
 
 ## 2) Create a task
@@ -103,7 +103,7 @@ Artifacts are written under `.nella/runs/<runId>` in the repository (diff, metri
 ## 5) Run with the Core library
 
 ```typescript
-import { runTask, check, Task, Changes } from '@nella-labs/core';
+import { runTask, check, Task, Changes } from '@usenella/core';
 
 const refusal = check(task, '/path/to/repo');
 if (refusal.shouldRefuse) {
@@ -159,3 +159,17 @@ Key fields returned in a run:
 - Add `files_to_ignore` for generated or non-critical files.
 - Keep forbidden patterns strict and well-scoped to reduce false positives.
 - Use `skipValidation` only for fast, local checks — keep validations enabled in CI.
+
+## 9) Explore advanced modules
+
+Nella Core includes advanced modules for larger agent systems:
+
+- **Indexing & search** — vector + lexical search with code verification.
+- **Workspace registry** — multi-repo routing for agent tools.
+- **Auth + rate limiting** — API key management and per-agent quotas.
+- **Context sharing** — cross-agent memory with visibility controls.
+- **Cloud sync** — push/pull run data from Google Cloud Storage.
+- **Export manager** — JSON/CSV/Markdown/HTML exports for audits.
+- **Playground server** — real-time playground with session telemetry.
+
+Start with the [Core Modules guide](./core/modules.md) for examples.
