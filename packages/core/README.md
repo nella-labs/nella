@@ -14,6 +14,7 @@ Reliability layer for coding agents. Enforces behavioral contracts that prevent 
 - **🔍 Scope Analysis** — Detect scope creep when agents modify files outside the declared plan
 - **📊 Metrics Calculation** — Compute scope creep ratio, constraint violations, validation integrity
 - **📝 Structured Logging** — Emit JSONL run records for auditing and analysis
+- **🧠 Context Tracking** — Track assumptions, dependency drift, and change history across runs
 
 ## Installation
 
@@ -54,7 +55,7 @@ console.log('Metrics:', result.metrics);
 
 | Function | Description |
 |----------|-------------|
-| `runTask(repoPath, task, changes?, options?)` | Main entrypoint — full validation flow |
+| `runTask(repoPath, task, changes?, options?)` | Main entrypoint — full validation flow (optionally with context tracking) |
 | `check(task, workspacePath, options?)` | Pre-flight refusal check |
 | `validate(task, workspacePath, changes, options?)` | Validate without full run |
 
@@ -119,4 +120,3 @@ pnpm test       # Run tests
 - [Nella Specification](../../docs/spec.md) — Architecture and design
 - [@nella-labs/cli](../cli/README.md) — Command-line interface
 - [@nella-labs/benchmark](../benchmark/README.md) — Benchmarking tools
-
