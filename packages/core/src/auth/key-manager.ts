@@ -3,6 +3,11 @@
  *
  * Secure API key generation, storage, and validation.
  * Keys are stored with bcrypt-style hashing.
+ *
+ * Features:
+ * - AES-256-GCM encryption for stored keys
+ * - Automatic key rotation policies
+ * - Audit logging integration
  */
 
 import * as fs from "fs";
@@ -15,10 +20,20 @@ import type {
   KeyStore,
   KeyStoreSettings,
   AuthEvent,
-  DEFAULT_PERMISSIONS,
-  DEFAULT_RATE_LIMIT,
-  DEFAULT_KEY_STORE_SETTINGS,
+  RotationPolicy,
+  RotationEvent,
+  ExtendedAuthEvent,
 } from "./types";
+import { DEFAULT_ROTATION_POLICY } from "./types";
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+const IV_LENGTH = 12; // GCM standard
+const AUTH_TAG_LENGTH = 16;
+const KEY_LENGTH = 32; // 256 bits
 
 // =============================================================================
 // Types
@@ -32,22 +47,65 @@ export interface CreateKeyOptions {
   rateLimit?: Partial<RateLimitConfig>;
   expiresInDays?: number;
   createdBy?: string;
+  rotationPolicy?: Partial<RotationPolicy>;
 }
 
-export type AuthEventHandler = (event: AuthEvent) => void;
+export interface KeyManagerOptions {
+  storagePath: string;
+  encryptionKey?: string; // Base64 encoded 32-byte key from NELLA_AUTH_ENCRYPTION_KEY
+}
+
+export type AuthEventHandler = (event: ExtendedAuthEvent) => void;
 
 // =============================================================================
 // Key Manager Class
 // =============================================================================
 
+/**
+ * Extended API Key with rotation info
+ */
+interface ExtendedApiKey extends ApiKey {
+  rotationPolicy?: RotationPolicy;
+  rotationScheduledAt?: string;
+  previousKeyId?: string;
+}
+
+/**
+ * Extended Key Store with encryption metadata
+ */
+interface ExtendedKeyStore extends KeyStore {
+  encryption?: {
+    enabled: boolean;
+    algorithm: string;
+    keyId: string; // Identifier for the encryption key version
+  };
+  rotationSchedule?: Array<{
+    keyId: string;
+    scheduledAt: string;
+    notifiedAt?: string;
+  }>;
+}
+
 export class KeyManager {
-  private store: KeyStore;
+  private store: ExtendedKeyStore;
   private storePath: string;
   private eventHandlers: AuthEventHandler[] = [];
+  private encryptionKey: Buffer | null = null;
+  private rotationCheckInterval: NodeJS.Timeout | null = null;
 
-  constructor(storagePath: string) {
-    this.storePath = path.join(storagePath, "keys.json");
+  constructor(options: KeyManagerOptions) {
+    this.storePath = path.join(options.storagePath, "keys.json");
     
+    // Setup encryption key if provided
+    if (options.encryptionKey) {
+      this.encryptionKey = Buffer.from(options.encryptionKey, "base64");
+      if (this.encryptionKey.length !== KEY_LENGTH) {
+        throw new Error(
+          `Encryption key must be ${KEY_LENGTH} bytes. Got ${this.encryptionKey.length} bytes.`
+        );
+      }
+    }
+
     // Ensure directory exists
     const dir = path.dirname(this.storePath);
     if (!fs.existsSync(dir)) {
@@ -55,6 +113,9 @@ export class KeyManager {
     }
 
     this.store = this.loadStore();
+
+    // Start rotation checker
+    this.startRotationChecker();
   }
 
   // =============================================================================
@@ -65,7 +126,7 @@ export class KeyManager {
     this.eventHandlers.push(handler);
   }
 
-  private emit(event: AuthEvent): void {
+  private emit(event: ExtendedAuthEvent): void {
     for (const handler of this.eventHandlers) {
       try {
         handler(event);
@@ -73,6 +134,114 @@ export class KeyManager {
         console.error("Auth event handler error:", error);
       }
     }
+  }
+
+  // =============================================================================
+  // Encryption Methods
+  // =============================================================================
+
+  /**
+   * Check if encryption is enabled
+   */
+  isEncryptionEnabled(): boolean {
+    return this.encryptionKey !== null;
+  }
+
+  /**
+   * Encrypt sensitive data
+   */
+  private encrypt(plaintext: string): string {
+    if (!this.encryptionKey) {
+      return plaintext; // Return as-is if encryption not enabled
+    }
+
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(
+      ENCRYPTION_ALGORITHM,
+      this.encryptionKey,
+      iv,
+      { authTagLength: AUTH_TAG_LENGTH }
+    );
+
+    let encrypted = cipher.update(plaintext, "utf8", "base64");
+    encrypted += cipher.final("base64");
+    const authTag = cipher.getAuthTag();
+
+    // Format: iv:authTag:encrypted
+    return `${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted}`;
+  }
+
+  /**
+   * Decrypt sensitive data
+   */
+  private decrypt(ciphertext: string): string {
+    if (!this.encryptionKey) {
+      return ciphertext; // Return as-is if encryption not enabled
+    }
+
+    // Check if data is encrypted (contains colons from our format)
+    if (!ciphertext.includes(":")) {
+      return ciphertext; // Not encrypted, return as-is
+    }
+
+    const [ivBase64, authTagBase64, encrypted] = ciphertext.split(":");
+    if (!ivBase64 || !authTagBase64 || !encrypted) {
+      return ciphertext; // Invalid format, return as-is
+    }
+
+    const iv = Buffer.from(ivBase64, "base64");
+    const authTag = Buffer.from(authTagBase64, "base64");
+
+    const decipher = crypto.createDecipheriv(
+      ENCRYPTION_ALGORITHM,
+      this.encryptionKey,
+      iv,
+      { authTagLength: AUTH_TAG_LENGTH }
+    );
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encrypted, "base64", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return decrypted;
+  }
+
+  /**
+   * Re-encrypt all keys with a new encryption key
+   */
+  reEncryptAll(newEncryptionKey: string): void {
+    const newKey = Buffer.from(newEncryptionKey, "base64");
+    if (newKey.length !== KEY_LENGTH) {
+      throw new Error(`New encryption key must be ${KEY_LENGTH} bytes.`);
+    }
+
+    // Decrypt all with old key, re-encrypt with new
+    for (const key of this.store.keys as ExtendedApiKey[]) {
+      // Decrypt hash with old key
+      const decryptedHash = this.decrypt(key.keyHash);
+      
+      // Temporarily switch to new key
+      const oldKey = this.encryptionKey;
+      this.encryptionKey = newKey;
+      
+      // Re-encrypt with new key
+      key.keyHash = this.encrypt(decryptedHash);
+      
+      // Restore old key for loop
+      this.encryptionKey = oldKey;
+    }
+
+    // Now permanently switch to new key
+    this.encryptionKey = newKey;
+    
+    // Update store encryption metadata
+    this.store.encryption = {
+      enabled: true,
+      algorithm: ENCRYPTION_ALGORITHM,
+      keyId: crypto.randomBytes(8).toString("hex"),
+    };
+
+    this.save();
   }
 
   // =============================================================================
@@ -88,6 +257,9 @@ export class KeyManager {
     const rawKey = this.generateKey();
     const keyHash = this.hashKey(rawKey);
     const prefix = rawKey.slice(0, 8);
+
+    // Encrypt hash if encryption is enabled
+    const storedHash = this.encrypt(keyHash);
 
     // Generate key ID
     const id = `key_${crypto.randomBytes(8).toString("hex")}`;
@@ -116,10 +288,15 @@ export class KeyManager {
       expiresAt = expiry.toISOString();
     }
 
-    const key: ApiKey = {
+    // Setup rotation policy
+    const rotationPolicy: RotationPolicy | undefined = options.rotationPolicy
+      ? { ...DEFAULT_ROTATION_POLICY, ...options.rotationPolicy }
+      : undefined;
+
+    const key: ExtendedApiKey = {
       id,
       name: options.name,
-      keyHash,
+      keyHash: storedHash,
       prefix,
       workspaceId: options.workspaceId ?? null,
       agentId: options.agentId ?? null,
@@ -133,12 +310,22 @@ export class KeyManager {
         usageCount: 0,
       },
       active: true,
+      rotationPolicy,
     };
+
+    // Schedule rotation if policy is enabled
+    if (rotationPolicy?.enabled) {
+      this.scheduleRotation(key);
+    }
 
     this.store.keys.push(key);
     this.save();
 
     this.emit({ type: "key:created", key, rawKey });
+
+    if (this.isEncryptionEnabled()) {
+      this.emit({ type: "key:encrypted", keyId: id });
+    }
 
     return { key, rawKey };
   }
@@ -211,7 +398,10 @@ export class KeyManager {
     const candidates = this.store.keys.filter((k) => k.prefix === prefix && k.active);
 
     for (const key of candidates) {
-      if (this.verifyKey(rawKey, key.keyHash)) {
+      // Decrypt hash if encrypted
+      const decryptedHash = this.decrypt(key.keyHash);
+      
+      if (this.verifyKey(rawKey, decryptedHash)) {
         // Update usage
         key.metadata.lastUsed = new Date().toISOString();
         key.metadata.usageCount++;
@@ -328,11 +518,27 @@ export class KeyManager {
   }
 
   /**
-   * Rotate key (create new, revoke old)
+   * Rotate key (create new, optionally keep old active for overlap period)
    */
-  rotate(keyId: string): { key: ApiKey; rawKey: string } | null {
-    const oldKey = this.get(keyId);
+  rotate(
+    keyId: string,
+    reason: "scheduled" | "manual" | "compromised" = "manual"
+  ): { key: ApiKey; rawKey: string; rotationEvent: RotationEvent } | null {
+    const oldKey = this.get(keyId) as ExtendedApiKey | null;
     if (!oldKey) return null;
+
+    // Determine overlap period
+    const overlapHours = oldKey.rotationPolicy?.overlapHours ?? 24;
+    const autoRevokeOld = oldKey.rotationPolicy?.autoRevokeOld ?? true;
+
+    // Calculate when old key expires
+    const oldKeyExpiresAt = new Date();
+    if (reason === "compromised") {
+      // Immediate revocation for compromised keys
+      oldKeyExpiresAt.setMinutes(oldKeyExpiresAt.getMinutes() + 5);
+    } else {
+      oldKeyExpiresAt.setHours(oldKeyExpiresAt.getHours() + overlapHours);
+    }
 
     // Create new key with same settings
     const result = this.create({
@@ -341,12 +547,37 @@ export class KeyManager {
       agentId: oldKey.agentId,
       permissions: oldKey.permissions,
       rateLimit: oldKey.rateLimit || undefined,
+      rotationPolicy: oldKey.rotationPolicy,
     });
 
-    // Revoke old key
-    this.revoke(keyId, "Rotated", "system");
+    // Link new key to old key
+    (result.key as ExtendedApiKey).previousKeyId = oldKey.id;
 
-    return result;
+    // Create rotation event
+    const rotationEvent: RotationEvent = {
+      oldKeyId: oldKey.id,
+      newKeyId: result.key.id,
+      rotatedAt: new Date().toISOString(),
+      oldKeyExpiresAt: oldKeyExpiresAt.toISOString(),
+      reason,
+    };
+
+    // Handle old key based on policy
+    if (autoRevokeOld) {
+      if (reason === "compromised") {
+        // Revoke immediately if compromised
+        this.revoke(keyId, `Key compromised, replaced by ${result.key.id}`, "system");
+      } else {
+        // Schedule revocation after overlap period
+        oldKey.metadata.expiresAt = oldKeyExpiresAt.toISOString();
+        this.save();
+      }
+    }
+
+    // Emit rotation event
+    this.emit({ type: "key:rotated", event: rotationEvent });
+
+    return { ...result, rotationEvent };
   }
 
   /**
@@ -375,21 +606,188 @@ export class KeyManager {
     this.save();
   }
 
+  /**
+   * Cleanup expired keys
+   */
+  cleanupExpired(): number {
+    const now = new Date();
+    const toRemove = this.store.keys.filter(
+      (k) => k.metadata.expiresAt && new Date(k.metadata.expiresAt) < now
+    );
+
+    for (const key of toRemove) {
+      this.revoke(key.id, "Expired", "system");
+    }
+
+    return toRemove.length;
+  }
+
+  // =============================================================================
+  // Rotation Scheduling
+  // =============================================================================
+
+  /**
+   * Schedule automatic rotation for a key
+   */
+  private scheduleRotation(key: ExtendedApiKey): void {
+    if (!key.rotationPolicy?.enabled) return;
+
+    const nextRotation = new Date();
+    nextRotation.setDate(nextRotation.getDate() + key.rotationPolicy.intervalDays);
+
+    key.rotationScheduledAt = nextRotation.toISOString();
+
+    // Add to rotation schedule
+    if (!this.store.rotationSchedule) {
+      this.store.rotationSchedule = [];
+    }
+
+    this.store.rotationSchedule.push({
+      keyId: key.id,
+      scheduledAt: nextRotation.toISOString(),
+    });
+
+    this.emit({
+      type: "key:rotation_scheduled",
+      keyId: key.id,
+      scheduledAt: nextRotation.toISOString(),
+    });
+  }
+
+  /**
+   * Get keys due for rotation
+   */
+  getKeysDueForRotation(): ExtendedApiKey[] {
+    const now = new Date();
+    return (this.store.keys as ExtendedApiKey[]).filter((key) => {
+      if (!key.active || !key.rotationScheduledAt) return false;
+      return new Date(key.rotationScheduledAt) <= now;
+    });
+  }
+
+  /**
+   * Get keys needing rotation notification
+   */
+  getKeysNeedingNotification(): ExtendedApiKey[] {
+    const now = new Date();
+    return (this.store.keys as ExtendedApiKey[]).filter((key) => {
+      if (!key.active || !key.rotationPolicy?.enabled || !key.rotationScheduledAt) {
+        return false;
+      }
+
+      const scheduledAt = new Date(key.rotationScheduledAt);
+      const notifyAt = new Date(scheduledAt);
+      notifyAt.setHours(notifyAt.getHours() - key.rotationPolicy.notifyBeforeHours);
+
+      // Check rotation schedule for notification
+      const schedule = this.store.rotationSchedule?.find((s) => s.keyId === key.id);
+      if (schedule?.notifiedAt) return false; // Already notified
+
+      return now >= notifyAt && now < scheduledAt;
+    });
+  }
+
+  /**
+   * Process scheduled rotations
+   */
+  processScheduledRotations(): RotationEvent[] {
+    const events: RotationEvent[] = [];
+    const dueKeys = this.getKeysDueForRotation();
+
+    for (const key of dueKeys) {
+      const result = this.rotate(key.id, "scheduled");
+      if (result) {
+        events.push(result.rotationEvent);
+      }
+    }
+
+    return events;
+  }
+
+  /**
+   * Update rotation policy for a key
+   */
+  updateRotationPolicy(
+    keyId: string,
+    policy: Partial<RotationPolicy>
+  ): ExtendedApiKey | null {
+    const key = this.get(keyId) as ExtendedApiKey | null;
+    if (!key) return null;
+
+    key.rotationPolicy = {
+      ...DEFAULT_ROTATION_POLICY,
+      ...key.rotationPolicy,
+      ...policy,
+    };
+
+    // Reschedule if policy changed
+    if (policy.enabled !== undefined || policy.intervalDays !== undefined) {
+      // Remove old schedule
+      if (this.store.rotationSchedule) {
+        this.store.rotationSchedule = this.store.rotationSchedule.filter(
+          (s) => s.keyId !== keyId
+        );
+      }
+
+      // Add new schedule if enabled
+      if (key.rotationPolicy.enabled) {
+        this.scheduleRotation(key);
+      } else {
+        key.rotationScheduledAt = undefined;
+      }
+    }
+
+    this.save();
+    return key;
+  }
+
+  /**
+   * Start background rotation checker
+   */
+  private startRotationChecker(): void {
+    // Check every hour
+    this.rotationCheckInterval = setInterval(() => {
+      this.processScheduledRotations();
+    }, 60 * 60 * 1000);
+  }
+
+  /**
+   * Stop rotation checker
+   */
+  stopRotationChecker(): void {
+    if (this.rotationCheckInterval) {
+      clearInterval(this.rotationCheckInterval);
+      this.rotationCheckInterval = null;
+    }
+  }
+
+  /**
+   * Dispose resources
+   */
+  dispose(): void {
+    this.stopRotationChecker();
+  }
+
   // =============================================================================
   // Private Methods
   // =============================================================================
 
-  private loadStore(): KeyStore {
+  private loadStore(): ExtendedKeyStore {
     if (fs.existsSync(this.storePath)) {
       try {
         const content = fs.readFileSync(this.storePath, "utf-8");
-        const store = JSON.parse(content) as KeyStore;
+        const store = JSON.parse(content) as ExtendedKeyStore;
         
         // Ensure settings have defaults
         store.settings = {
           ...this.getDefaultSettings(),
           ...store.settings,
         };
+
+        // Initialize rotation schedule if missing
+        if (!store.rotationSchedule) {
+          store.rotationSchedule = [];
+        }
 
         return store;
       } catch {
@@ -401,8 +799,9 @@ export class KeyManager {
       keys: [],
       agents: [],
       settings: this.getDefaultSettings(),
-      version: "1.0.0",
+      version: "2.0.0",
       updatedAt: new Date().toISOString(),
+      rotationSchedule: [],
     };
   }
 
@@ -417,7 +816,7 @@ export class KeyManager {
       defaultPermissions: this.getDefaultPermissions(),
       keyExpiryDays: 90,
       logAuthRequests: true,
-      encryptionEnabled: false,
+      encryptionEnabled: this.isEncryptionEnabled(),
     };
   }
 
@@ -473,28 +872,22 @@ export class KeyManager {
     const computedHash = crypto.pbkdf2Sync(rawKey, salt, 100000, 32, "sha256");
     return crypto.timingSafeEqual(storedHashBuffer, computedHash);
   }
-
-  /**
-   * Cleanup expired keys
-   */
-  cleanupExpired(): number {
-    const now = new Date();
-    const toRemove = this.store.keys.filter(
-      (k) => k.metadata.expiresAt && new Date(k.metadata.expiresAt) < now
-    );
-
-    for (const key of toRemove) {
-      this.revoke(key.id, "Expired", "system");
-    }
-
-    return toRemove.length;
-  }
 }
 
 // =============================================================================
 // Factory
 // =============================================================================
 
-export function createKeyManager(storagePath: string): KeyManager {
-  return new KeyManager(storagePath);
+export function createKeyManager(options: KeyManagerOptions): KeyManager {
+  return new KeyManager(options);
+}
+
+/**
+ * Create key manager with encryption from environment
+ */
+export function createKeyManagerFromEnv(storagePath: string): KeyManager {
+  return new KeyManager({
+    storagePath,
+    encryptionKey: process.env.NELLA_AUTH_ENCRYPTION_KEY,
+  });
 }
