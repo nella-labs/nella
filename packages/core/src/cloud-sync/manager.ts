@@ -305,7 +305,7 @@ export class CloudSyncManager {
       throw new Error(`Local file not found: ${localFilePath}`);
     }
 
-    let content = fs.readFileSync(localFilePath);
+    let content: Buffer<ArrayBuffer> = fs.readFileSync(localFilePath);
 
     // Encrypt if enabled
     if (this.config.encryption && this.config.encryptionKey) {
@@ -586,7 +586,7 @@ export class CloudSyncManager {
     return crypto.createHash("md5").update(content).digest("hex");
   }
 
-  private encrypt(data: Buffer): Buffer {
+  private encrypt(data: Buffer): Buffer<ArrayBuffer> {
     if (!this.config.encryptionKey) {
       throw new Error("Encryption key required");
     }
@@ -602,7 +602,7 @@ export class CloudSyncManager {
     return Buffer.concat([iv, authTag, encrypted]);
   }
 
-  private decrypt(data: Buffer): Buffer {
+  private decrypt(data: Buffer): Buffer<ArrayBuffer> {
     if (!this.config.encryptionKey) {
       throw new Error("Encryption key required");
     }

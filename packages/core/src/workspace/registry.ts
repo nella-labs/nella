@@ -341,11 +341,13 @@ export class WorkspaceRegistry {
       embedder: {
         provider: "voyage",
         model: "voyage-code-2",
+        dimensions: 1536,
       },
       search: {
         vectorWeight: 0.4,
         lexicalWeight: 0.6,
         rerankEnabled: false,
+        topK: 10,
       },
     };
   }

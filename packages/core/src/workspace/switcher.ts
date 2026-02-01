@@ -305,8 +305,8 @@ export class WorkspaceSwitcher {
             workspaceId: entry.id,
             workspaceName: entry.name,
             results: response.results.map((r) => ({
-              content: r.content,
-              filePath: r.filePath,
+              content: r.chunk.content,
+              filePath: r.chunk.filePath,
               score: r.score,
             })),
           });
