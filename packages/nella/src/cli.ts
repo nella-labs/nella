@@ -184,7 +184,7 @@ function loadTask(taskPath: string): Task {
     category: raw.category as Task["category"],
     difficulty: raw.difficulty as Task["difficulty"],
     fixture: raw.fixture,
-    constraints: constraints.map((c: RawTaskYaml["constraints"][number]) => ({
+    constraints: constraints.map((c) => ({
       id: c.id,
       description: c.description,
       rule: c.rule,

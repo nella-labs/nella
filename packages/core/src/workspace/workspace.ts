@@ -195,34 +195,6 @@ export class Workspace {
    */
   async getIndexManager(): Promise<IndexManager> {
     if (!this.indexManager) {
-<<<<<<< HEAD
-      // Build IndexManagerConfig from workspace config
-      const indexConfig: IndexManagerConfig = {
-        workspaceId: this.entry.id,
-        workspacePath: this.entry.path,
-        storagePath: this.indexPath,
-        embedder: {
-          provider: this.entry.config?.embedder?.provider || "voyage",
-          model: this.entry.config?.embedder?.model || "voyage-code-2",
-          dimensions: 1536,
-        },
-        chunking: {
-          maxTokens: 512,
-          overlap: 50,
-          strategy: "ast",
-        },
-        search: {
-          vectorWeight: this.entry.config?.search?.vectorWeight || 0.4,
-          lexicalWeight: this.entry.config?.search?.lexicalWeight || 0.6,
-          rerankEnabled: this.entry.config?.search?.rerankEnabled || false,
-          topK: 10,
-        },
-        include: this.entry.config?.include || ["**/*.ts", "**/*.js", "**/*.py"],
-        exclude: this.entry.config?.exclude || ["**/node_modules/**", "**/dist/**"],
-      };
-
-      this.indexManager = new IndexManager(indexConfig);
-=======
       const workspaceConfig = this.entry.config;
 
       const config: IndexManagerConfig = {
@@ -247,27 +219,15 @@ export class Workspace {
       };
 
       this.indexManager = new IndexManager(config);
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
 
       // Forward events
       this.indexManager.onEvent((event) => {
         if (event.type === "index:complete") {
-<<<<<<< HEAD
-          const metadata = this.indexManager?.getMetadata();
-          if (metadata) {
-            this.registry.updateIndexStatus(this.entry.id, "ready", {
-              filesIndexed: metadata.stats.filesIndexed,
-              chunksCount: metadata.stats.chunksCount,
-              totalTokens: metadata.stats.totalTokens,
-            });
-          }
-=======
           this.registry.updateIndexStatus(this.entry.id, "ready", {
             filesIndexed: event.stats.filesIndexed,
             chunksCount: event.stats.chunksCount,
             totalTokens: event.stats.totalTokens,
           });
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
         }
       });
     }
@@ -285,20 +245,6 @@ export class Workspace {
     try {
       const manager = await this.getIndexManager();
       await manager.index({
-<<<<<<< HEAD
-        force: !options?.incremental,
-      });
-
-      // Update status through registry
-      const metadata = manager.getMetadata();
-      if (metadata) {
-        this.registry.updateIndexStatus(this.entry.id, "ready", {
-          filesIndexed: metadata.stats.filesIndexed,
-          chunksCount: metadata.stats.chunksCount,
-          totalTokens: metadata.stats.totalTokens,
-        });
-      }
-=======
         force: options?.incremental === false,
       });
 
@@ -315,7 +261,6 @@ export class Workspace {
         chunksCount: stats.chunksCount,
         totalTokens: stats.totalTokens,
       });
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
 
       // Update local entry
       this.entry = this.registry.get(this.entry.id)!;
@@ -515,10 +460,6 @@ export class Workspace {
    * Update workspace configuration
    */
   updateConfig(config: Partial<WorkspaceConfig>): void {
-<<<<<<< HEAD
-    const currentConfig = this.entry.config || DEFAULT_WORKSPACE_CONFIG;
-    const newConfig: WorkspaceConfig = { ...currentConfig, ...config };
-=======
     const currentConfig: WorkspaceConfig = {
       ...DEFAULT_WORKSPACE_CONFIG,
       ...this.entry.config,
@@ -544,7 +485,6 @@ export class Workspace {
       },
       chunking: config.chunking ?? currentConfig.chunking,
     };
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
 
     this.registry.update(this.entry.id, { config: newConfig });
     this.entry = this.registry.get(this.entry.id)!;
@@ -582,9 +522,6 @@ export class Workspace {
     };
   }> {
     const manager = await this.getIndexManager();
-<<<<<<< HEAD
-    const metadata = manager.getMetadata();
-=======
     const status = manager.getStatus();
     const stats = status.stats || {
       filesIndexed: 0,
@@ -592,21 +529,14 @@ export class Workspace {
       totalTokens: 0,
       embeddingsCount: 0,
     };
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
 
     return {
       entry: { ...this.entry },
       context: this.getContext(),
       indexStats: {
-<<<<<<< HEAD
-        filesIndexed: metadata?.stats.filesIndexed || 0,
-        chunksCount: metadata?.stats.chunksCount || 0,
-        tokensIndexed: metadata?.stats.totalTokens || 0,
-=======
         filesIndexed: stats.filesIndexed,
         chunksCount: stats.chunksCount,
         tokensIndexed: stats.totalTokens,
->>>>>>> e828b420db8af060dd7d7260f10f5d084337a883
       },
     };
   }
