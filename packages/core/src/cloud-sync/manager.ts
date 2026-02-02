@@ -258,13 +258,13 @@ export class CloudSyncManager {
     }
 
     // Update file state
-    const fileState = this.state.files.find((f) => f.path === filePath);
+    const fileState = this.state.files.find((f: SyncFileState) => f.path === filePath);
     if (fileState) {
       fileState.status = "synced";
     }
 
     // Remove from conflicts
-    this.state.pending = this.state.pending.filter((p) => p.path !== filePath);
+    this.state.pending = this.state.pending.filter((p: PendingChange) => p.path !== filePath);
 
     this.saveState();
   }
@@ -370,7 +370,7 @@ export class CloudSyncManager {
     console.log(`[CloudSync] Would delete: gs://${this.config.bucketName}/${remotePath}`);
 
     // Remove from state
-    this.state.files = this.state.files.filter((f) => f.path !== filePath);
+    this.state.files = this.state.files.filter((f: SyncFileState) => f.path !== filePath);
   }
 
   /**
@@ -469,7 +469,7 @@ export class CloudSyncManager {
     for (const localFile of localFiles) {
       const remotePath = `${this.config.prefix}/${this.state.workspaceId}/${localFile}`;
       const remoteFile = remoteFileMap.get(remotePath);
-      const fileState = this.state.files.find((f) => f.path === localFile);
+      const fileState = this.state.files.find((f: SyncFileState) => f.path === localFile);
 
       if (!remoteFile) {
         // Local only, upload
@@ -549,16 +549,16 @@ export class CloudSyncManager {
   }
 
   private updateFileState(filePath: string, updates: Partial<SyncFileState>): void {
-    const existing = this.state.files.find((f) => f.path === filePath);
+    const existing = this.state.files.find((f: SyncFileState) => f.path === filePath);
     if (existing) {
       Object.assign(existing, updates);
     } else {
       this.state.files.push({
         path: filePath,
-        localHash: null,
-        remoteHash: null,
-        localModified: null,
-        remoteModified: null,
+        localHash: undefined,
+        remoteHash: undefined,
+        localModified: undefined,
+        remoteModified: undefined,
         status: "local-only",
         ...updates,
       });
@@ -567,12 +567,9 @@ export class CloudSyncManager {
 
   private addError(path: string, message: string): void {
     this.state.errors.push({
-      id: `err_${Date.now()}`,
       path,
       message,
-      code: "SYNC_ERROR",
-      occurredAt: new Date().toISOString(),
-      retryCount: 0,
+      timestamp: new Date().toISOString(),
     });
 
     // Keep only last 50 errors
