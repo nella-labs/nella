@@ -6,6 +6,9 @@
  */
 
 import * as crypto from "crypto";
+import * as http from "http";
+import * as fs from "fs";
+import * as path from "path";
 import type {
   PlaygroundServerConfig,
   PlaygroundSession,
@@ -23,6 +26,17 @@ import { McpToolHandler, createMcpToolHandler } from "../mcp";
 import { Authenticator, createAuthenticator } from "../auth";
 import { RateLimiter, createRateLimiter } from "../rate-limit";
 import { ContextManager, createContextManager } from "../context-sharing";
+
+// Dynamic imports for express and ws (they may not be installed)
+let express: typeof import("express") | null = null;
+let WebSocketServer: typeof import("ws").WebSocketServer | null = null;
+
+try {
+  express = require("express");
+  WebSocketServer = require("ws").WebSocketServer;
+} catch {
+  // Dependencies not installed - will throw on start()
+}
 
 // =============================================================================
 // Types
@@ -231,6 +245,8 @@ export class PlaygroundServer {
   private costConfig: CostConfig;
   private isRunning: boolean = false;
   private eventHandlers: ServerEventHandlers = {};
+  private httpServer: http.Server | null = null;
+  private wss: InstanceType<typeof import("ws").WebSocketServer> | null = null;
 
   constructor(config: Partial<PlaygroundServerConfig> & { workspacePath: string; storagePath: string }) {
     this.config = { ...DEFAULT_SERVER_CONFIG, ...config };
@@ -255,35 +271,173 @@ export class PlaygroundServer {
   // =============================================================================
 
   /**
-   * Start the playground server
-   * Note: This is a mock implementation. Real implementation would use express + ws
+   * Start the playground server with Express HTTP and WebSocket
    */
   async start(): Promise<void> {
     if (this.isRunning) {
       throw new Error("Server is already running");
     }
 
-    // In a real implementation:
-    // const app = express();
-    // const server = http.createServer(app);
-    // const wss = new WebSocketServer({ server });
-    // 
-    // app.get('/health', (req, res) => res.json({ status: 'ok' }));
-    // app.get('/api/session/:id', (req, res) => { ... });
-    // 
-    // wss.on('connection', (ws) => { ... });
-    // 
-    // server.listen(this.config.port, this.config.host);
+    if (!express || !WebSocketServer) {
+      throw new Error(
+        "Playground server requires 'express' and 'ws' packages. " +
+        "Install them with: npm install express ws"
+      );
+    }
+
+    const app = express();
+
+    // CORS middleware
+    if (this.config.cors) {
+      app.use((req, res, next) => {
+        const origin = req.headers.origin || "*";
+        if (
+          this.config.allowedOrigins.includes("*") ||
+          this.config.allowedOrigins.includes(origin)
+        ) {
+          res.setHeader("Access-Control-Allow-Origin", origin);
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+          res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        }
+        if (req.method === "OPTIONS") {
+          return res.sendStatus(200);
+        }
+        next();
+      });
+    }
+
+    app.use(express.json());
+
+    // Health check
+    app.get("/health", (_req, res) => {
+      res.json({
+        status: "ok",
+        running: this.isRunning,
+        clients: this.clients.size,
+        uptime: process.uptime(),
+      });
+    });
+
+    // Get session state
+    app.get("/api/session/:id", (req, res) => {
+      const session = this.sessionManager.get(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json({
+        id: session.id,
+        workspaceId: session.workspaceId,
+        state: session.state,
+        metadata: session.metadata,
+        createdAt: session.createdAt,
+        lastActivity: session.lastActivity,
+        clientCount: session.clients.length,
+      });
+    });
+
+    // Server status
+    app.get("/api/status", (_req, res) => {
+      res.json(this.getStatus());
+    });
+
+    // Serve dashboard HTML at root
+    app.get("/", (_req, res) => {
+      const dashboardPath = path.join(__dirname, "dashboard.html");
+      if (fs.existsSync(dashboardPath)) {
+        res.sendFile(dashboardPath);
+      } else {
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head><title>Nella Playground</title></head>
+          <body style="font-family: system-ui; background: #0d1117; color: #c9d1d9; padding: 40px;">
+            <h1>Nella Playground</h1>
+            <p>Dashboard HTML not found at ${dashboardPath}</p>
+            <p>WebSocket endpoint: ws://${this.config.host}:${this.config.port}/ws</p>
+            <p>API endpoints:</p>
+            <ul>
+              <li>GET /health - Health check</li>
+              <li>GET /api/status - Server status</li>
+              <li>GET /api/session/:id - Session state</li>
+            </ul>
+          </body>
+          </html>
+        `);
+      }
+    });
+
+    // Create HTTP server
+    this.httpServer = http.createServer(app);
+
+    // Create WebSocket server
+    this.wss = new WebSocketServer({ server: this.httpServer, path: "/ws" });
+
+    this.wss.on("connection", (ws) => {
+      const clientId = this.handleConnect((message: ServerMessage) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify(message));
+        }
+      });
+
+      ws.on("message", async (data) => {
+        try {
+          const message = JSON.parse(data.toString()) as ClientMessage;
+          await this.handleMessage(clientId, message);
+        } catch (error) {
+          const client = this.clients.get(clientId);
+          client?.send({
+            type: "error",
+            message: error instanceof Error ? error.message : "Invalid message",
+          });
+        }
+      });
+
+      ws.on("close", () => {
+        this.handleDisconnect(clientId);
+      });
+
+      ws.on("error", (error) => {
+        this.eventHandlers.onError?.(error);
+        this.handleDisconnect(clientId);
+      });
+    });
+
+    // Start listening
+    await new Promise<void>((resolve, reject) => {
+      this.httpServer!.listen(this.config.port, this.config.host, () => {
+        resolve();
+      });
+      this.httpServer!.on("error", reject);
+    });
 
     this.isRunning = true;
     console.log(`[Playground] Server started on http://${this.config.host}:${this.config.port}`);
+    console.log(`[Playground] WebSocket endpoint: ws://${this.config.host}:${this.config.port}/ws`);
+    console.log(`[Playground] Dashboard: http://${this.config.host}:${this.config.port}/`);
     this.eventHandlers.onStart?.(this.config.port);
   }
 
   async stop(): Promise<void> {
     if (!this.isRunning) return;
 
-    // Disconnect all clients
+    // Close WebSocket connections
+    if (this.wss) {
+      for (const client of this.wss.clients) {
+        client.close();
+      }
+      this.wss.close();
+      this.wss = null;
+    }
+
+    // Close HTTP server
+    if (this.httpServer) {
+      await new Promise<void>((resolve) => {
+        this.httpServer!.close(() => resolve());
+      });
+      this.httpServer = null;
+    }
+
+    // Disconnect all tracked clients
     for (const client of this.clients.values()) {
       this.handleDisconnect(client.id);
     }

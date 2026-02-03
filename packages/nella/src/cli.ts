@@ -4,10 +4,11 @@
  * Nella CLI
  *
  * Commands:
- *   nella check   - Pre-flight check: can the task proceed?
- *   nella validate - Validate changes against task constraints
- *   nella run     - Full run: check + validate + metrics
- *   nella mcp     - Start MCP server for AI agent integration
+ *   nella check      - Pre-flight check: can the task proceed?
+ *   nella validate   - Validate changes against task constraints
+ *   nella run        - Full run: check + validate + metrics
+ *   nella mcp        - Start MCP server for AI agent integration
+ *   nella playground - Start the playground server with real-time dashboard
  */
 
 import * as fs from "fs";
@@ -25,6 +26,7 @@ import {
   FileChange,
 } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
+import { startPlaygroundServer } from "./playground";
 
 // =============================================================================
 // Theme & Styling
@@ -99,7 +101,7 @@ function divider(char = "─"): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "check" | "validate" | "run" | "mcp" | "help";
+  command: "check" | "validate" | "run" | "mcp" | "playground" | "help";
   taskPath?: string;
   repoPath?: string;
   changesPath?: string;
@@ -108,6 +110,9 @@ interface CliArgs {
   output?: "json" | "pretty";
   // MCP-specific args
   workspace?: string;
+  // Playground-specific args
+  port?: number;
+  host?: string;
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -121,7 +126,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "help") {
+    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "playground" || arg === "help") {
       result.command = arg;
       i++;
       continue;
@@ -146,6 +151,14 @@ function parseArgs(args: string[]): CliArgs {
       result.workspace = args[++i];
     } else if (arg.startsWith("--workspace=")) {
       result.workspace = arg.slice("--workspace=".length);
+    } else if (arg === "--port" || arg === "-p") {
+      result.port = parseInt(args[++i], 10);
+    } else if (arg.startsWith("--port=")) {
+      result.port = parseInt(arg.slice("--port=".length), 10);
+    } else if (arg === "--host") {
+      result.host = args[++i];
+    } else if (arg.startsWith("--host=")) {
+      result.host = arg.slice("--host=".length);
     }
 
     i++;
@@ -541,6 +554,7 @@ function showHelp(): void {
     [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
     [theme.primary("run"), theme.muted("Full run: check + validate + compute metrics")],
     [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration")],
+    [theme.primary("playground"), theme.muted("Start playground server with real-time dashboard")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
   console.log(cmdTable.toString());
@@ -564,7 +578,9 @@ function showHelp(): void {
     [theme.accent("--task, -t"), theme.muted("<path>"), "Path to task.yaml or task directory"],
     [theme.accent("--repo, -r"), theme.muted("<path>"), "Path to repository"],
     [theme.accent("--changes, -c"), theme.muted("<path>"), "Path to changes.json file"],
-    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (for mcp command)"],
+    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (for mcp/playground)"],
+    [theme.accent("--port, -p"), theme.muted("<number>"), "Port for playground server (default: 3847)"],
+    [theme.accent("--host"), theme.muted("<host>"), "Host for playground server (default: localhost)"],
     [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
@@ -587,6 +603,9 @@ function showHelp(): void {
   console.log("");
   console.log(`  ${theme.muted("# Start MCP server for AI agent integration")}`);
   console.log(`  ${theme.dim("$")} nella mcp --workspace /path/to/project`);
+  console.log("");
+  console.log(`  ${theme.muted("# Start playground server with real-time dashboard")}`);
+  console.log(`  ${theme.dim("$")} nella playground --workspace /path/to/project --port 3847`);
   console.log("");
   
   // Footer
@@ -615,6 +634,13 @@ async function main(): Promise<void> {
       break;
     case "mcp":
       await startMcpServer({ workspace: args.workspace });
+      break;
+    case "playground":
+      await startPlaygroundServer({
+        workspace: args.workspace,
+        port: args.port,
+        host: args.host,
+      });
       break;
     case "help":
     default:
