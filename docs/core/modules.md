@@ -84,22 +84,6 @@ shared.set({
 const recent = shared.query('repo-1', { types: ['decision'], visibility: 'team', limit: 10 });
 ```
 
-## Cloud Sync (Google Cloud Storage)
-
-Sync session data and artifacts to a GCS bucket.
-
-```ts
-import { createCloudSyncManager } from '@usenella/core';
-
-const sync = createCloudSyncManager('repo-1', '/path/to/repo', {
-  projectId: 'my-gcp-project',
-  bucketName: 'nella-artifacts',
-  encryptionKey: process.env.NELLA_SYNC_KEY,
-});
-
-await sync.push();
-```
-
 ## Export Manager
 
 Bundle tool calls, searches, and verification results into exportable files.
@@ -167,7 +151,6 @@ const response = await handler.handleToolCall({
   - [Workspace management](./workspace.md)
   - [Auth & rate limiting](./auth.md)
   - [Context sharing](./context-sharing.md)
-  - [Cloud sync](./cloud-sync.md)
   - [Export manager](./export.md)
   - [Playground server](./playground.md)
   - [MCP tool handler](./mcp-tools.md)

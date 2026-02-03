@@ -155,7 +155,6 @@ Features:
 - [Workspace Management](../../docs/core/workspace.md) — Register and switch workspaces
 - [Auth & Rate Limiting](../../docs/core/auth.md) — API keys and quotas
 - [Context Sharing](../../docs/core/context-sharing.md) — Shared memory across agents
-- [Cloud Sync](../../docs/core/cloud-sync.md) — Google Cloud Storage sync
 - [Export Manager](../../docs/core/export.md) — Bundle and export run data
 - [Playground Server](../../docs/core/playground.md) — Local playground runtime
 - [MCP Tool Handler](../../docs/core/mcp-tools.md) — Embed Nella MCP tools
