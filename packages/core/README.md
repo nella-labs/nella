@@ -61,6 +61,32 @@ console.log('Passed:', result.passed);
 console.log('Metrics:', result.metrics);
 ```
 
+## Playground Server
+
+Start a real-time dashboard for monitoring agent sessions:
+
+```typescript
+import { createPlaygroundServer } from '@usenella/core';
+
+const server = createPlaygroundServer({
+  workspacePath: '/path/to/repo',
+  storagePath: '/path/to/repo/.nella',
+  port: 3847,
+});
+
+server.on({
+  onStart: (port) => console.log(`Dashboard: http://localhost:${port}`),
+  onClientConnect: (id) => console.log(`Client connected: ${id}`),
+});
+
+await server.start();
+```
+
+Features:
+- **WebSocket updates** — Real-time tool calls, chain of thought, cost tracking
+- **Dashboard UI** — Visual interface at `http://localhost:3847`
+- **HTTP API** — `/health`, `/api/status`, `/api/session/:id` endpoints
+
 ## API Overview
 
 ### Main Functions

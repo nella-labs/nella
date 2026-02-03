@@ -42,6 +42,22 @@ nella run -t ./tasks/my-task -r ./project -c changes.json
 nella mcp --workspace /path/to/project
 ```
 
+### Playground Server
+
+```bash
+# Start playground with real-time dashboard
+nella playground --workspace /path/to/project
+
+# With custom port
+nella playground --workspace /path/to/project --port 4000
+```
+
+Open `http://localhost:3847` to view the dashboard with:
+- Real-time tool call monitoring
+- Chain of thought visualization
+- Cost tracking (tokens + estimated $)
+- Session management
+
 ## Commands
 
 ### `nella check`
@@ -90,6 +106,19 @@ Start an MCP server for AI agent integration.
 ```bash
 nella mcp [--workspace <path>]
 ```
+
+### `nella playground`
+
+Start the playground server with a real-time dashboard.
+
+```bash
+nella playground [--workspace <path>] [--port <number>] [--host <host>]
+```
+
+Features:
+- **Dashboard UI** — Visual interface for monitoring agent sessions
+- **WebSocket updates** — Real-time tool calls, chain of thought, cost tracking
+- **HTTP API** — `/health`, `/api/status`, `/api/session/:id` endpoints
 
 ## MCP Integration
 
@@ -147,7 +176,9 @@ Add to your Claude Desktop config:
 | `--task <path>` | `-t` | Path to task.yaml or task directory |
 | `--repo <path>` | `-r` | Path to repository |
 | `--changes <path>` | `-c` | Path to changes.json file |
-| `--workspace <path>` | `-w` | Path to workspace (for `mcp` command) |
+| `--workspace <path>` | `-w` | Path to workspace (for `mcp`/`playground`) |
+| `--port <number>` | `-p` | Port for playground server (default: 3847) |
+| `--host <host>` | | Host for playground server (default: localhost) |
 | `--skip-validation` | | Skip test/lint/compile commands |
 | `--skip-prerequisites` | | Skip package.json/node_modules checks |
 | `--json` | | Output as JSON |
