@@ -340,30 +340,112 @@ export class PlaygroundServer {
       res.json(this.getStatus());
     });
 
-    // Serve dashboard HTML at root
+    // Serve dashboard info at root - points to hosted dashboard
     app.get("/", (_req, res) => {
-      const dashboardPath = path.join(__dirname, "dashboard.html");
-      if (fs.existsSync(dashboardPath)) {
-        res.sendFile(dashboardPath);
-      } else {
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head><title>Nella Playground</title></head>
-          <body style="font-family: system-ui; background: #0d1117; color: #c9d1d9; padding: 40px;">
-            <h1>Nella Playground</h1>
-            <p>Dashboard HTML not found at ${dashboardPath}</p>
-            <p>WebSocket endpoint: ws://${this.config.host}:${this.config.port}/ws</p>
-            <p>API endpoints:</p>
-            <ul>
-              <li>GET /health - Health check</li>
-              <li>GET /api/status - Server status</li>
-              <li>GET /api/session/:id - Session state</li>
-            </ul>
-          </body>
-          </html>
-        `);
-      }
+      const wsUrl = `ws://${this.config.host}:${this.config.port}/ws`;
+      const dashboardUrl = `https://app.getnella.dev/dashboard/playground?ws=${encodeURIComponent(wsUrl)}`;
+      
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Nella Playground Server</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+              color: #c9d1d9;
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 20px;
+            }
+            .container {
+              max-width: 600px;
+              background: rgba(22, 27, 34, 0.8);
+              border: 1px solid #30363d;
+              border-radius: 12px;
+              padding: 40px;
+              text-align: center;
+            }
+            h1 { 
+              color: #7c3aed;
+              font-size: 2rem;
+              margin-bottom: 8px;
+            }
+            .tagline {
+              color: #8b949e;
+              margin-bottom: 32px;
+            }
+            .status {
+              background: #238636;
+              color: white;
+              padding: 8px 16px;
+              border-radius: 20px;
+              display: inline-block;
+              font-size: 0.875rem;
+              margin-bottom: 24px;
+            }
+            .endpoints {
+              text-align: left;
+              background: #0d1117;
+              border-radius: 8px;
+              padding: 20px;
+              margin: 24px 0;
+            }
+            .endpoint {
+              font-family: 'SF Mono', Monaco, monospace;
+              font-size: 0.875rem;
+              color: #58a6ff;
+              margin: 8px 0;
+            }
+            .endpoint span { color: #8b949e; }
+            .btn {
+              display: inline-block;
+              background: #7c3aed;
+              color: white;
+              padding: 12px 24px;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 500;
+              margin-top: 16px;
+              transition: background 0.2s;
+            }
+            .btn:hover { background: #6d28d9; }
+            .note {
+              color: #8b949e;
+              font-size: 0.875rem;
+              margin-top: 24px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>⚡ Nella Playground</h1>
+            <p class="tagline">Reliability layer for coding agents</p>
+            <div class="status">● Server Running</div>
+            
+            <div class="endpoints">
+              <div class="endpoint"><span>WebSocket:</span> ${wsUrl}</div>
+              <div class="endpoint"><span>Health:</span> GET /health</div>
+              <div class="endpoint"><span>Status:</span> GET /api/status</div>
+              <div class="endpoint"><span>Session:</span> GET /api/session/:id</div>
+            </div>
+            
+            <a href="${dashboardUrl}" class="btn" target="_blank">
+              Open Dashboard →
+            </a>
+            
+            <p class="note">
+              Connect your MCP client to the WebSocket endpoint above,<br>
+              or open the hosted dashboard to monitor sessions.
+            </p>
+          </div>
+        </body>
+        </html>
+      `);
     });
 
     // Create HTTP server
