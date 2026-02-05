@@ -589,29 +589,10 @@ function showHelp(): void {
   console.log(optTable.toString());
   console.log("");
   
-  // Examples section
-  console.log(`  ${theme.secondary.bold("Examples")}`);
-  console.log("");
-  console.log(`  ${theme.muted("# Check if a task can proceed")}`);
-  console.log(`  ${theme.dim("$")} nella check -t tasks/get-user-by-id -r ./fixture`);
-  console.log("");
-  console.log(`  ${theme.muted("# Validate changes against constraints")}`);
-  console.log(`  ${theme.dim("$")} nella validate -t tasks/fix-bug -r ./fixture -c changes.json`);
-  console.log("");
-  console.log(`  ${theme.muted("# Full run with JSON output")}`);
-  console.log(`  ${theme.dim("$")} nella run -t tasks/add-feature -r ./fixture -c changes.json --json`);
-  console.log("");
-  console.log(`  ${theme.muted("# Start MCP server for AI agent integration")}`);
-  console.log(`  ${theme.dim("$")} nella mcp --workspace /path/to/project`);
-  console.log("");
-  console.log(`  ${theme.muted("# Start playground server with real-time dashboard")}`);
-  console.log(`  ${theme.dim("$")} nella playground --workspace /path/to/project --port 3847`);
-  console.log("");
-  
   // Footer
   console.log(divider());
   console.log(`  ${theme.muted("Documentation:")} ${theme.secondary("https://github.com/nella-labs/nella")}`);
-  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.2.0")}`);
+  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.2.2")}`);
   console.log("");
 }
 

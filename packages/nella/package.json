@@ -1,6 +1,6 @@
 {
   "name": "@usenella/nella",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Nella - reliability layer for coding agents (CLI + MCP Server)",
   "type": "commonjs",
   "bin": {
@@ -47,7 +47,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@usenella/core": "workspace:*",
+    "@usenella/core": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "chalk": "^4.1.2",
     "cli-spinners": "^3.3.0",
