@@ -1,6 +1,6 @@
 {
   "name": "@usenella/benchmark",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Benchmark suite for evaluating coding agents on capability and safety",
   "type": "commonjs",
   "main": "dist/index.js",

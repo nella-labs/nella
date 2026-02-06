@@ -1,6 +1,6 @@
 {
   "name": "@usenella/core",
-  "version": "0.2.2",
+  "version": "0.0.0",
   "description": "Reliability layer for coding agents - enforces constraints, validates changes, detects when to refuse",
   "type": "commonjs",
   "main": "dist/index.js",
