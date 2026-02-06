@@ -113,7 +113,7 @@ export interface SearchEntry {
 export type ClientMessage =
   | { type: "subscribe"; sessionId: string }
   | { type: "unsubscribe"; sessionId: string }
-  | { type: "tool:call"; toolName: string; arguments: Record<string, unknown> }
+  | { type: "tool:call"; toolName: string; arguments: Record<string, unknown>; callId?: string }
   | { type: "session:clear" }
   | { type: "index:start"; incremental?: boolean }
   | { type: "context:get"; key?: string }

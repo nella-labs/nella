@@ -318,6 +318,162 @@ export class PlaygroundServer {
       });
     });
 
+    // List available MCP tools
+    app.get("/api/tools", (_req, res) => {
+      res.json({
+        tools: [
+          // Validation Tools
+          {
+            name: "nella_check",
+            category: "validation",
+            description: "Check if proposed changes comply with task constraints",
+            inputSchema: {
+              type: "object",
+              properties: {
+                constraints: { type: "array", description: "Constraints to check against" },
+                modifiedFiles: { type: "array", items: { type: "string" }, description: "List of files modified" },
+                diff: { type: "string", description: "Unified diff of proposed changes" },
+              },
+              required: ["constraints", "modifiedFiles", "diff"],
+            },
+          },
+          {
+            name: "nella_validate",
+            category: "validation",
+            description: "Run validation commands (tests, lints, builds)",
+            inputSchema: {
+              type: "object",
+              properties: {
+                test: { type: "string", description: "Test command (e.g., 'npm test')" },
+                lint: { type: "string", description: "Lint command (e.g., 'npm run lint')" },
+                compile: { type: "string", description: "Compile command (e.g., 'npm run build')" },
+              },
+            },
+          },
+          {
+            name: "nella_run",
+            category: "validation",
+            description: "Execute complete task validation (refusal + constraints + validation)",
+            inputSchema: {
+              type: "object",
+              properties: {
+                taskId: { type: "string", description: "Task identifier" },
+                prompt: { type: "string", description: "Task prompt/description" },
+              },
+              required: ["taskId", "prompt"],
+            },
+          },
+          // Safety Tools
+          {
+            name: "nella_detect_risks",
+            category: "safety",
+            description: "Analyze text for risky patterns (credentials, backdoors, dangerous ops)",
+            inputSchema: {
+              type: "object",
+              properties: {
+                content: { type: "string", description: "Text content to analyze" },
+              },
+              required: ["content"],
+            },
+          },
+          {
+            name: "nella_should_refuse",
+            category: "safety",
+            description: "Determine if a task should be refused based on risk analysis",
+            inputSchema: {
+              type: "object",
+              properties: {
+                taskId: { type: "string", description: "Task identifier" },
+                prompt: { type: "string", description: "Task prompt to evaluate" },
+                skipPrerequisites: { type: "boolean", description: "Skip prerequisite checks" },
+              },
+              required: ["taskId", "prompt"],
+            },
+          },
+          {
+            name: "nella_check_prerequisites",
+            category: "safety",
+            description: "Verify required prerequisites are met (package.json, node_modules)",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+          // Context Tools
+          {
+            name: "nella_get_context",
+            category: "context",
+            description: "Get current session context (changes, assumptions, dependencies)",
+            inputSchema: {
+              type: "object",
+              properties: {
+                changesLimit: { type: "number", description: "Max recent changes to include" },
+              },
+            },
+          },
+          {
+            name: "nella_add_assumption",
+            category: "context",
+            description: "Record an assumption about the codebase for later validation",
+            inputSchema: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["schema", "interface", "dependency", "behavior", "config", "structure", "other"], description: "Type of assumption" },
+                description: { type: "string", description: "Description of the assumption" },
+                relatedFiles: { type: "array", items: { type: "string" }, description: "Related files" },
+                confidence: { type: "number", description: "Confidence level 0-1" },
+              },
+              required: ["type", "description"],
+            },
+          },
+          {
+            name: "nella_check_assumptions",
+            category: "context",
+            description: "Get status of all tracked assumptions",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+          {
+            name: "nella_get_file_history",
+            category: "context",
+            description: "Get change history for a specific file",
+            inputSchema: {
+              type: "object",
+              properties: {
+                filePath: { type: "string", description: "Path to the file" },
+              },
+              required: ["filePath"],
+            },
+          },
+          {
+            name: "nella_check_dependencies",
+            category: "context",
+            description: "Check for dependency changes since session start",
+            inputSchema: {
+              type: "object",
+              properties: {},
+            },
+          },
+          {
+            name: "nella_record_change",
+            category: "context",
+            description: "Manually record a file change in the session",
+            inputSchema: {
+              type: "object",
+              properties: {
+                filePath: { type: "string", description: "Path to the changed file" },
+                operation: { type: "string", enum: ["create", "modify", "delete", "rename"], description: "Type of operation" },
+                reason: { type: "string", description: "Why the change was made" },
+              },
+              required: ["filePath", "operation"],
+            },
+          },
+        ],
+      });
+    });
+
     // Get session state
     app.get("/api/session/:id", (req, res) => {
       const session = this.sessionManager.get(req.params.id);
@@ -583,7 +739,7 @@ export class PlaygroundServer {
           this.handleUnsubscribe(client, message.sessionId);
           break;
         case "tool:call":
-          await this.handleToolCall(client, message.toolName, message.arguments);
+          await this.handleToolCall(client, message.toolName, message.arguments, message.callId);
           break;
         case "session:clear":
           this.handleSessionClear(client);
@@ -650,7 +806,8 @@ export class PlaygroundServer {
   private async handleToolCall(
     client: WebSocketClient,
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    callId?: string
   ): Promise<void> {
     if (!client.sessionId) {
       throw new Error("Not subscribed to a session");
@@ -678,7 +835,8 @@ export class PlaygroundServer {
       this.toolHandlers.set(session.id, handler);
     }
 
-    const callId = `call_${crypto.randomBytes(8).toString("hex")}`;
+    // Use client-provided callId or generate one
+    const finalCallId = callId || `call_${crypto.randomBytes(8).toString("hex")}`;
 
     // Add chain of thought entry
     this.sessionManager.addChainOfThought(session.id, {
@@ -691,7 +849,7 @@ export class PlaygroundServer {
     // Broadcast start
     this.broadcast(session.id, {
       type: "tool:start",
-      callId,
+      callId: finalCallId,
       toolName,
     });
 
@@ -709,7 +867,7 @@ export class PlaygroundServer {
 
     // Create entry
     const entry: ToolCallEntry = {
-      id: callId,
+      id: finalCallId,
       toolName,
       arguments: args,
       result: result.content,
@@ -738,7 +896,7 @@ export class PlaygroundServer {
     // Broadcast end
     this.broadcast(session.id, {
       type: "tool:end",
-      callId,
+      callId: finalCallId,
       entry,
     });
 
