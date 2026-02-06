@@ -1,7 +1,10 @@
 /**
  * Safety Tools
  *
- * MCP tools for risk detection, refusal checking, and prerequisite verification.
+ * MCP tools for prompt injection protection, risk detection, refusal checking,
+ * and prerequisite verification.
+ *
+ * Objective: Prompt Injection Protection (O3)
  */
 
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
@@ -22,16 +25,17 @@ export function registerSafetyTools(): Tool[] {
   return [
     {
       name: "nella_detect_risks",
-      description: `Analyze text for risky patterns.
-      
-Detects potentially dangerous patterns like:
+      description: `Analyze text for prompt injection and risky patterns (Objective: Prompt Injection Protection).
+
+Scans prompts and code for potentially dangerous patterns including:
+- Prompt injection attempts (credential harvesting, privilege escalation)
 - Credential/secret logging
 - Security bypass attempts
 - Dangerous operations (drop table, rm -rf)
 - Data exposure patterns
 - Backdoor indicators
 
-Returns list of matched risk patterns.`,
+Returns list of matched risk patterns. Use before executing any agent-generated code.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -45,14 +49,15 @@ Returns list of matched risk patterns.`,
     },
     {
       name: "nella_should_refuse",
-      description: `Determine if a task should be refused.
-      
+      description: `Determine if a task should be refused. Acts as a prompt injection and safety gate (Objective: Prompt Injection Protection).
+
 Evaluates whether a task should be declined based on:
+- Prompt injection patterns in the request
 - Risk patterns in the prompt
 - Missing prerequisites
 - Dangerous operations
 
-Use this before starting potentially risky work.`,
+Use this before starting potentially risky work. Returns a refusal decision with confidence score.`,
       inputSchema: {
         type: "object",
         properties: {

@@ -8,11 +8,51 @@
 
 Nella is a framework that sits between AI coding agents and your codebase. It enforces behavioral contracts that prevent agents from making unsafe or incorrect changes:
 
-- **Plan-before-edit** — Agents declare their intended scope upfront
-- **Constraints** — Protect critical files (auth, payments, etc.) from modification
-- **Validation integrity** — Ensure tests/typecheck/lint actually ran and passed
-- **Refusal correctness** — Detect when agents should refuse risky or contradictory tasks
-- **Traceability** — Structured logs of what changed, why, and linked decisions
+- **Plan-before-edit** — Agents declare their intended scope upfront *(prevents contradictions)*
+- **Constraints** — Protect critical files from modification *(prompt injection protection)*
+- **Validation integrity** — Ensure tests/typecheck/lint actually ran and passed *(reduces hallucinations)*
+- **Refusal correctness** — Detect when agents should refuse risky or contradictory tasks *(prompt injection protection)*
+- **Traceability** — Structured logs of what changed, why, and linked decisions *(increases context)*
+
+## Why Nella?
+
+LLMs used as coding agents suffer from four fundamental reliability problems. Nella addresses each one:
+
+| Problem | What Happens | How Nella Solves It |
+|---------|-------------|---------------------|
+| **Hallucinated Code** | Agents reference imports, symbols, and APIs that don't exist | Index the real codebase and verify generated code against it |
+| **Lost Context** | Agents forget prior decisions, assumptions, and changes across turns | Maintain persistent session state with assumption tracking and change ledgers |
+| **Prompt Injection** | Malicious or risky prompts trick agents into dangerous operations | Scan prompts for risk patterns and recommend refusal before execution |
+| **Contradictions** | Agents contradict earlier decisions or generate code not grounded in the codebase | Track assumptions, detect conflicts, and verify all referenced symbols exist |
+
+```mermaid
+graph LR
+    subgraph "Problems"
+        H["Hallucinated Code"]
+        C["Lost Context"]
+        P["Prompt Injection"]
+        U["Contradictions"]
+    end
+    subgraph "Nella"
+        V["Code Verifier"]
+        S["Codebase Search"]
+        CT["Context Manager"]
+        AT["Assumption Tracker"]
+        CL["Change Ledger"]
+        RD["Refusal Detector"]
+        CS["Constraint System"]
+    end
+    V --> H
+    S --> H
+    CT --> C
+    CL --> C
+    AT --> C
+    AT --> U
+    RD --> P
+    CS --> P
+    CS --> U
+    V --> U
+```
 
 ## Packages
 

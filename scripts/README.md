@@ -100,20 +100,15 @@ You can manually trigger the workflow:
 | Source (`nella/docs`) | Target (`nella-website`) |
 |----------------------|--------------------------|
 | `mcp/tools.md` | `api-reference/tools-reference.mdx` |
-| `mcp/context.md` | `guides/context-management.mdx` |
-| `mcp/examples.md` | `examples/mcp-examples.mdx` |
 | `mcp/integration.md` | `guides/mcp-integration.mdx` |
 | `mcp/README.md` | `api-reference/mcp-overview.mdx` |
 | `core/api-reference.md` | `api-reference/core-api.mdx` |
 | `core/configuration.md` | `configuration/core-config.mdx` |
-| `core/auth.md` | `guides/authentication.mdx` |
-| `core/context-sharing.md` | `guides/context-sharing.mdx` |
-| `core/indexing.md` | `guides/indexing.mdx` |
-| `core/workspace.md` | `guides/workspace.mdx` |
+| `core/modules.md` | `guides/modules.mdx` |
+| `core/context.md` | `guides/context-management.mdx` |
 | `core/types.md` | `api-reference/types.mdx` |
 | `core/examples.md` | `examples/core-examples.mdx` |
 | `cli/commands.md` | `cli/commands.mdx` |
-| `cli/examples.md` | `cli/cli-examples.mdx` |
 | `how-to-use.md` | `getting-started/usage-guide.mdx` |
 | `spec.md` | `guides/specification.mdx` |
 

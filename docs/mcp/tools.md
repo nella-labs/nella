@@ -28,6 +28,8 @@ Complete reference for all tools exposed by the Nella MCP Server.
 
 ### nella_check
 
+> **Objectives:** Prevent Contradictions & Unbacked Behaviors
+
 Quick constraint validation without running full test suites. Use this for fast feedback before committing to changes.
 
 **Input Parameters:**
@@ -82,6 +84,8 @@ Claude: Let me check if my planned changes violate any constraints.
 ---
 
 ### nella_validate
+
+> **Objectives:** Reduce Hallucinations, Prevent Contradictions
 
 Run validation commands (tests, lints, builds) to verify changes work correctly.
 
@@ -143,6 +147,8 @@ Claude: Let me run the test suite to verify my changes.
 ---
 
 ### nella_run
+
+> **Objectives:** All — Hallucination Reduction, Context Expansion, Prompt Injection Protection, Contradiction Prevention
 
 Complete Nella validation workflow. Orchestrates:
 1. Refusal check
@@ -231,7 +237,9 @@ Claude: Now let me run the full validation to ensure everything is correct.
 
 ### nella_detect_risks
 
-Analyze text for risky patterns. Scans for:
+> **Objectives:** Prompt Injection Protection
+
+Analyze text for prompt injection and risky patterns. Scans for:
 - Credential exposure (passwords, tokens, API keys)
 - Security bypasses (disable auth, skip validation)
 - Dangerous operations (drop table, rm -rf)
@@ -290,7 +298,9 @@ Claude: Let me check if this code has any security concerns.
 
 ### nella_should_refuse
 
-Determine if a task should be refused. Evaluates:
+> **Objectives:** Prompt Injection Protection
+
+Determine if a task should be refused. Acts as a prompt injection and safety gate. Evaluates:
 - Risk patterns in the prompt
 - Missing prerequisites
 - Dangerous operation indicators
@@ -353,6 +363,8 @@ Claude: Before starting, let me verify this task is safe to proceed with.
 
 ### nella_check_prerequisites
 
+> **Objectives:** Prompt Injection Protection, Reduce Hallucinations
+
 Verify workspace prerequisites are met before starting work.
 
 **Input Parameters:**
@@ -399,6 +411,8 @@ Claude: Let me first verify the workspace is set up correctly.
 ## Context Tools
 
 ### nella_get_context
+
+> **Objectives:** Increase Context, Prevent Contradictions
 
 Get the full session context including recent changes, assumptions, and dependencies.
 
@@ -451,6 +465,8 @@ Claude: Let me review what we've done in this session so far.
 
 ### nella_add_assumption
 
+> **Objectives:** Prevent Contradictions, Increase Context
+
 Record an assumption about the codebase that can be validated when changes are made.
 
 **Input Parameters:**
@@ -499,6 +515,8 @@ Claude: I'm assuming the User model has an email field. Let me record this.
 
 ### nella_check_assumptions
 
+> **Objectives:** Prevent Contradictions
+
 Get the status of all recorded assumptions, including any that have been invalidated.
 
 **Input Parameters:**
@@ -542,6 +560,8 @@ Claude: Let me check if my assumptions are still valid.
 ---
 
 ### nella_get_file_history
+
+> **Objectives:** Increase Context, Prevent Contradictions
 
 Get the change history for a specific file within the current session.
 
@@ -588,6 +608,8 @@ Claude: Let me see what changes we've made to the users service.
 ---
 
 ### nella_check_dependencies
+
+> **Objectives:** Reduce Hallucinations, Increase Context
 
 Check for dependency changes (package.json, lockfile) since the last snapshot.
 
@@ -646,6 +668,8 @@ Claude: Let me check if any dependencies have changed.
 ---
 
 ### nella_record_change
+
+> **Objectives:** Increase Context, Prevent Contradictions
 
 Manually record file changes to keep context accurate. Use this when making changes outside of `nella_run`.
 

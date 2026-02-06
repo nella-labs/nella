@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm --filter @usenella/core build:*)",
+      "Bash(pnpm --filter @usenella/nella build:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
