@@ -201,21 +201,45 @@ export {
   // Key Manager
   KeyManager,
   createKeyManager,
+  createKeyManagerFromEnv,
   // Agent Manager
   AgentManager,
   createAgentManager,
   // Authenticator
   Authenticator,
   createAuthenticator,
+  // Token Manager (JWT)
+  TokenManager,
+  getTokenManager,
+  createTokenManager,
+  resetTokenManager,
+  // Audit Log
+  AuditLogManager,
+  getAuditLog,
+  createAuditLog,
+  resetAuditLog,
+  // Middleware (IP Filter & Request Signing)
+  IPFilter,
+  RequestSigner,
+  getIPFilter,
+  getRequestSigner,
+  createIPFilterMiddleware,
+  createSigningMiddleware,
+  resetMiddleware,
   // Constants
   DEFAULT_RATE_LIMIT,
   DEFAULT_PERMISSIONS,
   ADMIN_PERMISSIONS,
   DEFAULT_KEY_STORE_SETTINGS,
+  DEFAULT_JWT_CONFIG,
+  DEFAULT_AUDIT_CONFIG,
+  DEFAULT_ROTATION_POLICY,
+  DEFAULT_IP_WHITELIST,
+  DEFAULT_REQUEST_SIGNING,
 } from "./auth";
 
 export type {
-  // Types
+  // Core types
   ApiKey,
   ApiKeyPermissions,
   RateLimitConfig,
@@ -229,13 +253,39 @@ export type {
   KeyStore,
   KeyStoreSettings,
   AuthEvent,
+  // JWT types
+  JWTPayload,
+  JWTConfig,
+  // Audit types
+  AuditEntry,
+  AuditCategory,
+  AuditLogConfig,
+  // Rotation types
+  RotationPolicy,
+  RotationEvent,
+  // Middleware types
+  IPWhitelistConfig,
+  RequestSigningConfig,
+  SignedRequestHeaders,
+  // Extended event type
+  ExtendedAuthEvent,
   // Options
   CreateKeyOptions,
   CreateAgentOptions,
   AuthenticatorOptions,
+  KeyManagerOptions,
+  TokenManagerOptions,
+  TokenResult,
+  TokenValidationResult,
+  AuditLogOptions,
+  IPValidationResult,
+  SignatureValidationResult,
   // Event handlers
   KeyEventHandler,
   AgentEventHandler,
+  TokenEventHandler,
+  AuditEventHandler,
+  MiddlewareEventHandler,
 } from "./auth";
 
 // =============================================================================
