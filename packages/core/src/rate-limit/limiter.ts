@@ -1,8 +1,9 @@
 /**
  * Rate Limiter
  *
- * In-memory rate limiter with sliding window algorithm.
- * Supports per-key and per-agent limits.
+ * Orchestrates rate limiting with pluggable backends, algorithms,
+ * priority handling, dynamic limits, and graceful degradation.
+ * Backward compatible with the original in-memory sliding window API.
  */
 
 import type {
@@ -10,9 +11,21 @@ import type {
   RateLimitResult,
   RateLimiterConfig,
   RateLimitEvent,
-  RateLimitBucket,
+  RequestInfo,
+  GracefulDegradationConfig,
 } from "./types";
-import { DEFAULT_RATE_LIMITER_CONFIG, RATE_WINDOWS } from "./types";
+import {
+  DEFAULT_RATE_LIMITER_CONFIG,
+  DEFAULT_GRACEFUL_DEGRADATION_CONFIG,
+  RATE_WINDOWS,
+} from "./types";
+import type { RateLimitBackend } from "./backends/interface";
+import { createBackend, MemoryBackend } from "./backends";
+import type { RateLimitAlgorithm } from "./algorithms/interface";
+import { createAlgorithm, TokenBucketAlgorithm } from "./algorithms";
+import { generateHeaders } from "./headers";
+import { PriorityHandler } from "./priority";
+import { DynamicLimitAdjuster } from "./dynamic-limits";
 
 // =============================================================================
 // Types
@@ -20,26 +33,51 @@ import { DEFAULT_RATE_LIMITER_CONFIG, RATE_WINDOWS } from "./types";
 
 export type RateLimitEventHandler = (event: RateLimitEvent) => void;
 
-interface RequestInfo {
-  entityId: string;
-  entityType: "key" | "agent";
-  tokens?: number;
-}
-
 // =============================================================================
 // Rate Limiter Class
 // =============================================================================
 
 export class RateLimiter {
-  private states: Map<string, RateLimitState> = new Map();
+  private backend: RateLimitBackend;
+  private algorithm: RateLimitAlgorithm;
+  private priorityHandler: PriorityHandler;
+  private dynamicAdjuster: DynamicLimitAdjuster;
   private configs: Map<string, RateLimiterConfig> = new Map();
   private defaultConfig: RateLimiterConfig;
   private eventHandlers: RateLimitEventHandler[] = [];
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private degradationConfig: GracefulDegradationConfig;
+
+  // Keep a local state cache for synchronous access (backward compat)
+  private stateCache: Map<string, RateLimitState> = new Map();
 
   constructor(defaultConfig?: Partial<RateLimiterConfig>) {
     this.defaultConfig = { ...DEFAULT_RATE_LIMITER_CONFIG, ...defaultConfig };
-    
+
+    // Initialize backend
+    this.backend = createBackend({
+      type: this.defaultConfig.backend || "memory",
+      redisOptions: this.defaultConfig.redisOptions,
+      sqlitePath: this.defaultConfig.sqlitePath,
+      onEvent: (event) => this.emit(event),
+    });
+
+    // Initialize algorithm
+    this.algorithm = createAlgorithm(this.defaultConfig.algorithm);
+
+    // Initialize priority handler
+    this.priorityHandler = new PriorityHandler(this.defaultConfig.priority);
+
+    // Initialize dynamic adjuster
+    this.dynamicAdjuster = new DynamicLimitAdjuster(this.defaultConfig.dynamicLimits);
+    this.dynamicAdjuster.onEvent((event) => this.emit(event));
+
+    // Graceful degradation config
+    this.degradationConfig = {
+      ...DEFAULT_GRACEFUL_DEGRADATION_CONFIG,
+      ...this.defaultConfig.gracefulDegradation,
+    };
+
     // Start cleanup interval (every minute)
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
   }
@@ -75,10 +113,11 @@ export class RateLimiter {
   }
 
   /**
-   * Get config for entity (or default)
+   * Get config for entity (or default), with dynamic adjustment applied
    */
   getConfig(entityId: string): RateLimiterConfig {
-    return this.configs.get(entityId) || this.defaultConfig;
+    const base = this.configs.get(entityId) || this.defaultConfig;
+    return this.dynamicAdjuster.getAdjustedConfig(base);
   }
 
   /**
@@ -89,82 +128,102 @@ export class RateLimiter {
   }
 
   // =============================================================================
-  // Rate Limiting
+  // Synchronous Rate Limiting (backward compatible API)
   // =============================================================================
 
   /**
-   * Check if request is allowed (doesn't consume)
+   * Check if request is allowed (doesn't consume).
+   * Uses local state cache for synchronous access.
    */
   check(request: RequestInfo): RateLimitResult {
-    const state = this.getOrCreateState(request);
-    const config = this.getConfig(request.entityId);
-    const now = Date.now();
+    const state = this.getOrCreateStateSync(request);
+    const config = this.getEffectiveConfig(request);
 
-    // Update buckets
-    this.updateBuckets(state, now);
-
-    // Check concurrent
-    if (state.concurrent >= config.maxConcurrent) {
-      return this.blocked(state, config, "concurrent");
+    // Priority bypass
+    if (request.priority && this.priorityHandler.shouldBypass(request.priority)) {
+      this.emit({
+        type: "rate:priority:bypass",
+        entityId: request.entityId,
+        priority: request.priority,
+      });
+      const result = this.buildAllowedResult(state, config);
+      result.appliedPriority = request.priority;
+      result.headers = generateHeaders(result, config);
+      return result;
     }
 
-    // Check minute limit
-    const minuteBucket = state.buckets.minute;
-    if (minuteBucket.count >= config.requestsPerMinute) {
-      return this.blocked(state, config, "minute");
+    // Refill tokens if using token bucket
+    if (this.algorithm instanceof TokenBucketAlgorithm) {
+      this.algorithm.refillTokens(state, config, Date.now());
     }
 
-    // Check hour limit
-    const hourBucket = state.buckets.hour;
-    if (hourBucket.count >= config.requestsPerHour) {
-      return this.blocked(state, config, "hour");
-    }
+    let result = this.algorithm.check(state, config, request);
 
-    // Check day limit
-    const dayBucket = state.buckets.day;
-    if (dayBucket.count >= config.requestsPerDay) {
-      return this.blocked(state, config, "day");
-    }
+    // Apply graceful degradation
+    result = this.applyGracefulDegradation(result, state, config, request);
 
-    // Check tokens if provided
-    if (request.tokens && request.tokens > config.maxTokensPerRequest) {
-      return this.blocked(state, config, "tokens");
+    // Attach priority and headers
+    if (request.priority) {
+      result.appliedPriority = request.priority;
     }
+    result.headers = generateHeaders(result, config);
 
-    return this.allowed(state, config);
+    return result;
   }
 
   /**
-   * Consume a request (check + record)
+   * Consume a request (check + record).
+   * Uses local state cache for synchronous access.
    */
   consume(request: RequestInfo): RateLimitResult {
-    const result = this.check(request);
+    const state = this.getOrCreateStateSync(request);
+    const config = this.getEffectiveConfig(request);
 
-    if (result.allowed) {
-      const state = this.getOrCreateState(request);
-      const now = Date.now();
-
-      // Increment counters
+    // Priority bypass
+    if (request.priority && this.priorityHandler.shouldBypass(request.priority)) {
+      this.emit({
+        type: "rate:priority:bypass",
+        entityId: request.entityId,
+        priority: request.priority,
+      });
+      state.concurrent++;
+      state.updatedAt = Date.now();
       state.buckets.minute.count++;
       state.buckets.hour.count++;
       state.buckets.day.count++;
-      state.concurrent++;
-      state.updatedAt = now;
+      this.syncToBackend(request.entityId, state);
 
-      // Track tokens
-      if (request.tokens) {
-        state.buckets.minute.tokens += request.tokens;
-        state.buckets.hour.tokens += request.tokens;
-        state.buckets.day.tokens += request.tokens;
+      const result = this.buildAllowedResult(state, config);
+      result.appliedPriority = request.priority;
+      result.headers = generateHeaders(result, config);
+      this.emit({ type: "rate:check", entityId: request.entityId, allowed: true });
+      return result;
+    }
+
+    // Refill tokens if using token bucket
+    if (this.algorithm instanceof TokenBucketAlgorithm) {
+      this.algorithm.refillTokens(state, config, Date.now());
+    }
+
+    let result = this.algorithm.consume(state, config, request);
+
+    // Apply graceful degradation
+    result = this.applyGracefulDegradation(result, state, config, request);
+
+    if (result.allowed) {
+      this.syncToBackend(request.entityId, state);
+      this.checkWarnings(state, config);
+
+      if (request.priority) {
+        result.appliedPriority = request.priority;
       }
-
-      this.states.set(request.entityId, state);
-
-      // Emit warning if approaching limit
-      this.checkWarnings(state, this.getConfig(request.entityId));
-
+      result.headers = generateHeaders(result, config);
       this.emit({ type: "rate:check", entityId: request.entityId, allowed: true });
     } else {
+      if (request.priority) {
+        result.appliedPriority = request.priority;
+      }
+      result.headers = generateHeaders(result, config);
       this.emit({
         type: "rate:limited",
         entityId: request.entityId,
@@ -180,15 +239,129 @@ export class RateLimiter {
    * Release a concurrent slot
    */
   release(entityId: string): void {
-    const state = this.states.get(entityId);
+    const state = this.stateCache.get(entityId);
     if (state && state.concurrent > 0) {
       state.concurrent--;
       state.updatedAt = Date.now();
+      this.syncToBackend(entityId, state);
     }
   }
 
+  // =============================================================================
+  // Async Rate Limiting (for distributed backends like Redis)
+  // =============================================================================
+
   /**
-   * Get current usage for entity
+   * Check if request is allowed (async version for distributed backends).
+   */
+  async checkAsync(request: RequestInfo): Promise<RateLimitResult> {
+    const state = await this.getOrCreateStateAsync(request);
+    const config = this.getEffectiveConfig(request);
+
+    if (request.priority && this.priorityHandler.shouldBypass(request.priority)) {
+      this.emit({
+        type: "rate:priority:bypass",
+        entityId: request.entityId,
+        priority: request.priority,
+      });
+      const result = this.buildAllowedResult(state, config);
+      result.appliedPriority = request.priority;
+      result.headers = generateHeaders(result, config);
+      return result;
+    }
+
+    if (this.algorithm instanceof TokenBucketAlgorithm) {
+      this.algorithm.refillTokens(state, config, Date.now());
+    }
+
+    let result = this.algorithm.check(state, config, request);
+    result = this.applyGracefulDegradation(result, state, config, request);
+
+    if (request.priority) {
+      result.appliedPriority = request.priority;
+    }
+    result.headers = generateHeaders(result, config);
+
+    return result;
+  }
+
+  /**
+   * Consume a request (async version for distributed backends).
+   */
+  async consumeAsync(request: RequestInfo): Promise<RateLimitResult> {
+    const state = await this.getOrCreateStateAsync(request);
+    const config = this.getEffectiveConfig(request);
+
+    if (request.priority && this.priorityHandler.shouldBypass(request.priority)) {
+      this.emit({
+        type: "rate:priority:bypass",
+        entityId: request.entityId,
+        priority: request.priority,
+      });
+      state.concurrent++;
+      state.updatedAt = Date.now();
+      state.buckets.minute.count++;
+      state.buckets.hour.count++;
+      state.buckets.day.count++;
+      await this.backend.setState(request.entityId, state);
+
+      const result = this.buildAllowedResult(state, config);
+      result.appliedPriority = request.priority;
+      result.headers = generateHeaders(result, config);
+      this.emit({ type: "rate:check", entityId: request.entityId, allowed: true });
+      return result;
+    }
+
+    if (this.algorithm instanceof TokenBucketAlgorithm) {
+      this.algorithm.refillTokens(state, config, Date.now());
+    }
+
+    let result = this.algorithm.consume(state, config, request);
+    result = this.applyGracefulDegradation(result, state, config, request);
+
+    if (result.allowed) {
+      await this.backend.setState(request.entityId, state);
+      this.checkWarnings(state, config);
+
+      if (request.priority) {
+        result.appliedPriority = request.priority;
+      }
+      result.headers = generateHeaders(result, config);
+      this.emit({ type: "rate:check", entityId: request.entityId, allowed: true });
+    } else {
+      if (request.priority) {
+        result.appliedPriority = request.priority;
+      }
+      result.headers = generateHeaders(result, config);
+      this.emit({
+        type: "rate:limited",
+        entityId: request.entityId,
+        limitHit: result.limitHit || "unknown",
+        retryAfter: result.retryAfter || 0,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Release a concurrent slot (async version)
+   */
+  async releaseAsync(entityId: string): Promise<void> {
+    const state = await this.backend.getState(entityId);
+    if (state && state.concurrent > 0) {
+      state.concurrent--;
+      state.updatedAt = Date.now();
+      await this.backend.setState(entityId, state);
+    }
+  }
+
+  // =============================================================================
+  // Usage & State
+  // =============================================================================
+
+  /**
+   * Get current usage for entity (synchronous, uses local cache)
    */
   getUsage(entityId: string): {
     minute: { count: number; limit: number };
@@ -196,13 +369,34 @@ export class RateLimiter {
     day: { count: number; limit: number };
     concurrent: { count: number; limit: number };
   } | null {
-    const state = this.states.get(entityId);
+    const state = this.stateCache.get(entityId);
     if (!state) return null;
 
     const config = this.getConfig(entityId);
+    this.algorithm.updateWindows(state, Date.now());
 
-    // Update buckets first
-    this.updateBuckets(state, Date.now());
+    return {
+      minute: { count: state.buckets.minute.count, limit: config.requestsPerMinute },
+      hour: { count: state.buckets.hour.count, limit: config.requestsPerHour },
+      day: { count: state.buckets.day.count, limit: config.requestsPerDay },
+      concurrent: { count: state.concurrent, limit: config.maxConcurrent },
+    };
+  }
+
+  /**
+   * Get current usage for entity (async, reads from backend)
+   */
+  async getUsageAsync(entityId: string): Promise<{
+    minute: { count: number; limit: number };
+    hour: { count: number; limit: number };
+    day: { count: number; limit: number };
+    concurrent: { count: number; limit: number };
+  } | null> {
+    const state = await this.backend.getState(entityId);
+    if (!state) return null;
+
+    const config = this.getConfig(entityId);
+    this.algorithm.updateWindows(state, Date.now());
 
     return {
       minute: { count: state.buckets.minute.count, limit: config.requestsPerMinute },
@@ -216,52 +410,149 @@ export class RateLimiter {
    * Reset limits for entity
    */
   reset(entityId: string): void {
-    this.states.delete(entityId);
+    this.stateCache.delete(entityId);
+    this.backend.deleteState(entityId);
     this.emit({ type: "rate:reset", entityId, window: "all" });
+  }
+
+  /**
+   * Save all state (for persistence across restarts)
+   */
+  async saveState(): Promise<void> {
+    // Sync local cache to backend first
+    for (const [entityId, state] of this.stateCache) {
+      await this.backend.setState(entityId, state);
+    }
+
+    // If using MemoryBackend with persistence, trigger file save
+    if (this.backend instanceof MemoryBackend) {
+      await this.backend.save();
+    }
+
+    const states = await this.backend.exportState();
+    this.emit({ type: "rate:state:saved", entityCount: states.size });
+  }
+
+  /**
+   * Load state from persistence
+   */
+  async loadState(states: Map<string, RateLimitState>): Promise<void> {
+    await this.backend.importState(states);
+
+    // Update local cache
+    for (const [entityId, state] of states) {
+      this.stateCache.set(entityId, state);
+    }
+
+    this.emit({ type: "rate:state:restored", entityCount: states.size });
+  }
+
+  /**
+   * Get the current backend instance
+   */
+  getBackend(): RateLimitBackend {
+    return this.backend;
+  }
+
+  /**
+   * Get the current algorithm instance
+   */
+  getAlgorithm(): RateLimitAlgorithm {
+    return this.algorithm;
+  }
+
+  // =============================================================================
+  // Lifecycle
+  // =============================================================================
+
+  /**
+   * Stop cleanup interval and destroy backend
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.dynamicAdjuster.destroy();
+    this.backend.destroy();
   }
 
   // =============================================================================
   // Private Methods
   // =============================================================================
 
-  private getOrCreateState(request: RequestInfo): RateLimitState {
-    let state = this.states.get(request.entityId);
+  private getEffectiveConfig(request: RequestInfo): RateLimiterConfig {
+    let config = this.getConfig(request.entityId);
+
+    if (request.priority) {
+      config = this.priorityHandler.getEffectiveConfig(config, request.priority);
+    }
+
+    return config;
+  }
+
+  private getOrCreateStateSync(request: RequestInfo): RateLimitState {
+    let state = this.stateCache.get(request.entityId);
 
     if (!state) {
-      const now = Date.now();
-      state = {
-        entityId: request.entityId,
-        entityType: request.entityType,
-        buckets: {
-          minute: { windowStart: now, count: 0, tokens: 0 },
-          hour: { windowStart: now, count: 0, tokens: 0 },
-          day: { windowStart: now, count: 0, tokens: 0 },
-        },
-        concurrent: 0,
-        updatedAt: now,
-      };
-      this.states.set(request.entityId, state);
+      state = this.createNewState(request);
+      this.stateCache.set(request.entityId, state);
+      this.syncToBackend(request.entityId, state);
     }
 
     return state;
   }
 
-  private updateBuckets(state: RateLimitState, now: number): void {
-    // Reset buckets if window has passed
-    for (const [window, duration] of Object.entries(RATE_WINDOWS)) {
-      const bucket = state.buckets[window];
-      if (now - bucket.windowStart >= duration) {
-        // Window expired, reset
-        bucket.windowStart = now;
-        bucket.count = 0;
-        bucket.tokens = 0;
+  private async getOrCreateStateAsync(request: RequestInfo): Promise<RateLimitState> {
+    let state = await this.backend.getState(request.entityId);
 
-        this.emit({ type: "rate:reset", entityId: state.entityId, window });
-      }
+    if (!state) {
+      state = this.createNewState(request);
+      await this.backend.setState(request.entityId, state);
     }
+
+    // Update local cache
+    this.stateCache.set(request.entityId, state);
+    return state;
   }
 
-  private allowed(state: RateLimitState, config: RateLimiterConfig): RateLimitResult {
+  private createNewState(request: RequestInfo): RateLimitState {
+    const now = Date.now();
+    const state: RateLimitState = {
+      entityId: request.entityId,
+      entityType: request.entityType,
+      buckets: {
+        minute: { windowStart: now, count: 0, tokens: 0 },
+        hour: { windowStart: now, count: 0, tokens: 0 },
+        day: { windowStart: now, count: 0, tokens: 0 },
+      },
+      concurrent: 0,
+      updatedAt: now,
+    };
+
+    // Initialize token bucket state if using token bucket algorithm
+    const config = this.getConfig(request.entityId);
+    if (config.algorithm === "token-bucket" && config.tokenBucket) {
+      state.tokenBucketState = {
+        availableTokens: config.tokenBucket.bucketSize,
+        lastRefill: now,
+      };
+    }
+
+    return state;
+  }
+
+  private syncToBackend(entityId: string, state: RateLimitState): void {
+    // Fire-and-forget sync to backend
+    this.backend.setState(entityId, state).catch(() => {
+      // Silently fail - local cache is source of truth for sync API
+    });
+  }
+
+  private buildAllowedResult(
+    state: RateLimitState,
+    config: RateLimiterConfig,
+  ): RateLimitResult {
     return {
       allowed: true,
       remaining: {
@@ -274,56 +565,44 @@ export class RateLimiter {
     };
   }
 
-  private blocked(
+  private applyGracefulDegradation(
+    result: RateLimitResult,
     state: RateLimitState,
     config: RateLimiterConfig,
-    limitHit: "minute" | "hour" | "day" | "tokens" | "concurrent"
+    request: RequestInfo,
   ): RateLimitResult {
-    let reason: string;
-    let resetIn: number;
-    const now = Date.now();
+    if (!this.degradationConfig.enabled) return result;
 
-    switch (limitHit) {
-      case "minute":
-        reason = "Per-minute rate limit exceeded";
-        resetIn = RATE_WINDOWS.minute - (now - state.buckets.minute.windowStart);
-        break;
-      case "hour":
-        reason = "Per-hour rate limit exceeded";
-        resetIn = RATE_WINDOWS.hour - (now - state.buckets.hour.windowStart);
-        break;
-      case "day":
-        reason = "Per-day rate limit exceeded";
-        resetIn = RATE_WINDOWS.day - (now - state.buckets.day.windowStart);
-        break;
-      case "tokens":
-        reason = "Token limit exceeded for single request";
-        resetIn = 0;
-        break;
-      case "concurrent":
-        reason = "Maximum concurrent requests exceeded";
-        resetIn = 1000; // Wait 1 second
-        break;
+    if (result.allowed) {
+      const threshold = this.degradationConfig.softLimitThreshold;
+
+      const minutePercent = state.buckets.minute.count / config.requestsPerMinute;
+      const hourPercent = state.buckets.hour.count / config.requestsPerHour;
+      const dayPercent = state.buckets.day.count / config.requestsPerDay;
+
+      const maxPercent = Math.max(minutePercent, hourPercent, dayPercent);
+
+      if (maxPercent >= threshold) {
+        result.warning = true;
+        result.warningMessage = this.degradationConfig.warningMessage;
+
+        let warningWindow = "minute";
+        if (hourPercent === maxPercent) warningWindow = "hour";
+        if (dayPercent === maxPercent) warningWindow = "day";
+
+        this.emit({
+          type: "rate:soft-limit",
+          entityId: request.entityId,
+          window: warningWindow,
+          percentUsed: maxPercent * 100,
+        });
+      }
     }
 
-    return {
-      allowed: false,
-      reason,
-      limitHit,
-      remaining: {
-        minute: Math.max(0, config.requestsPerMinute - state.buckets.minute.count),
-        hour: Math.max(0, config.requestsPerHour - state.buckets.hour.count),
-        day: Math.max(0, config.requestsPerDay - state.buckets.day.count),
-        tokens: config.maxTokensPerRequest,
-        concurrent: Math.max(0, config.maxConcurrent - state.concurrent),
-      },
-      resetIn,
-      retryAfter: Math.ceil(resetIn / 1000),
-    };
+    return result;
   }
 
   private checkWarnings(state: RateLimitState, config: RateLimiterConfig): void {
-    // Warn at 80% usage
     const threshold = 0.8;
 
     const minutePercent = state.buckets.minute.count / config.requestsPerMinute;
@@ -348,23 +627,16 @@ export class RateLimiter {
   }
 
   private cleanup(): void {
-    // Remove stale states (no activity for > 1 hour)
+    // Clean local cache
     const cutoff = Date.now() - RATE_WINDOWS.hour;
-    for (const [id, state] of this.states.entries()) {
+    for (const [id, state] of this.stateCache.entries()) {
       if (state.updatedAt < cutoff && state.concurrent === 0) {
-        this.states.delete(id);
+        this.stateCache.delete(id);
       }
     }
-  }
 
-  /**
-   * Stop cleanup interval
-   */
-  destroy(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
+    // Clean backend
+    this.backend.cleanup(RATE_WINDOWS.hour);
   }
 }
 
