@@ -10,13 +10,13 @@
  * - Audit logging integration
  */
 
-import * as fs from "fs";
+import * as fs from "fs/promises";
+import { existsSync } from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import type {
   ApiKey,
   ApiKeyPermissions,
-  RateLimitConfig,
   KeyStore,
   KeyStoreSettings,
   AuthEvent,
@@ -24,6 +24,7 @@ import type {
   RotationEvent,
   ExtendedAuthEvent,
 } from "./types";
+import type { RateLimitConfig } from "./types";
 import { DEFAULT_ROTATION_POLICY } from "./types";
 
 // =============================================================================
@@ -87,13 +88,14 @@ interface ExtendedKeyStore extends KeyStore {
 }
 
 export class KeyManager {
-  private store: ExtendedKeyStore;
+  private store!: ExtendedKeyStore;
   private storePath: string;
   private eventHandlers: AuthEventHandler[] = [];
   private encryptionKey: Buffer | null = null;
   private rotationCheckInterval: NodeJS.Timeout | null = null;
+  private initialized = false;
 
-  constructor(options: KeyManagerOptions) {
+  private constructor(options: KeyManagerOptions) {
     this.storePath = path.join(options.storagePath, "keys.json");
     
     // Setup encryption key if provided
@@ -105,14 +107,26 @@ export class KeyManager {
         );
       }
     }
+  }
 
-    // Ensure directory exists
+  /**
+   * Create and initialize a KeyManager instance
+   */
+  static async create(options: KeyManagerOptions): Promise<KeyManager> {
+    const manager = new KeyManager(options);
+    await manager.init();
+    return manager;
+  }
+
+  /**
+   * Async initialization — ensures storage directory exists and loads store
+   */
+  private async init(): Promise<void> {
     const dir = path.dirname(this.storePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    await fs.mkdir(dir, { recursive: true });
 
-    this.store = this.loadStore();
+    this.store = await this.loadStore();
+    this.initialized = true;
 
     // Start rotation checker
     this.startRotationChecker();
@@ -209,7 +223,7 @@ export class KeyManager {
   /**
    * Re-encrypt all keys with a new encryption key
    */
-  reEncryptAll(newEncryptionKey: string): void {
+  async reEncryptAll(newEncryptionKey: string): Promise<void> {
     const newKey = Buffer.from(newEncryptionKey, "base64");
     if (newKey.length !== KEY_LENGTH) {
       throw new Error(`New encryption key must be ${KEY_LENGTH} bytes.`);
@@ -241,7 +255,7 @@ export class KeyManager {
       keyId: crypto.randomBytes(8).toString("hex"),
     };
 
-    this.save();
+    await this.save();
   }
 
   // =============================================================================
@@ -252,7 +266,7 @@ export class KeyManager {
    * Create a new API key
    * Returns the raw key value (only returned once!)
    */
-  create(options: CreateKeyOptions): { key: ApiKey; rawKey: string } {
+  async create(options: CreateKeyOptions): Promise<{ key: ApiKey; rawKey: string }> {
     // Generate key
     const rawKey = this.generateKey();
     const keyHash = this.hashKey(rawKey);
@@ -319,7 +333,7 @@ export class KeyManager {
     }
 
     this.store.keys.push(key);
-    this.save();
+    await this.save();
 
     this.emit({ type: "key:created", key, rawKey });
 
@@ -333,7 +347,7 @@ export class KeyManager {
   /**
    * Create admin key
    */
-  createAdmin(name: string, createdBy?: string): { key: ApiKey; rawKey: string } {
+  async createAdmin(name: string, createdBy?: string): Promise<{ key: ApiKey; rawKey: string }> {
     return this.create({
       name,
       createdBy,
@@ -353,11 +367,11 @@ export class KeyManager {
   /**
    * Create workspace-scoped key
    */
-  createForWorkspace(
+  async createForWorkspace(
     workspaceId: string,
     name: string,
     permissions?: Partial<ApiKeyPermissions>
-  ): { key: ApiKey; rawKey: string } {
+  ): Promise<{ key: ApiKey; rawKey: string }> {
     return this.create({
       name,
       workspaceId,
@@ -368,13 +382,13 @@ export class KeyManager {
   /**
    * Create agent-scoped key
    */
-  createForAgent(
+  async createForAgent(
     workspaceId: string,
     agentId: string,
     name: string,
     permissions?: Partial<ApiKeyPermissions>,
     rateLimit?: Partial<RateLimitConfig>
-  ): { key: ApiKey; rawKey: string } {
+  ): Promise<{ key: ApiKey; rawKey: string }> {
     return this.create({
       name,
       workspaceId,
@@ -392,7 +406,7 @@ export class KeyManager {
    * Validate a raw API key
    * Returns the key if valid, null otherwise
    */
-  validate(rawKey: string): ApiKey | null {
+  async validate(rawKey: string): Promise<ApiKey | null> {
     // Find by prefix first (fast lookup)
     const prefix = rawKey.slice(0, 8);
     const candidates = this.store.keys.filter((k) => k.prefix === prefix && k.active);
@@ -405,7 +419,7 @@ export class KeyManager {
         // Update usage
         key.metadata.lastUsed = new Date().toISOString();
         key.metadata.usageCount++;
-        this.save();
+        await this.save();
 
         return key;
       }
@@ -470,7 +484,7 @@ export class KeyManager {
   /**
    * Revoke a key
    */
-  revoke(keyId: string, reason: string, revokedBy?: string): boolean {
+  async revoke(keyId: string, reason: string, revokedBy?: string): Promise<boolean> {
     const key = this.get(keyId);
     if (!key) return false;
 
@@ -481,7 +495,7 @@ export class KeyManager {
       reason,
     };
 
-    this.save();
+    await this.save();
 
     this.emit({ type: "key:revoked", keyId, reason });
 
@@ -491,12 +505,12 @@ export class KeyManager {
   /**
    * Update key permissions
    */
-  updatePermissions(keyId: string, permissions: Partial<ApiKeyPermissions>): ApiKey | null {
+  async updatePermissions(keyId: string, permissions: Partial<ApiKeyPermissions>): Promise<ApiKey | null> {
     const key = this.get(keyId);
     if (!key) return null;
 
     key.permissions = { ...key.permissions, ...permissions };
-    this.save();
+    await this.save();
 
     return key;
   }
@@ -504,7 +518,7 @@ export class KeyManager {
   /**
    * Update key rate limit
    */
-  updateRateLimit(keyId: string, rateLimit: Partial<RateLimitConfig>): ApiKey | null {
+  async updateRateLimit(keyId: string, rateLimit: Partial<RateLimitConfig>): Promise<ApiKey | null> {
     const key = this.get(keyId);
     if (!key) return null;
 
@@ -512,7 +526,7 @@ export class KeyManager {
       ...(key.rateLimit || this.getDefaultRateLimit()),
       ...rateLimit,
     };
-    this.save();
+    await this.save();
 
     return key;
   }
@@ -520,10 +534,10 @@ export class KeyManager {
   /**
    * Rotate key (create new, optionally keep old active for overlap period)
    */
-  rotate(
+  async rotate(
     keyId: string,
     reason: "scheduled" | "manual" | "compromised" = "manual"
-  ): { key: ApiKey; rawKey: string; rotationEvent: RotationEvent } | null {
+  ): Promise<{ key: ApiKey; rawKey: string; rotationEvent: RotationEvent } | null> {
     const oldKey = this.get(keyId) as ExtendedApiKey | null;
     if (!oldKey) return null;
 
@@ -541,7 +555,7 @@ export class KeyManager {
     }
 
     // Create new key with same settings
-    const result = this.create({
+    const result = await this.create({
       name: oldKey.name,
       workspaceId: oldKey.workspaceId,
       agentId: oldKey.agentId,
@@ -566,11 +580,11 @@ export class KeyManager {
     if (autoRevokeOld) {
       if (reason === "compromised") {
         // Revoke immediately if compromised
-        this.revoke(keyId, `Key compromised, replaced by ${result.key.id}`, "system");
+        await this.revoke(keyId, `Key compromised, replaced by ${result.key.id}`, "system");
       } else {
         // Schedule revocation after overlap period
         oldKey.metadata.expiresAt = oldKeyExpiresAt.toISOString();
-        this.save();
+        await this.save();
       }
     }
 
@@ -583,12 +597,12 @@ export class KeyManager {
   /**
    * Delete key permanently
    */
-  delete(keyId: string): boolean {
+  async delete(keyId: string): Promise<boolean> {
     const index = this.store.keys.findIndex((k) => k.id === keyId);
     if (index === -1) return false;
 
     this.store.keys.splice(index, 1);
-    this.save();
+    await this.save();
 
     return true;
   }
@@ -601,22 +615,22 @@ export class KeyManager {
     return { ...this.store.settings };
   }
 
-  updateSettings(settings: Partial<KeyStoreSettings>): void {
+  async updateSettings(settings: Partial<KeyStoreSettings>): Promise<void> {
     this.store.settings = { ...this.store.settings, ...settings };
-    this.save();
+    await this.save();
   }
 
   /**
    * Cleanup expired keys
    */
-  cleanupExpired(): number {
+  async cleanupExpired(): Promise<number> {
     const now = new Date();
     const toRemove = this.store.keys.filter(
       (k) => k.metadata.expiresAt && new Date(k.metadata.expiresAt) < now
     );
 
     for (const key of toRemove) {
-      this.revoke(key.id, "Expired", "system");
+      await this.revoke(key.id, "Expired", "system");
     }
 
     return toRemove.length;
@@ -690,12 +704,12 @@ export class KeyManager {
   /**
    * Process scheduled rotations
    */
-  processScheduledRotations(): RotationEvent[] {
+  async processScheduledRotations(): Promise<RotationEvent[]> {
     const events: RotationEvent[] = [];
     const dueKeys = this.getKeysDueForRotation();
 
     for (const key of dueKeys) {
-      const result = this.rotate(key.id, "scheduled");
+      const result = await this.rotate(key.id, "scheduled");
       if (result) {
         events.push(result.rotationEvent);
       }
@@ -707,10 +721,10 @@ export class KeyManager {
   /**
    * Update rotation policy for a key
    */
-  updateRotationPolicy(
+  async updateRotationPolicy(
     keyId: string,
     policy: Partial<RotationPolicy>
-  ): ExtendedApiKey | null {
+  ): Promise<ExtendedApiKey | null> {
     const key = this.get(keyId) as ExtendedApiKey | null;
     if (!key) return null;
 
@@ -737,7 +751,7 @@ export class KeyManager {
       }
     }
 
-    this.save();
+    await this.save();
     return key;
   }
 
@@ -747,7 +761,7 @@ export class KeyManager {
   private startRotationChecker(): void {
     // Check every hour
     this.rotationCheckInterval = setInterval(() => {
-      this.processScheduledRotations();
+      void this.processScheduledRotations();
     }, 60 * 60 * 1000);
   }
 
@@ -772,42 +786,39 @@ export class KeyManager {
   // Private Methods
   // =============================================================================
 
-  private loadStore(): ExtendedKeyStore {
-    if (fs.existsSync(this.storePath)) {
-      try {
-        const content = fs.readFileSync(this.storePath, "utf-8");
-        const store = JSON.parse(content) as ExtendedKeyStore;
-        
-        // Ensure settings have defaults
-        store.settings = {
-          ...this.getDefaultSettings(),
-          ...store.settings,
-        };
+  private async loadStore(): Promise<ExtendedKeyStore> {
+    try {
+      const content = await fs.readFile(this.storePath, "utf-8");
+      const store = JSON.parse(content) as ExtendedKeyStore;
+      
+      // Ensure settings have defaults
+      store.settings = {
+        ...this.getDefaultSettings(),
+        ...store.settings,
+      };
 
-        // Initialize rotation schedule if missing
-        if (!store.rotationSchedule) {
-          store.rotationSchedule = [];
-        }
-
-        return store;
-      } catch {
-        // Corrupted file, start fresh
+      // Initialize rotation schedule if missing
+      if (!store.rotationSchedule) {
+        store.rotationSchedule = [];
       }
-    }
 
-    return {
-      keys: [],
-      agents: [],
-      settings: this.getDefaultSettings(),
-      version: "2.0.0",
-      updatedAt: new Date().toISOString(),
-      rotationSchedule: [],
-    };
+      return store;
+    } catch {
+      // File doesn't exist or is corrupted, start fresh
+      return {
+        keys: [],
+        agents: [],
+        settings: this.getDefaultSettings(),
+        version: "2.0.0",
+        updatedAt: new Date().toISOString(),
+        rotationSchedule: [],
+      };
+    }
   }
 
-  private save(): void {
+  private async save(): Promise<void> {
     this.store.updatedAt = new Date().toISOString();
-    fs.writeFileSync(this.storePath, JSON.stringify(this.store, null, 2));
+    await fs.writeFile(this.storePath, JSON.stringify(this.store, null, 2));
   }
 
   private getDefaultSettings(): KeyStoreSettings {
@@ -878,15 +889,15 @@ export class KeyManager {
 // Factory
 // =============================================================================
 
-export function createKeyManager(options: KeyManagerOptions): KeyManager {
-  return new KeyManager(options);
+export async function createKeyManager(options: KeyManagerOptions): Promise<KeyManager> {
+  return KeyManager.create(options);
 }
 
 /**
  * Create key manager with encryption from environment
  */
-export function createKeyManagerFromEnv(storagePath: string): KeyManager {
-  return new KeyManager({
+export async function createKeyManagerFromEnv(storagePath: string): Promise<KeyManager> {
+  return KeyManager.create({
     storagePath,
     encryptionKey: process.env.NELLA_AUTH_ENCRYPTION_KEY,
   });
