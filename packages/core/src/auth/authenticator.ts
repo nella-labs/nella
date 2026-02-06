@@ -44,18 +44,33 @@ const ACTION_PERMISSIONS: Record<AuthAction, keyof ApiKeyPermissions> = {
 // =============================================================================
 
 export class Authenticator {
-  private keyManager: KeyManager;
-  private agentManager: AgentManager;
+  private keyManager!: KeyManager;
+  private agentManager!: AgentManager;
   private onEventHandler?: (event: ExtendedAuthEvent) => void;
 
-  constructor(options: AuthenticatorOptions) {
-    const keyManagerOptions: KeyManagerOptions = {
-      storagePath: options.storagePath,
-      encryptionKey: options.encryptionKey,
-    };
-    this.keyManager = new KeyManager(keyManagerOptions);
-    this.agentManager = new AgentManager(options.storagePath);
+  private constructor(private options: AuthenticatorOptions) {
     this.onEventHandler = options.onEvent;
+  }
+
+  /**
+   * Create and initialize an Authenticator instance
+   */
+  static async create(options: AuthenticatorOptions): Promise<Authenticator> {
+    const auth = new Authenticator(options);
+    await auth.init();
+    return auth;
+  }
+
+  /**
+   * Async initialization — creates KeyManager and AgentManager
+   */
+  private async init(): Promise<void> {
+    const keyManagerOptions: KeyManagerOptions = {
+      storagePath: this.options.storagePath,
+      encryptionKey: this.options.encryptionKey,
+    };
+    this.keyManager = await KeyManager.create(keyManagerOptions);
+    this.agentManager = await AgentManager.create(this.options.storagePath);
 
     // Forward events
     this.keyManager.onEvent((event) => this.emit(event));
@@ -73,9 +88,9 @@ export class Authenticator {
   /**
    * Authenticate a request
    */
-  authenticate(request: AuthRequest): AuthResult {
+  async authenticate(request: AuthRequest): Promise<AuthResult> {
     // Validate key
-    const key = this.keyManager.validate(request.apiKey);
+    const key = await this.keyManager.validate(request.apiKey);
     if (!key) {
       this.emit({ type: "auth:failure", error: "INVALID_KEY" });
       return {
@@ -136,7 +151,7 @@ export class Authenticator {
 
     // Record agent activity
     if (agent) {
-      this.agentManager.recordActivity(agent.id);
+      await this.agentManager.recordActivity(agent.id);
     }
 
     return {
@@ -149,16 +164,16 @@ export class Authenticator {
   /**
    * Quick check if key is valid (no permission check)
    */
-  isValidKey(apiKey: string): boolean {
-    const key = this.keyManager.validate(apiKey);
+  async isValidKey(apiKey: string): Promise<boolean> {
+    const key = await this.keyManager.validate(apiKey);
     return key !== null && key.active && !this.keyManager.isExpired(key);
   }
 
   /**
    * Check if agent can access file
    */
-  canAccessFile(apiKey: string, filePath: string): boolean {
-    const key = this.keyManager.validate(apiKey);
+  async canAccessFile(apiKey: string, filePath: string): Promise<boolean> {
+    const key = await this.keyManager.validate(apiKey);
     if (!key?.agentId) return true; // No agent restriction
 
     return this.agentManager.canAccessFile(key.agentId, filePath);
@@ -187,34 +202,34 @@ export class Authenticator {
   /**
    * Setup a workspace with agent and keys
    */
-  setupWorkspace(
+  async setupWorkspace(
     workspaceId: string,
     options?: {
       agentType?: Agent["type"];
       agentName?: string;
       createAdminKey?: boolean;
     }
-  ): {
+  ): Promise<{
     agent: Agent;
     agentKey: { key: ApiKey; rawKey: string };
     adminKey?: { key: ApiKey; rawKey: string };
-  } {
+  }> {
     // Create agent
     const agentType = options?.agentType || "custom";
     let agent: Agent;
 
     switch (agentType) {
       case "copilot":
-        agent = this.agentManager.createCopilot(workspaceId, options?.agentName);
+        agent = await this.agentManager.createCopilot(workspaceId, options?.agentName);
         break;
       case "cursor":
-        agent = this.agentManager.createCursor(workspaceId, options?.agentName);
+        agent = await this.agentManager.createCursor(workspaceId, options?.agentName);
         break;
       case "cline":
-        agent = this.agentManager.createCline(workspaceId, options?.agentName);
+        agent = await this.agentManager.createCline(workspaceId, options?.agentName);
         break;
       default:
-        agent = this.agentManager.create({
+        agent = await this.agentManager.create({
           name: options?.agentName || "Default Agent",
           type: agentType,
           workspaceId,
@@ -222,7 +237,7 @@ export class Authenticator {
     }
 
     // Create agent key
-    const agentKey = this.keyManager.createForAgent(
+    const agentKey = await this.keyManager.createForAgent(
       workspaceId,
       agent.id,
       `${agent.name} Key`,
@@ -233,7 +248,7 @@ export class Authenticator {
     // Create admin key if requested
     let adminKey: { key: ApiKey; rawKey: string } | undefined;
     if (options?.createAdminKey) {
-      adminKey = this.keyManager.createAdmin(`${workspaceId} Admin`);
+      adminKey = await this.keyManager.createAdmin(`${workspaceId} Admin`);
     }
 
     return { agent, agentKey, adminKey };
@@ -262,10 +277,10 @@ export class Authenticator {
 // Factory
 // =============================================================================
 
-export function createAuthenticator(
+export async function createAuthenticator(
   storagePath: string,
   onEvent?: (event: ExtendedAuthEvent) => void,
   encryptionKey?: string
-): Authenticator {
-  return new Authenticator({ storagePath, onEvent, encryptionKey });
+): Promise<Authenticator> {
+  return Authenticator.create({ storagePath, onEvent, encryptionKey });
 }

@@ -318,6 +318,34 @@ export class PlaygroundServer {
       });
     });
 
+    // Context health smoke test
+    app.get("/context-health", (_req, res) => {
+      try {
+        // Round-trip: set → get → delete
+        const entry = this.contextManager.set({
+          key: "__health_check__",
+          value: { ts: Date.now() },
+          type: "object",
+          sourceAgentId: "system",
+          workspaceId: "__health__",
+          ttl: 60,
+        });
+        const fetched = this.contextManager.get("__health_check__", "__health__");
+        this.contextManager.delete(entry.id);
+
+        res.json({
+          status: fetched ? "ok" : "degraded",
+          persistence: "sqlite",
+          encryption: this.contextManager.isEncryptionEnabled(),
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+
     // List available MCP tools
     app.get("/api/tools", (_req, res) => {
       res.json({

@@ -5,7 +5,8 @@
  * Append-only log with automatic rotation.
  */
 
-import * as fs from "fs";
+import * as fs from "fs/promises";
+import { existsSync, statSync } from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import type {
@@ -36,26 +37,40 @@ export class AuditLogManager {
   private logPath: string;
   private storagePath: string;
   private eventHandlers: AuditEventHandler[] = [];
-  private writeStream: fs.WriteStream | null = null;
+  private writeStream: null = null; // Reserved for future streaming
   private currentFileSize = 0;
 
-  constructor(options: AuditLogOptions) {
+  private constructor(options: AuditLogOptions) {
     this.storagePath = options.storagePath;
     this.config = {
       ...DEFAULT_AUDIT_CONFIG,
       ...options.config,
     };
     this.logPath = path.join(this.storagePath, this.config.logPath);
+  }
 
-    // Ensure directory exists
+  /**
+   * Create and initialize an AuditLogManager instance
+   */
+  static async create(options: AuditLogOptions): Promise<AuditLogManager> {
+    const manager = new AuditLogManager(options);
+    await manager.init();
+    return manager;
+  }
+
+  /**
+   * Async initialization — ensures log directory exists and tracks file size
+   */
+  private async init(): Promise<void> {
     const logDir = path.dirname(this.logPath);
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
+    await fs.mkdir(logDir, { recursive: true });
 
     // Initialize file size tracking
-    if (fs.existsSync(this.logPath)) {
-      this.currentFileSize = fs.statSync(this.logPath).size;
+    try {
+      const stat = await fs.stat(this.logPath);
+      this.currentFileSize = stat.size;
+    } catch {
+      this.currentFileSize = 0;
     }
   }
 
@@ -87,7 +102,7 @@ export class AuditLogManager {
   /**
    * Log an audit entry
    */
-  log(entry: Omit<AuditEntry, "id" | "timestamp">): AuditEntry {
+  async log(entry: Omit<AuditEntry, "id" | "timestamp">): Promise<AuditEntry> {
     if (!this.config.enabled) {
       return this.createEntry(entry);
     }
@@ -103,10 +118,10 @@ export class AuditLogManager {
     const fullEntry = this.createEntry(entry);
 
     // Check rotation before write
-    this.checkRotation();
+    await this.checkRotation();
 
     // Append to log file
-    this.appendEntry(fullEntry);
+    await this.appendEntry(fullEntry);
 
     // Emit event
     this.emit(fullEntry);
@@ -117,13 +132,13 @@ export class AuditLogManager {
   /**
    * Log authentication attempt
    */
-  logAuth(
+  async logAuth(
     success: boolean,
     actor: AuditEntry["actor"],
     action: string,
     details?: Record<string, unknown>,
     error?: string
-  ): AuditEntry {
+  ): Promise<AuditEntry> {
     return this.log({
       category: "authentication",
       action,
@@ -137,13 +152,13 @@ export class AuditLogManager {
   /**
    * Log authorization check
    */
-  logAuthz(
+  async logAuthz(
     allowed: boolean,
     actor: AuditEntry["actor"],
     action: string,
     target: AuditEntry["target"],
     details?: Record<string, unknown>
-  ): AuditEntry {
+  ): Promise<AuditEntry> {
     return this.log({
       category: "authorization",
       action,
@@ -157,14 +172,14 @@ export class AuditLogManager {
   /**
    * Log key management operation
    */
-  logKeyOp(
+  async logKeyOp(
     action: string,
     actor: AuditEntry["actor"],
     keyId: string,
     keyName?: string,
     details?: Record<string, unknown>,
     error?: string
-  ): AuditEntry {
+  ): Promise<AuditEntry> {
     return this.log({
       category: "key_management",
       action,
@@ -183,14 +198,14 @@ export class AuditLogManager {
   /**
    * Log agent management operation
    */
-  logAgentOp(
+  async logAgentOp(
     action: string,
     actor: AuditEntry["actor"],
     agentId: string,
     agentName?: string,
     details?: Record<string, unknown>,
     error?: string
-  ): AuditEntry {
+  ): Promise<AuditEntry> {
     return this.log({
       category: "agent_management",
       action,
@@ -209,7 +224,7 @@ export class AuditLogManager {
   /**
    * Log from an auth event
    */
-  logFromEvent(event: ExtendedAuthEvent, actor?: AuditEntry["actor"]): AuditEntry {
+  async logFromEvent(event: ExtendedAuthEvent, actor?: AuditEntry["actor"]): Promise<AuditEntry> {
     const defaultActor: AuditEntry["actor"] = actor || {
       type: "system",
       id: "system",
@@ -334,14 +349,11 @@ export class AuditLogManager {
   /**
    * Read recent audit entries
    */
-  getRecent(limit: number = 100): AuditEntry[] {
-    if (!fs.existsSync(this.logPath)) {
-      return [];
-    }
-
-    const content = fs.readFileSync(this.logPath, "utf-8");
-    const lines = content.trim().split("\n").filter(Boolean);
-    const entries: AuditEntry[] = [];
+  async getRecent(limit: number = 100): Promise<AuditEntry[]> {
+    try {
+      const content = await fs.readFile(this.logPath, "utf-8");
+      const lines = content.trim().split("\n").filter(Boolean);
+      const entries: AuditEntry[] = [];
 
     // Read from end for most recent
     const startIndex = Math.max(0, lines.length - limit);
@@ -354,12 +366,15 @@ export class AuditLogManager {
     }
 
     return entries;
+    } catch {
+      return [];
+    }
   }
 
   /**
    * Search audit log
    */
-  search(options: {
+  async search(options: {
     category?: AuditCategory;
     actorId?: string;
     targetId?: string;
@@ -367,8 +382,8 @@ export class AuditLogManager {
     since?: Date;
     until?: Date;
     limit?: number;
-  }): AuditEntry[] {
-    const entries = this.getRecent(options.limit || 1000);
+  }): Promise<AuditEntry[]> {
+    const entries = await this.getRecent(options.limit || 1000);
     
     return entries.filter((entry) => {
       if (options.category && entry.category !== options.category) {
@@ -402,10 +417,10 @@ export class AuditLogManager {
   /**
    * Get entries for a specific key
    */
-  getKeyHistory(keyId: string, limit: number = 100): AuditEntry[] {
-    return this.search({
+  async getKeyHistory(keyId: string, limit: number = 100): Promise<AuditEntry[]> {
+    return (await this.search({
       limit,
-    }).filter(
+    })).filter(
       (e) =>
         e.actor.id === keyId ||
         (e.target?.type === "key" && e.target.id === keyId)
@@ -415,10 +430,10 @@ export class AuditLogManager {
   /**
    * Get entries for a specific agent
    */
-  getAgentHistory(agentId: string, limit: number = 100): AuditEntry[] {
-    return this.search({
+  async getAgentHistory(agentId: string, limit: number = 100): Promise<AuditEntry[]> {
+    return (await this.search({
       limit,
-    }).filter(
+    })).filter(
       (e) =>
         e.actor.id === agentId ||
         (e.target?.type === "agent" && e.target.id === agentId)
@@ -428,7 +443,7 @@ export class AuditLogManager {
   /**
    * Get failed authentication attempts
    */
-  getFailedAuths(since?: Date, limit: number = 100): AuditEntry[] {
+  async getFailedAuths(since?: Date, limit: number = 100): Promise<AuditEntry[]> {
     return this.search({
       category: "authentication",
       outcome: "failure",
@@ -444,19 +459,19 @@ export class AuditLogManager {
   /**
    * Get audit log statistics
    */
-  getStats(): {
+  async getStats(): Promise<{
     totalEntries: number;
     fileSize: number;
     oldestEntry: string | null;
     newestEntry: string | null;
     rotatedFiles: number;
-  } {
+  }> {
     let totalEntries = 0;
     let oldestEntry: string | null = null;
     let newestEntry: string | null = null;
 
-    if (fs.existsSync(this.logPath)) {
-      const content = fs.readFileSync(this.logPath, "utf-8");
+    try {
+      const content = await fs.readFile(this.logPath, "utf-8");
       const lines = content.trim().split("\n").filter(Boolean);
       totalEntries = lines.length;
 
@@ -470,6 +485,8 @@ export class AuditLogManager {
           // Ignore parse errors
         }
       }
+    } catch {
+      // File doesn't exist
     }
 
     // Count rotated files
@@ -477,11 +494,13 @@ export class AuditLogManager {
     const baseName = path.basename(this.logPath);
     let rotatedFiles = 0;
     
-    if (fs.existsSync(dir)) {
-      const files = fs.readdirSync(dir);
+    try {
+      const files = await fs.readdir(dir);
       rotatedFiles = files.filter(
         (f) => f.startsWith(baseName) && f !== baseName
       ).length;
+    } catch {
+      // Directory doesn't exist
     }
 
     return {
@@ -496,55 +515,59 @@ export class AuditLogManager {
   /**
    * Force log rotation
    */
-  rotate(): void {
-    if (!fs.existsSync(this.logPath)) {
+  async rotate(): Promise<void> {
+    try {
+      await fs.access(this.logPath);
+    } catch {
       return;
     }
-
-    // Close current stream
-    this.closeStream();
 
     // Rotate existing files
     for (let i = this.config.maxFiles - 1; i >= 1; i--) {
       const oldPath = `${this.logPath}.${i}`;
       const newPath = `${this.logPath}.${i + 1}`;
       
-      if (fs.existsSync(oldPath)) {
+      try {
+        await fs.access(oldPath);
         if (i === this.config.maxFiles - 1) {
-          fs.unlinkSync(oldPath); // Delete oldest
+          await fs.unlink(oldPath); // Delete oldest
         } else {
-          fs.renameSync(oldPath, newPath);
+          await fs.rename(oldPath, newPath);
         }
+      } catch {
+        // File doesn't exist, skip
       }
     }
 
     // Rotate current file
-    fs.renameSync(this.logPath, `${this.logPath}.1`);
+    await fs.rename(this.logPath, `${this.logPath}.1`);
     this.currentFileSize = 0;
   }
 
   /**
    * Clear all audit logs (use with caution)
    */
-  clear(): void {
-    this.closeStream();
-
+  async clear(): Promise<void> {
     // Delete main log
-    if (fs.existsSync(this.logPath)) {
-      fs.unlinkSync(this.logPath);
+    try {
+      await fs.unlink(this.logPath);
+    } catch {
+      // File doesn't exist
     }
 
     // Delete rotated logs
     const dir = path.dirname(this.logPath);
     const baseName = path.basename(this.logPath);
     
-    if (fs.existsSync(dir)) {
-      const files = fs.readdirSync(dir);
+    try {
+      const files = await fs.readdir(dir);
       for (const file of files) {
         if (file.startsWith(baseName) && file !== baseName) {
-          fs.unlinkSync(path.join(dir, file));
+          await fs.unlink(path.join(dir, file));
         }
       }
+    } catch {
+      // Directory doesn't exist
     }
 
     this.currentFileSize = 0;
@@ -553,8 +576,8 @@ export class AuditLogManager {
   /**
    * Export audit log to JSON
    */
-  export(): string {
-    const entries = this.getRecent(Number.MAX_SAFE_INTEGER);
+  async export(): Promise<string> {
+    const entries = await this.getRecent(Number.MAX_SAFE_INTEGER);
     return JSON.stringify(entries, null, 2);
   }
 
@@ -562,7 +585,7 @@ export class AuditLogManager {
    * Close resources
    */
   close(): void {
-    this.closeStream();
+    // No-op — reserved for future resource cleanup
   }
 
   // =============================================================================
@@ -577,25 +600,17 @@ export class AuditLogManager {
     };
   }
 
-  private appendEntry(entry: AuditEntry): void {
+  private async appendEntry(entry: AuditEntry): Promise<void> {
     const line = JSON.stringify(entry) + "\n";
     const lineBytes = Buffer.byteLength(line, "utf-8");
 
-    // Use synchronous append for reliability
-    fs.appendFileSync(this.logPath, line);
+    await fs.appendFile(this.logPath, line);
     this.currentFileSize += lineBytes;
   }
 
-  private checkRotation(): void {
+  private async checkRotation(): Promise<void> {
     if (this.currentFileSize >= this.config.maxFileSize) {
-      this.rotate();
-    }
-  }
-
-  private closeStream(): void {
-    if (this.writeStream) {
-      this.writeStream.end();
-      this.writeStream = null;
+      await this.rotate();
     }
   }
 }
@@ -606,9 +621,9 @@ export class AuditLogManager {
 
 let defaultAuditLog: AuditLogManager | null = null;
 
-export function getAuditLog(options?: AuditLogOptions): AuditLogManager {
+export async function getAuditLog(options?: AuditLogOptions): Promise<AuditLogManager> {
   if (!defaultAuditLog && options) {
-    defaultAuditLog = new AuditLogManager(options);
+    defaultAuditLog = await AuditLogManager.create(options);
   }
   if (!defaultAuditLog) {
     throw new Error("AuditLogManager not initialized. Call with options first.");
@@ -616,8 +631,8 @@ export function getAuditLog(options?: AuditLogOptions): AuditLogManager {
   return defaultAuditLog;
 }
 
-export function createAuditLog(options: AuditLogOptions): AuditLogManager {
-  return new AuditLogManager(options);
+export async function createAuditLog(options: AuditLogOptions): Promise<AuditLogManager> {
+  return AuditLogManager.create(options);
 }
 
 export function resetAuditLog(): void {
