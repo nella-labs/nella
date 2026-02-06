@@ -17,6 +17,17 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 3. **Structured output** — All results are machine-readable JSONL for analysis
 4. **Zero trust** — Validates everything, trusts nothing from the agent
 
+### Core Objectives
+
+Every component in Nella maps to one or more of these four reliability objectives:
+
+| Objective | Problem | Nella Solution | Key Components |
+|-----------|---------|----------------|----------------|
+| **Reduce Hallucinations** | Agents reference non-existent imports, symbols, APIs | Index the real codebase; verify generated code against it | `CodeVerifier`, `nella_verify`, `nella_search` |
+| **Increase Context** | Agents lose prior decisions and assumptions across turns | Persistent session state with assumptions, change history, dependency snapshots | `ContextManager`, `SessionStore`, `ChangeLedger`, `AssumptionTracker`, `DependencyTracker` |
+| **Prompt Injection Protection** | Malicious prompts trigger dangerous operations | Scan prompts for risk patterns; recommend refusal; enforce constraints | `shouldRefuse`, `detectRiskPatterns`, `RISK_PATTERNS`, `nella_detect_risks` |
+| **Prevent Contradictions** | Agents contradict prior intent or generate code not grounded in codebase | Track assumptions and detect conflicts; verify symbols exist; enforce scope | `AssumptionTracker.getConflicts()`, `CodeVerifier`, `checkScope` |
+
 ---
 
 ## Architecture

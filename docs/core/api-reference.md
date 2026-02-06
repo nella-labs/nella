@@ -556,13 +556,4 @@ Store file change history across runs.
 
 ## Advanced Modules
 
-Nella Core also ships additional modules for indexing, workspace management, auth, and export workflows:
-
-- [Indexing & Search](./indexing.md)
-- [Workspace Management](./workspace.md)
-- [Auth & Rate Limiting](./auth.md)
-- [Context Sharing](./context-sharing.md)
-- [Cloud Sync](./cloud-sync.md)
-- [Export Manager](./export.md)
-- [Playground Server](./playground.md)
-- [MCP Tool Handler](./mcp-tools.md)
+Nella Core also ships additional modules for indexing, workspace management, auth, and export workflows. See the [Core Modules Guide](./modules.md) for setup and examples.

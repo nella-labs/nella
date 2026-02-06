@@ -642,4 +642,4 @@ console.log(ctx.getSummary());
 ctx.save();
 ```
 
-> Looking for shared, cross-agent context? See [Context Sharing](./context-sharing.md).
+> Looking for shared, cross-agent context? See the Context Sharing section in [Core Modules](./modules.md).

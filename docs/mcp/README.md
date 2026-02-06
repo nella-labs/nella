@@ -17,8 +17,8 @@ The `@usenella/nella` package provides both a CLI and an MCP server that allows 
 |----------|-------------|
 | [Tools Reference](./tools.md) | Complete reference for all 12 MCP tools |
 | [Integration Guide](./integration.md) | Setup for Claude Desktop, Claude Code, and custom clients |
-| [Context Management](./context.md) | Session persistence, assumptions, and dependency tracking |
-| [Examples](./examples.md) | Practical usage examples and workflows |
+| [Context Management](../core/context.md) | Session persistence, assumptions, and dependency tracking |
+| [Examples](../core/examples.md) | Practical code examples |
 
 ## Quick Start
 

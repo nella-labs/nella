@@ -162,14 +162,6 @@ const response = await handler.handleToolCall({
 
 ## Next Steps
 
-- Dive deeper into each module:
-  - [Indexing & search](./indexing.md)
-  - [Workspace management](./workspace.md)
-  - [Auth & rate limiting](./auth.md)
-  - [Context sharing](./context-sharing.md)
-  - [Cloud sync](./cloud-sync.md)
-  - [Export manager](./export.md)
-  - [Playground server](./playground.md)
-  - [MCP tool handler](./mcp-tools.md)
-- Pair these modules with the core validation flow in [docs/core/api-reference.md](./api-reference.md).
-- Use the CLI + MCP server in [packages/nella/README.md](../../packages/nella/README.md).
+- See the full [API Reference](./api-reference.md) for detailed function signatures.
+- See [Context Management](./context.md) for the assumption/change tracking system.
+- Use the CLI + MCP server via [packages/nella/README.md](../../packages/nella/README.md).
