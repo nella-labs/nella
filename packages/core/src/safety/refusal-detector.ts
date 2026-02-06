@@ -1,10 +1,17 @@
 /**
- * Refusal Detector
+ * Refusal Detector — Prompt Injection & Safety Gate
+ *
+ * Nella's primary defense against prompt injection and dangerous operations.
+ * Scans agent prompts for risk patterns and determines whether a task should
+ * be refused before execution begins.
  *
  * Detects when a task should be refused based on:
- * - Risk patterns in the prompt
+ * - Prompt injection attempts (credential exposure, security bypasses, backdoors)
+ * - Risk patterns in the prompt (dangerous operations, data exposure)
  * - Missing prerequisites
  * - Impossible constraints
+ *
+ * Objective: Prompt Injection Protection (O3)
  */
 
 import * as fs from "fs";
@@ -16,7 +23,8 @@ import { Task, RefusalResult } from "../types";
 // =============================================================================
 
 /**
- * Patterns that indicate risky requests
+ * Patterns that detect prompt injection attempts and risky requests.
+ * Each regex matches a known dangerous pattern in agent prompts or generated code.
  */
 export const RISK_PATTERNS = [
   // Credential/secret exposure
