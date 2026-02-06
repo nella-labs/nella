@@ -247,7 +247,20 @@ export {
   createRateLimiter,
   getRateLimiter,
   DEFAULT_RATE_LIMITER_CONFIG,
+  DEFAULT_PRIORITY_CONFIG,
+  DEFAULT_DYNAMIC_LIMITS_CONFIG,
+  DEFAULT_GRACEFUL_DEGRADATION_CONFIG,
   RATE_WINDOWS,
+  MemoryBackend,
+  RedisBackend,
+  SQLiteBackend,
+  createBackend,
+  SlidingWindowAlgorithm,
+  TokenBucketAlgorithm,
+  createAlgorithm,
+  generateHeaders,
+  PriorityHandler,
+  DynamicLimitAdjuster,
 } from "./rate-limit";
 
 export type {
@@ -258,6 +271,18 @@ export type {
   RateLimiterConfig,
   RateLimitEvent,
   RateLimitEventHandler,
+  RateLimitHeaders,
+  RateLimitBackend,
+  RateLimitAlgorithm,
+  BackendType,
+  RedisOptions,
+  AlgorithmType,
+  TokenBucketConfig,
+  RequestPriority,
+  PriorityConfig,
+  DynamicLimitsConfig,
+  GracefulDegradationConfig,
+  RequestInfo as RateLimitRequestInfo,
 } from "./rate-limit";
 
 // =============================================================================
