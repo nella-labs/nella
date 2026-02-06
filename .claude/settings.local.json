@@ -5,7 +5,8 @@
       "Bash(pnpm build:*)",
       "Bash(pnpm --filter @usenella/core build:*)",
       "Bash(pnpm --filter @usenella/nella build:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)"
     ]
   }
 }
