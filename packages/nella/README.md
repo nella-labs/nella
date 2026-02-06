@@ -277,10 +277,10 @@ expected:
 
 Full documentation available at:
 - [CLI Commands](../../docs/cli/commands.md)
-- [CLI Examples](../../docs/cli/examples.md)
 - [MCP Integration](../../docs/mcp/integration.md)
 - [Core API Reference](../../docs/core/api-reference.md)
 - [Core Modules](../../docs/core/modules.md)
+- [Examples](../../docs/core/examples.md)
 
 ## License
 

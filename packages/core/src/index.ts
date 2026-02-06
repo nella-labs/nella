@@ -1,14 +1,26 @@
 /**
  * Nella Core
  *
- * Reliability layer for coding agents.
+ * Reliability layer for coding agents — addresses four problems:
  *
- * Core enforces behavioral contracts that prevent agents from:
- * - Contradicting prior intent/decisions
- * - Touching forbidden areas
- * - Pretending tests ran when they didn't
- * - Scope-creeping outside the declared plan
- * - Proceeding when prerequisites are missing
+ * 1. Hallucination Reduction
+ *    - Code verification against indexed codebase (imports, symbols, APIs)
+ *    - Search returns only real code from the project
+ *
+ * 2. Context Expansion
+ *    - Persistent session tracking across conversations
+ *    - Assumption tracking with automatic invalidation
+ *    - Change ledger and dependency drift detection
+ *
+ * 3. Prompt Injection Protection
+ *    - Risk pattern detection (credential exposure, security bypass, backdoors)
+ *    - Refusal recommendation for dangerous prompts
+ *    - Constraint enforcement on forbidden files and patterns
+ *
+ * 4. Contradiction & Unbacked Behavior Prevention
+ *    - Assumption conflict detection before changes
+ *    - Scope creep analysis against declared plans
+ *    - Symbol verification ensures code references real codebase entities
  *
  * @packageDocumentation
  */

@@ -187,7 +187,7 @@ export const NELLA_TOOLS: McpTool[] = [
   },
   {
     name: "nella_verify",
-    description: "Verify generated code against the indexed codebase. Checks imports, symbols, and API usage to ensure the code is valid and uses real, existing code from the project.",
+    description: "Verify generated code against the indexed codebase. Checks imports, symbols, and API usage to catch hallucinated references and ensure the code uses real, existing code from the project.",
     inputSchema: {
       type: "object",
       properties: {
@@ -250,7 +250,7 @@ export const NELLA_TOOLS: McpTool[] = [
   },
   {
     name: "nella_get_context",
-    description: "Get shared context from the workspace. Useful for retrieving decisions, preferences, snippets, or other information shared between agents.",
+    description: "Get shared context from the workspace. Expands the agent's effective context by retrieving decisions, preferences, snippets, or other information persisted across sessions.",
     inputSchema: {
       type: "object",
       properties: {
@@ -278,7 +278,7 @@ export const NELLA_TOOLS: McpTool[] = [
   },
   {
     name: "nella_set_context",
-    description: "Set shared context in the workspace. Use this to share decisions, important information, or preferences with other agents.",
+    description: "Set shared context in the workspace. Persists decisions and information beyond the current conversation, expanding effective context for future sessions.",
     inputSchema: {
       type: "object",
       properties: {

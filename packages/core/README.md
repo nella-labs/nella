@@ -151,14 +151,6 @@ Features:
 - [Configuration](../../docs/core/configuration.md) — Task YAML schema and options
 - [Context Management](../../docs/core/context.md) — Session tracking and assumptions
 - [Core Modules](../../docs/core/modules.md) — Indexing, workspace, auth, export, and more
-- [Indexing & Search](../../docs/core/indexing.md) — Hybrid RAG indexing guide
-- [Workspace Management](../../docs/core/workspace.md) — Register and switch workspaces
-- [Auth & Rate Limiting](../../docs/core/auth.md) — API keys and quotas
-- [Context Sharing](../../docs/core/context-sharing.md) — Shared memory across agents
-- [Cloud Sync](../../docs/core/cloud-sync.md) — Google Cloud Storage sync
-- [Export Manager](../../docs/core/export.md) — Bundle and export run data
-- [Playground Server](../../docs/core/playground.md) — Local playground runtime
-- [MCP Tool Handler](../../docs/core/mcp-tools.md) — Embed Nella MCP tools
 - [Examples](../../docs/core/examples.md) — Practical code examples
 
 ## Development
