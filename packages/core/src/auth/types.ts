@@ -83,24 +83,10 @@ export interface ApiKeyPermissions {
 }
 
 /**
- * Rate limit configuration
+ * Rate limit configuration — canonical type from rate-limit module.
+ * Re-exported here for backward compatibility.
  */
-export interface RateLimitConfig {
-  /** Requests per minute */
-  requestsPerMinute: number;
-  
-  /** Requests per hour */
-  requestsPerHour: number;
-  
-  /** Requests per day */
-  requestsPerDay: number;
-  
-  /** Max tokens per request */
-  maxTokensPerRequest: number;
-  
-  /** Max concurrent requests */
-  maxConcurrent: number;
-}
+export type { RateLimiterConfig as RateLimitConfig } from "../rate-limit/types";
 
 // =============================================================================
 // Agent Types
@@ -286,13 +272,12 @@ export type AuthEvent =
 // Defaults
 // =============================================================================
 
-export const DEFAULT_RATE_LIMIT: RateLimitConfig = {
-  requestsPerMinute: 60,
-  requestsPerHour: 1000,
-  requestsPerDay: 10000,
-  maxTokensPerRequest: 100000,
-  maxConcurrent: 5,
-};
+import { DEFAULT_RATE_LIMITER_CONFIG } from "../rate-limit/types";
+
+/**
+ * Default rate limit — re-exported from rate-limit module for backward compatibility.
+ */
+export const DEFAULT_RATE_LIMIT = DEFAULT_RATE_LIMITER_CONFIG;
 
 export const DEFAULT_PERMISSIONS: ApiKeyPermissions = {
   search: true,

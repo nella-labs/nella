@@ -4,7 +4,7 @@
  * Register and manage agents with their configurations.
  */
 
-import * as fs from "fs";
+import * as fs from "fs/promises";
 import * as path from "path";
 import * as crypto from "crypto";
 import type {
@@ -14,8 +14,6 @@ import type {
   ApiKeyPermissions,
   RateLimitConfig,
   AuthEvent,
-  DEFAULT_PERMISSIONS,
-  DEFAULT_RATE_LIMIT,
 } from "./types";
 
 // =============================================================================
@@ -46,20 +44,32 @@ interface AgentStore {
 // =============================================================================
 
 export class AgentManager {
-  private store: AgentStore;
+  private store!: AgentStore;
   private storePath: string;
   private eventHandlers: AgentEventHandler[] = [];
+  private initialized = false;
 
-  constructor(storagePath: string) {
+  private constructor(storagePath: string) {
     this.storePath = path.join(storagePath, "agents.json");
-    
-    // Ensure directory exists
-    const dir = path.dirname(this.storePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+  }
 
-    this.store = this.loadStore();
+  /**
+   * Create and initialize an AgentManager instance
+   */
+  static async create(storagePath: string): Promise<AgentManager> {
+    const manager = new AgentManager(storagePath);
+    await manager.init();
+    return manager;
+  }
+
+  /**
+   * Async initialization — ensures storage directory and loads store
+   */
+  private async init(): Promise<void> {
+    const dir = path.dirname(this.storePath);
+    await fs.mkdir(dir, { recursive: true });
+    this.store = await this.loadStore();
+    this.initialized = true;
   }
 
   // =============================================================================
@@ -87,7 +97,7 @@ export class AgentManager {
   /**
    * Register a new agent
    */
-  create(options: CreateAgentOptions): Agent {
+  async create(options: CreateAgentOptions): Promise<Agent> {
     // Generate agent ID
     const id = `agent_${crypto.randomBytes(8).toString("hex")}`;
 
@@ -127,7 +137,7 @@ export class AgentManager {
     };
 
     this.store.agents.push(agent);
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:created", agent });
 
@@ -137,7 +147,7 @@ export class AgentManager {
   /**
    * Create pre-configured agents for common types
    */
-  createCopilot(workspaceId: string, name?: string): Agent {
+  async createCopilot(workspaceId: string, name?: string): Promise<Agent> {
     return this.create({
       name: name || "GitHub Copilot",
       type: "copilot",
@@ -159,7 +169,7 @@ export class AgentManager {
     });
   }
 
-  createCursor(workspaceId: string, name?: string): Agent {
+  async createCursor(workspaceId: string, name?: string): Promise<Agent> {
     return this.create({
       name: name || "Cursor",
       type: "cursor",
@@ -181,7 +191,7 @@ export class AgentManager {
     });
   }
 
-  createCline(workspaceId: string, name?: string): Agent {
+  async createCline(workspaceId: string, name?: string): Promise<Agent> {
     return this.create({
       name: name || "Cline",
       type: "cline",
@@ -252,11 +262,11 @@ export class AgentManager {
   /**
    * Update agent
    */
-  update(agentId: string, updates: {
+  async update(agentId: string, updates: {
     name?: string;
     config?: Partial<AgentConfig>;
     active?: boolean;
-  }): Agent | null {
+  }): Promise<Agent | null> {
     const agent = this.get(agentId);
     if (!agent) return null;
 
@@ -277,7 +287,7 @@ export class AgentManager {
       };
     }
 
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:updated", agent });
 
@@ -287,7 +297,7 @@ export class AgentManager {
   /**
    * Update agent rate limit
    */
-  updateRateLimit(agentId: string, rateLimit: Partial<RateLimitConfig>): Agent | null {
+  async updateRateLimit(agentId: string, rateLimit: Partial<RateLimitConfig>): Promise<Agent | null> {
     const agent = this.get(agentId);
     if (!agent) return null;
 
@@ -296,7 +306,7 @@ export class AgentManager {
       ...rateLimit,
     };
 
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:updated", agent });
 
@@ -306,7 +316,7 @@ export class AgentManager {
   /**
    * Update agent permissions
    */
-  updatePermissions(agentId: string, permissions: Partial<ApiKeyPermissions>): Agent | null {
+  async updatePermissions(agentId: string, permissions: Partial<ApiKeyPermissions>): Promise<Agent | null> {
     const agent = this.get(agentId);
     if (!agent) return null;
 
@@ -315,7 +325,7 @@ export class AgentManager {
       ...permissions,
     };
 
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:updated", agent });
 
@@ -325,12 +335,12 @@ export class AgentManager {
   /**
    * Deactivate agent
    */
-  deactivate(agentId: string): boolean {
+  async deactivate(agentId: string): Promise<boolean> {
     const agent = this.get(agentId);
     if (!agent) return false;
 
     agent.active = false;
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:deactivated", agentId });
 
@@ -340,12 +350,12 @@ export class AgentManager {
   /**
    * Activate agent
    */
-  activate(agentId: string): boolean {
+  async activate(agentId: string): Promise<boolean> {
     const agent = this.get(agentId);
     if (!agent) return false;
 
     agent.active = true;
-    this.save();
+    await this.save();
 
     this.emit({ type: "agent:updated", agent });
 
@@ -355,12 +365,12 @@ export class AgentManager {
   /**
    * Delete agent
    */
-  delete(agentId: string): boolean {
+  async delete(agentId: string): Promise<boolean> {
     const index = this.store.agents.findIndex((a) => a.id === agentId);
     if (index === -1) return false;
 
     this.store.agents.splice(index, 1);
-    this.save();
+    await this.save();
 
     return true;
   }
@@ -368,7 +378,7 @@ export class AgentManager {
   /**
    * Record agent activity
    */
-  recordActivity(agentId: string, tokens: number = 0): void {
+  async recordActivity(agentId: string, tokens: number = 0): Promise<void> {
     const agent = this.get(agentId);
     if (!agent) return;
 
@@ -376,7 +386,7 @@ export class AgentManager {
     agent.metadata.totalRequests++;
     agent.metadata.totalTokens += tokens;
 
-    this.save();
+    await this.save();
   }
 
   // =============================================================================
@@ -425,26 +435,23 @@ export class AgentManager {
   // Private Methods
   // =============================================================================
 
-  private loadStore(): AgentStore {
-    if (fs.existsSync(this.storePath)) {
-      try {
-        const content = fs.readFileSync(this.storePath, "utf-8");
-        return JSON.parse(content) as AgentStore;
-      } catch {
-        // Corrupted file, start fresh
-      }
+  private async loadStore(): Promise<AgentStore> {
+    try {
+      const content = await fs.readFile(this.storePath, "utf-8");
+      return JSON.parse(content) as AgentStore;
+    } catch {
+      // File doesn't exist or is corrupted, start fresh
+      return {
+        agents: [],
+        version: "1.0.0",
+        updatedAt: new Date().toISOString(),
+      };
     }
-
-    return {
-      agents: [],
-      version: "1.0.0",
-      updatedAt: new Date().toISOString(),
-    };
   }
 
-  private save(): void {
+  private async save(): Promise<void> {
     this.store.updatedAt = new Date().toISOString();
-    fs.writeFileSync(this.storePath, JSON.stringify(this.store, null, 2));
+    await fs.writeFile(this.storePath, JSON.stringify(this.store, null, 2));
   }
 
   private getDefaultPermissions(): ApiKeyPermissions {
@@ -474,6 +481,6 @@ export class AgentManager {
 // Factory
 // =============================================================================
 
-export function createAgentManager(storagePath: string): AgentManager {
-  return new AgentManager(storagePath);
+export async function createAgentManager(storagePath: string): Promise<AgentManager> {
+  return AgentManager.create(storagePath);
 }
