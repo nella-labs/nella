@@ -319,6 +319,13 @@ export {
   createContextManager as createSharedContextManager,
   DEFAULT_CHANNEL_SETTINGS,
   DEFAULT_CONTEXT_TTL,
+  DEFAULT_MAX_VERSIONS,
+  DEFAULT_CLEANUP_INTERVAL_MS,
+  DEFAULT_EXPIRING_WARNING_MS,
+  ContextConflictError,
+  ContextValidationError,
+  LocalTransport,
+  SupabaseTransport,
 } from "./context-sharing";
 
 export type {
@@ -330,11 +337,21 @@ export type {
   ContextQueryResult,
   ContextEvent,
   ContextStore,
+  ContextVersion,
+  ContextSchema,
+  SchemaValidationResult,
+  ContextSearchOptions,
+  ContextSnapshot,
+  ImportStrategy,
   CodeSnippetContext,
   DecisionContext,
   DependencyContext,
   SetContextOptions,
+  ContextManagerOptions,
   ContextEventHandler,
+  ContextTransport,
+  ContextMessage,
+  ChannelHandler,
 } from "./context-sharing";
 
 // =============================================================================
