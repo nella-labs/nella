@@ -58,6 +58,9 @@ export interface CloudStorageConfig {
   /** Path to service account key file */
   keyFilename?: string;
 
+  /** Inline service account credentials */
+  credentials?: Record<string, unknown>;
+
   /** Base path prefix in bucket */
   basePath?: string;
 }
