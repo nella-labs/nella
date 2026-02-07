@@ -86,19 +86,37 @@ const recent = shared.query('repo-1', { types: ['decision'], visibility: 'team',
 
 ## Cloud Sync (Google Cloud Storage)
 
-Sync session data and artifacts to a GCS bucket.
+Sync workspace files and artifacts to GCS using the modern `sync/*` stack.
 
 ```ts
-import { createCloudSyncManager } from '@usenella/core';
+import { SyncManager } from '@usenella/core';
 
-const sync = createCloudSyncManager('repo-1', '/path/to/repo', {
-  projectId: 'my-gcp-project',
-  bucketName: 'nella-artifacts',
-  encryptionKey: process.env.NELLA_SYNC_KEY,
+const sync = new SyncManager();
+await sync.init({
+  tier: 'gcp',
+  cloudStorageConfig: {
+    bucket: 'nella-artifacts',
+    projectId: 'my-gcp-project',
+  },
+  cloudSync: {
+    conflictResolution: 'manual',
+    include: ['**/*'],
+    exclude: ['**/node_modules/**', '**/.git/**', '**/.nella/**'],
+  },
 });
 
-await sync.push();
+await sync.createCloudSync('repo-1', '/path/to/repo', {
+  compression: true,
+  bandwidthLimitKBps: 512,
+});
+
+await sync.syncWorkspace('repo-1');
+const state = sync.getCloudSyncState('repo-1');
+console.log(state?.lastSync);
 ```
+
+Legacy compatibility:
+`createCloudSyncManager(...)` is still exported, but deprecated in favor of `SyncManager.createCloudSync(...)`.
 
 ## Export Manager
 
