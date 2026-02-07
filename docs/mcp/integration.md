@@ -4,11 +4,102 @@ How to set up and configure the Nella MCP Server with various clients.
 
 ## Table of Contents
 
+- [Hosted (Cloud)](#hosted-cloud)
 - [Claude Desktop](#claude-desktop)
 - [Claude Code (CLI)](#claude-code-cli)
 - [Custom MCP Clients](#custom-mcp-clients)
 - [Configuration Options](#configuration-options)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Hosted (Cloud)
+
+The easiest way to use Nella MCP — no local installation required. Connect any MCP-compatible client to the hosted server using your API key.
+
+### Getting an API Key
+
+1. Sign up at [getnella.dev](https://app.getnella.dev)
+2. Go to **Dashboard → API Keys**
+3. Click **Create New Key** and copy the `nella_...` key (shown only once)
+
+### Connecting via Streamable HTTP
+
+The hosted server uses the MCP Streamable HTTP transport at:
+
+```
+https://mcp.getnella.dev/mcp
+```
+
+All requests require an `Authorization: Bearer nella_...` header.
+
+### Claude Desktop (Remote)
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "transport": "streamable-http",
+      "url": "https://mcp.getnella.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer nella_YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Claude Code (Remote)
+
+```bash
+claude mcp add nella --transport streamable-http \
+  --url https://mcp.getnella.dev/mcp \
+  --header "Authorization: Bearer nella_YOUR_API_KEY"
+```
+
+### Rate Limits
+
+Each API key has configurable rate limits (set in the dashboard):
+
+| Preset   | Per Minute | Per Hour | Per Day  |
+|----------|-----------|----------|----------|
+| Low      | 30        | 500      | 5,000    |
+| Standard | 60        | 1,000    | 10,000   |
+| High     | 120       | 2,000    | 20,000   |
+
+When a limit is hit, the server responds with `429 Too Many Requests`.
+
+### Health Check
+
+```bash
+curl https://mcp.getnella.dev/health
+```
+
+### Self-Hosting
+
+You can self-host the Nella MCP server using Docker:
+
+```bash
+docker pull ghcr.io/nella-labs/nella-mcp:latest
+
+docker run -p 3001:3001 \
+  -e SUPABASE_URL=your_url \
+  -e SUPABASE_SERVICE_ROLE_KEY=your_key \
+  -e PORT=3001 \
+  ghcr.io/nella-labs/nella-mcp:latest
+```
+
+Or use the CLI:
+
+```bash
+nella serve --port 3001
+```
+
+Required environment variables:
+- `SUPABASE_URL` — Your Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — Service role key for API key validation
+- `PORT` — Server port (default: 3001)
+- `REDIS_URL` — (Optional) Redis connection for distributed rate limiting
 
 ---
 

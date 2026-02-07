@@ -256,6 +256,7 @@ graph TB
 
     subgraph sync["Cloud Sync"]
         syncMgr["sync/manager.ts"]
+        cloudFileSync["sync/cloud/manager.ts"]
         localAdapter["adapters/local.ts"]
         supabaseAdapter["adapters/supabase.ts"]
         gcpAdapter["adapters/gcp.ts"]
@@ -294,6 +295,7 @@ graph TB
     syncMgr --> localAdapter
     syncMgr --> supabaseAdapter
     syncMgr --> gcpAdapter
+    syncMgr --> cloudFileSync
 
     style orchestration fill:#6366f1,color:#fff
     style validators fill:#8b5cf6,color:#fff
@@ -814,6 +816,7 @@ graph TB
         File_CRUD["File CRUD"]
         Chunk_CRUD["Chunk CRUD"]
         Search["Search<br/>(vector / text / hybrid)"]
+        CloudFileSync["Cloud File Sync<br/>(delta, queue, conflicts)"]
     end
 
     Client --> SyncMgr
@@ -832,6 +835,7 @@ graph TB
     SyncMgr --> File_CRUD
     SyncMgr --> Chunk_CRUD
     SyncMgr --> Search
+    SyncMgr --> CloudFileSync
 
     style Client fill:#6366f1,color:#fff
     style SyncMgr fill:#7c3aed,color:#fff

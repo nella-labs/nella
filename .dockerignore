@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Git
+.git/
+.gitignore
+
+# Environment & secrets
+.env
+.env.*
+.private/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docs & non-runtime
+docs/
+fixtures/
+tasks/
+scripts/
+benchmark-results/
+*.md
+LICENSE
+
+# CI/CD
+.github/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+*.test.*
+*.spec.*
+__tests__/
+coverage/

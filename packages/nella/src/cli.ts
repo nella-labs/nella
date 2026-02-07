@@ -13,6 +13,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
 import Table from "cli-table3";
@@ -26,7 +27,15 @@ import {
   FileChange,
 } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
+import { startHostedServer } from "./mcp/hosted-server";
 import { startPlaygroundServer } from "./playground";
+import {
+  login,
+  loadSession,
+  clearSession,
+  getValidSession,
+  createApiKey,
+} from "./auth";
 
 // =============================================================================
 // Theme & Styling
@@ -101,7 +110,7 @@ function divider(char = "─"): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "check" | "validate" | "run" | "mcp" | "playground" | "help";
+  command: "check" | "validate" | "run" | "mcp" | "serve" | "connect" | "auth" | "playground" | "help";
   taskPath?: string;
   repoPath?: string;
   changesPath?: string;
@@ -113,6 +122,12 @@ interface CliArgs {
   // Playground-specific args
   port?: number;
   host?: string;
+  // Connect-specific args
+  apiKey?: string;
+  serverUrl?: string;
+  client?: "claude" | "vscode" | "all";
+  // Auth-specific args
+  authSubcommand?: "login" | "logout" | "status";
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -126,8 +141,18 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "playground" || arg === "help") {
-      result.command = arg;
+    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "help") {
+      result.command = arg as CliArgs["command"];
+
+      // Parse auth subcommand
+      if (arg === "auth" && i + 1 < args.length) {
+        const sub = args[i + 1];
+        if (sub === "login" || sub === "logout" || sub === "status") {
+          result.authSubcommand = sub;
+          i++; // consume subcommand
+        }
+      }
+
       i++;
       continue;
     }
@@ -159,6 +184,18 @@ function parseArgs(args: string[]): CliArgs {
       result.host = args[++i];
     } else if (arg.startsWith("--host=")) {
       result.host = arg.slice("--host=".length);
+    } else if (arg === "--api-key" || arg === "-k") {
+      result.apiKey = args[++i];
+    } else if (arg.startsWith("--api-key=")) {
+      result.apiKey = arg.slice("--api-key=".length);
+    } else if (arg === "--server-url" || arg === "-u") {
+      result.serverUrl = args[++i];
+    } else if (arg.startsWith("--server-url=")) {
+      result.serverUrl = arg.slice("--server-url=".length);
+    } else if (arg === "--client") {
+      result.client = args[++i] as "claude" | "vscode" | "all";
+    } else if (arg.startsWith("--client=")) {
+      result.client = arg.slice("--client=".length) as "claude" | "vscode" | "all";
     }
 
     i++;
@@ -531,6 +568,272 @@ async function runRunCommand(args: CliArgs): Promise<void> {
   process.exit(result.passed ? 0 : 1);
 }
 
+// =============================================================================
+// Connect Command
+// =============================================================================
+
+interface McpClientConfig {
+  url: string;
+  headers: { Authorization: string };
+}
+
+function getClaudeDesktopConfigPath(): string {
+  const platform = process.platform;
+  if (platform === "win32") {
+    return path.join(process.env.APPDATA || "", "Claude", "claude_desktop_config.json");
+  } else if (platform === "darwin") {
+    return path.join(process.env.HOME || "", "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  } else {
+    return path.join(process.env.HOME || "", ".config", "claude", "claude_desktop_config.json");
+  }
+}
+
+function getVsCodeMcpConfigPath(): string {
+  // Write to .vscode/mcp.json in the current working directory
+  return path.join(process.cwd(), ".vscode", "mcp.json");
+}
+
+function configureClaudeDesktop(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
+  const configPath = getClaudeDesktopConfigPath();
+
+  try {
+    let config: Record<string, unknown> = {};
+
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    } else {
+      // Ensure directory exists
+      const dir = path.dirname(configPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+
+    // Add or update nella MCP server
+    const mcpServers = (config.mcpServers as Record<string, unknown>) || {};
+    mcpServers.nella = {
+      url: serverUrl,
+      headers: { Authorization: `Bearer ${apiKey}` },
+    } as McpClientConfig;
+    config.mcpServers = mcpServers;
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    return { success: true, path: configPath };
+  } catch (err) {
+    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function configureVsCode(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
+  const configPath = getVsCodeMcpConfigPath();
+
+  try {
+    let config: Record<string, unknown> = {};
+
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    } else {
+      const dir = path.dirname(configPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+
+    const servers = (config.servers as Record<string, unknown>) || {};
+    servers.nella = {
+      url: serverUrl,
+      headers: { Authorization: `Bearer ${apiKey}` },
+    } as McpClientConfig;
+    config.servers = servers;
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    return { success: true, path: configPath };
+  } catch (err) {
+    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// =============================================================================
+// Auth Command
+// =============================================================================
+
+async function runAuthCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const sub = args.authSubcommand;
+
+  if (!sub) {
+    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella auth login")}    ${theme.muted("Log in with your Nella account")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella auth logout")}   ${theme.muted("Clear stored credentials")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella auth status")}   ${theme.muted("Show current login state")}`);
+    console.log("");
+    return;
+  }
+
+  if (sub === "login") {
+    console.log(`  ${theme.icons.info}  ${theme.bold("Log in to Nella")}\n`);
+
+    const result = await login();
+
+    if (result.success) {
+      console.log(`\n  ${theme.icons.success}  ${theme.success.bold("Logged in")} as ${theme.secondary(result.email!)}`);
+      console.log(`  ${theme.muted("   Session saved to ~/.nella/auth.json")}\n`);
+      console.log(`  ${theme.muted("Next:")} ${theme.secondary("nella connect")} to configure your MCP clients\n`);
+    } else {
+      console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Login failed:")} ${result.error}\n`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (sub === "logout") {
+    clearSession();
+    console.log(`  ${theme.icons.success}  ${theme.success("Logged out")} \u2014 credentials removed\n`);
+    return;
+  }
+
+  if (sub === "status") {
+    const session = await getValidSession();
+    if (session) {
+      console.log(`  ${theme.icons.success}  ${theme.success.bold("Authenticated")}\n`);
+      console.log(`  ${theme.muted("Email:")}   ${theme.secondary(session.user.email)}`);
+      console.log(`  ${theme.muted("User ID:")} ${theme.dim(session.user.id)}`);
+      const exp = new Date(session.expires_at * 1000);
+      console.log(`  ${theme.muted("Expires:")} ${theme.dim(exp.toLocaleString())}`);
+    } else {
+      console.log(`  ${theme.icons.warning}  ${theme.warning("Not logged in")}`);
+      console.log(`\n  ${theme.muted("Run")} ${theme.secondary("nella auth login")} ${theme.muted("to authenticate")}`);
+    }
+    console.log("");
+    return;
+  }
+}
+
+async function runConnectCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const serverUrl = args.serverUrl || "https://nella-mcp-production.up.railway.app/mcp";
+  let apiKey = args.apiKey || process.env.NELLA_API_KEY;
+  const client = args.client || "all";
+
+  // If no API key provided, try to auto-create one using stored session
+  if (!apiKey) {
+    const session = await getValidSession();
+    if (session) {
+      console.log(`  ${theme.icons.info}  Logged in as ${theme.secondary(session.user.email)}`);
+      console.log(`  ${theme.muted("   Creating API key automatically...")}\n`);
+
+      const keyName = `cli-${os.hostname()}-${new Date().toISOString().slice(0, 10)}`;
+      const { apiKey: newKey, error } = await createApiKey(session, keyName);
+
+      if (newKey) {
+        apiKey = newKey;
+        console.log(`  ${theme.icons.success}  API key created: ${theme.dim(newKey.substring(0, 15) + "...")}\n`);
+      } else {
+        console.log(`  ${theme.icons.error}  Failed to create key: ${error}`);
+        console.log(`  ${theme.muted("   Pass one manually with --api-key")}\n`);
+        process.exit(1);
+      }
+    } else {
+      console.log(box([
+        `${theme.icons.error}  ${theme.error.bold("No API key provided")}`,
+        "",
+        `  Either log in first, or pass a key directly:`,
+        "",
+        `  ${theme.muted("$")} ${theme.secondary("nella auth login")}`,
+        `  ${theme.muted("$")} ${theme.secondary("nella connect")}`,
+        "",
+        `  ${theme.muted("— or —")}`,
+        "",
+        `  ${theme.muted("$")} ${theme.secondary("nella connect --api-key nella_your_key_here")}`,
+        "",
+        `  Get your API key at ${theme.secondary("https://app.getnella.dev/dashboard/api-keys")}`,
+      ].join("\n"), "Setup"), "\n");
+      process.exit(1);
+    }
+  }
+
+  if (!apiKey.startsWith("nella_")) {
+    console.log(`  ${theme.icons.error}  API key must start with ${theme.accent("nella_")}\n`);
+    process.exit(1);
+  }
+
+  console.log(`  ${theme.icons.info}  ${theme.bold("Connecting to Nella MCP Server")}\n`);
+  console.log(`  ${theme.muted("Server:")}  ${theme.secondary(serverUrl)}`);
+  console.log(`  ${theme.muted("Key:")}     ${theme.dim(apiKey.substring(0, 15) + "..." + apiKey.slice(-4))}`);
+  console.log("");
+
+  // Verify the server is reachable
+  try {
+    const http = require("http");
+    const https = require("https");
+    const healthUrl = serverUrl.replace(/\/mcp$/, "/health");
+    const mod = healthUrl.startsWith("https") ? https : http;
+
+    const healthCheck = await new Promise<{ ok: boolean; version?: string }>((resolve) => {
+      const req = mod.get(healthUrl, (res: { statusCode?: number; on: Function }) => {
+        let data = "";
+        res.on("data", (chunk: string) => { data += chunk; });
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            resolve({ ok: res.statusCode === 200, version: json.version });
+          } catch {
+            resolve({ ok: false });
+          }
+        });
+      });
+      req.on("error", () => resolve({ ok: false }));
+      req.setTimeout(5000, () => { req.destroy(); resolve({ ok: false }); });
+    });
+
+    if (healthCheck.ok) {
+      console.log(`  ${theme.icons.success}  Server reachable ${theme.muted(`(v${healthCheck.version})`)}`);
+    } else {
+      console.log(`  ${theme.icons.warning}  Server unreachable — config will be written anyway`);
+    }
+  } catch {
+    console.log(`  ${theme.icons.warning}  Could not verify server — config will be written anyway`);
+  }
+
+  console.log("");
+
+  const results: { name: string; success: boolean; path: string; error?: string }[] = [];
+
+  if (client === "claude" || client === "all") {
+    const r = configureClaudeDesktop(serverUrl, apiKey);
+    results.push({ name: "Claude Desktop", ...r });
+  }
+
+  if (client === "vscode" || client === "all") {
+    const r = configureVsCode(serverUrl, apiKey);
+    results.push({ name: "VS Code (Copilot)", ...r });
+  }
+
+  for (const r of results) {
+    if (r.success) {
+      console.log(`  ${theme.icons.success}  ${theme.success(r.name)} configured`);
+      console.log(`     ${theme.muted(r.path)}`);
+    } else {
+      console.log(`  ${theme.icons.error}  ${theme.error(r.name)} failed: ${r.error}`);
+      console.log(`     ${theme.muted(r.path)}`);
+    }
+  }
+
+  console.log("");
+  console.log(divider());
+
+  const allSuccess = results.every((r) => r.success);
+  if (allSuccess) {
+    console.log(`\n  ${theme.icons.star}  ${theme.success.bold("All set!")} ${theme.muted("Restart your clients to connect.")}\n`);
+  } else {
+    console.log(`\n  ${theme.icons.warning}  ${theme.warning("Some clients failed to configure. Check paths above.")}\n`);
+  }
+}
+
 function showHelp(): void {
   console.log(logo);
   console.log(tagline);
@@ -553,7 +856,10 @@ function showHelp(): void {
     [theme.primary("check"), theme.muted("Pre-flight safety check — can the task proceed?")],
     [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
     [theme.primary("run"), theme.muted("Full run: check + validate + compute metrics")],
-    [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration")],
+    [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration (stdio)")],
+    [theme.primary("serve"), theme.muted("Start hosted MCP server (HTTP, for production)")],
+    [theme.primary("auth"), theme.muted("Login, logout, or check auth status (login|logout|status)")],
+    [theme.primary("connect"), theme.muted("Configure Claude Desktop & VS Code to use Nella MCP")],
     [theme.primary("playground"), theme.muted("Start playground server with real-time dashboard")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
@@ -581,6 +887,9 @@ function showHelp(): void {
     [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (for mcp/playground)"],
     [theme.accent("--port, -p"), theme.muted("<number>"), "Port for playground server (default: 3847)"],
     [theme.accent("--host"), theme.muted("<host>"), "Host for playground server (default: localhost)"],
+    [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect command"],
+    [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect (default: production)"],
+    [theme.accent("--client"), theme.muted("<name>"), "Target client: claude, vscode, or all (default: all)"],
     [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
@@ -615,6 +924,15 @@ async function main(): Promise<void> {
       break;
     case "mcp":
       await startMcpServer({ workspace: args.workspace });
+      break;
+    case "serve":
+      await startHostedServer({ port: args.port, host: args.host });
+      break;
+    case "auth":
+      await runAuthCommand(args);
+      break;
+    case "connect":
+      await runConnectCommand(args);
       break;
     case "playground":
       await startPlaygroundServer({
