@@ -41,6 +41,7 @@ class CloudStorageManager {
     this.storage = new Storage({
       projectId: config.projectId,
       keyFilename: config.keyFilename,
+      credentials: config.credentials,
     });
 
     this.bucket = this.storage.bucket(config.bucket);
