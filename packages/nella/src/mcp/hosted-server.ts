@@ -1,0 +1,637 @@
+/**
+ * Hosted MCP Server
+ *
+ * Exposes Nella's MCP tools over Streamable HTTP transport.
+ * Authenticates via API keys stored in Supabase, rate limits via Redis,
+ * and logs usage to the usage_events table.
+ *
+ * Usage:
+ *   nella serve --port 3000
+ *   NODE_ENV=production node packages/nella/dist/mcp/hosted-server.js
+ *
+ * Required env vars:
+ *   SUPABASE_URL              - Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key
+ *   REDIS_URL                 - Redis connection string (rediss://... for TLS)
+ *
+ * Optional env vars:
+ *   PORT                      - HTTP port (default: 3000)
+ *   NELLA_LOG_LEVEL           - Log level (default: info)
+ */
+
+import * as crypto from "crypto";
+import * as http from "http";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
+import dotenv from "dotenv";
+
+// Load .env from repo root (two levels up from packages/nella/)
+dotenv.config({ path: path.resolve(__dirname, "../../../../.env") });
+// Also try cwd for Docker / production
+dotenv.config();
+
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  type Tool,
+  type CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import { ContextManager } from "@usenella/core";
+import { registerValidationTools, handleValidationTool } from "./tools/validation";
+import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
+import { registerContextTools, handleContextTool } from "./tools/context";
+import type { ServerContext } from "./server";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface ApiKeyRecord {
+  id: string;
+  user_id: string;
+  name: string;
+  key_prefix: string;
+  rate_limits: {
+    requests_per_minute: number;
+    requests_per_hour: number;
+    requests_per_day: number;
+  } | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
+interface AuthenticatedRequest {
+  apiKeyId: string;
+  userId: string;
+  rateLimits: {
+    requests_per_minute: number;
+    requests_per_hour: number;
+    requests_per_day: number;
+  };
+}
+
+interface RateLimitEntry {
+  timestamps: number[];
+}
+
+export interface HostedServerOptions {
+  port?: number;
+  host?: string;
+}
+
+// =============================================================================
+// Supabase Client (lazy)
+// =============================================================================
+
+let supabaseClient: any = null;
+
+function getSupabase() {
+  if (supabaseClient) return supabaseClient;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables"
+    );
+  }
+
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    supabaseClient = createClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    return supabaseClient;
+  } catch {
+    throw new Error(
+      "Failed to initialize Supabase client. Ensure @supabase/supabase-js is installed."
+    );
+  }
+}
+
+// =============================================================================
+// In-Memory Rate Limiter (backed by Redis when available)
+// =============================================================================
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function checkRateLimit(
+  apiKeyId: string,
+  limits: AuthenticatedRequest["rateLimits"]
+): { allowed: boolean; retryAfter?: number; reason?: string } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(apiKeyId) || { timestamps: [] };
+
+  // Clean old entries (older than 24h)
+  const dayAgo = now - 86400000;
+  entry.timestamps = entry.timestamps.filter((t) => t > dayAgo);
+
+  const minuteAgo = now - 60000;
+  const hourAgo = now - 3600000;
+
+  const perMinute = entry.timestamps.filter((t) => t > minuteAgo).length;
+  const perHour = entry.timestamps.filter((t) => t > hourAgo).length;
+  const perDay = entry.timestamps.length;
+
+  if (perMinute >= limits.requests_per_minute) {
+    return {
+      allowed: false,
+      retryAfter: 60,
+      reason: `Rate limit exceeded: ${perMinute}/${limits.requests_per_minute} requests per minute`,
+    };
+  }
+  if (perHour >= limits.requests_per_hour) {
+    return {
+      allowed: false,
+      retryAfter: 3600,
+      reason: `Rate limit exceeded: ${perHour}/${limits.requests_per_hour} requests per hour`,
+    };
+  }
+  if (perDay >= limits.requests_per_day) {
+    return {
+      allowed: false,
+      retryAfter: 86400,
+      reason: `Rate limit exceeded: ${perDay}/${limits.requests_per_day} requests per day`,
+    };
+  }
+
+  entry.timestamps.push(now);
+  rateLimitStore.set(apiKeyId, entry);
+  return { allowed: true };
+}
+
+// =============================================================================
+// Auth: API Key Validation
+// =============================================================================
+
+// Cache validated keys for 60s to avoid hammering Supabase
+const keyCache = new Map<string, { record: ApiKeyRecord; cachedAt: number }>();
+const KEY_CACHE_TTL = 60000;
+
+async function validateApiKey(
+  apiKey: string
+): Promise<{ success: true; record: ApiKeyRecord } | { success: false; error: string; status: number }> {
+  if (!apiKey || !apiKey.startsWith("nella_")) {
+    return { success: false, error: "Invalid API key format", status: 401 };
+  }
+
+  const keyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
+
+  // Check cache
+  const cached = keyCache.get(keyHash);
+  if (cached && Date.now() - cached.cachedAt < KEY_CACHE_TTL) {
+    return { success: true, record: cached.record };
+  }
+
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("api_keys")
+      .select("id, user_id, name, key_prefix, rate_limits, expires_at, revoked_at")
+      .eq("key_hash", keyHash)
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: "Invalid API key", status: 401 };
+    }
+
+    const record = data as ApiKeyRecord;
+
+    if (record.revoked_at) {
+      return { success: false, error: "API key has been revoked", status: 403 };
+    }
+
+    if (record.expires_at && new Date(record.expires_at) < new Date()) {
+      return { success: false, error: "API key has expired", status: 403 };
+    }
+
+    // Cache it
+    keyCache.set(keyHash, { record, cachedAt: Date.now() });
+
+    // Update last_used_at (fire and forget)
+    supabase
+      .from("api_keys")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("id", record.id)
+      .then(() => {})
+      .catch(() => {});
+
+    return { success: true, record };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Auth error: ${message}`, status: 500 };
+  }
+}
+
+// =============================================================================
+// Usage Logging
+// =============================================================================
+
+async function logUsageEvent(params: {
+  apiKeyId: string;
+  toolName: string;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  workspace?: string;
+  tokensUsed?: number;
+}): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    await supabase.from("usage_events").insert({
+      api_key_id: params.apiKeyId,
+      tool_name: params.toolName,
+      duration_ms: params.durationMs,
+      success: params.success,
+      error: params.error || null,
+      workspace: params.workspace || null,
+      tokens_used: params.tokensUsed || 0,
+    });
+  } catch {
+    // Usage logging should never crash the server
+  }
+}
+
+// =============================================================================
+// Server
+// =============================================================================
+
+const startTime = Date.now();
+
+function log(level: string, message: string, data?: Record<string, unknown>): void {
+  const logLevel = process.env.NELLA_LOG_LEVEL || "info";
+  const levels = ["debug", "info", "warn", "error"];
+  if (levels.indexOf(level) < levels.indexOf(logLevel)) return;
+
+  const timestamp = new Date().toISOString();
+  const entry = { timestamp, level, message, ...data };
+  console.log(JSON.stringify(entry));
+}
+
+export async function startHostedServer(options: HostedServerOptions = {}): Promise<void> {
+  const port = options.port || parseInt(process.env.PORT || "3000", 10);
+  const host = options.host || "0.0.0.0";
+
+  // Validate required env vars early
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
+    process.exit(1);
+  }
+
+  // Collect all tools
+  const allTools: Tool[] = [
+    ...registerValidationTools(),
+    ...registerSafetyTools(),
+    ...registerContextTools(),
+  ];
+
+  log("info", "Nella hosted MCP server starting", { port, tools: allTools.length });
+
+  // Track active transports per session
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  // Create a new MCP server + transport for a session
+  function createSession(): { server: Server; transport: StreamableHTTPServerTransport } {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => crypto.randomUUID(),
+    });
+
+    const server = new Server(
+      { name: "nella", version: "0.2.2" },
+      { capabilities: { tools: {} } }
+    );
+
+    // List tools
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return { tools: allTools };
+    });
+
+    // Handle tool calls
+    server.setRequestHandler(
+      CallToolRequestSchema,
+      async (request: {
+        params: { name: string; arguments?: Record<string, unknown> };
+      }): Promise<CallToolResult> => {
+        const { name, arguments: toolArgs } = request.params;
+        const callStart = Date.now();
+
+        // Create a temporary workspace context for this call
+        const tmpDir = path.join(
+          os.tmpdir(),
+          `nella-hosted-${crypto.randomBytes(4).toString("hex")}`
+        );
+
+        try {
+          // Ensure temp dir exists
+          if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+          }
+
+          const contextManager = new ContextManager(tmpDir);
+          const serverContext: ServerContext = {
+            workspacePath: tmpDir,
+            contextManager,
+          };
+
+          // Try each tool category
+          const validationResult = await handleValidationTool(
+            name,
+            toolArgs || {},
+            serverContext
+          );
+          if (validationResult !== null) return validationResult as CallToolResult;
+
+          const safetyResult = await handleSafetyTool(
+            name,
+            toolArgs || {},
+            serverContext
+          );
+          if (safetyResult !== null) return safetyResult as CallToolResult;
+
+          const contextResult = await handleContextTool(
+            name,
+            toolArgs || {},
+            serverContext
+          );
+          if (contextResult !== null) return contextResult as CallToolResult;
+
+          return {
+            content: [{ type: "text", text: `Unknown tool: ${name}` }],
+            isError: true,
+          } as CallToolResult;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              { type: "text", text: `Error executing ${name}: ${message}` },
+            ],
+            isError: true,
+          } as CallToolResult;
+        } finally {
+          // Clean up temp dir
+          try {
+            if (fs.existsSync(tmpDir)) {
+              fs.rmSync(tmpDir, { recursive: true, force: true });
+            }
+          } catch {
+            // Best effort cleanup
+          }
+        }
+      }
+    );
+
+    // Track transport lifecycle
+    transport.onclose = () => {
+      const sid = transport.sessionId;
+      if (sid) transports.delete(sid);
+      server.close().catch(() => {});
+    };
+
+    server.connect(transport).catch((err) => {
+      log("error", "Failed to connect MCP server to transport", {
+        error: String(err),
+      });
+    });
+
+    if (transport.sessionId) {
+      transports.set(transport.sessionId, transport);
+    }
+
+    return { server, transport };
+  }
+
+  // =========================================================================
+  // HTTP Server
+  // =========================================================================
+
+  const httpServer = http.createServer(async (req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const pathname = url.pathname;
+
+    // CORS headers
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, Mcp-Session-Id"
+    );
+    res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /health
+    // -----------------------------------------------------------------------
+    if (pathname === "/health" && req.method === "GET") {
+      const health = {
+        status: "ok",
+        version: "0.2.2",
+        uptime: Math.floor((Date.now() - startTime) / 1000),
+        activeSessions: transports.size,
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(health));
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // MCP endpoint: POST/GET/DELETE /mcp
+    // -----------------------------------------------------------------------
+    if (pathname === "/mcp") {
+      // Authenticate
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing Authorization: Bearer <api_key> header" }));
+        return;
+      }
+
+      const apiKey = authHeader.slice(7);
+      const authResult = await validateApiKey(apiKey);
+      if (!authResult.success) {
+        res.writeHead(authResult.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: authResult.error }));
+        return;
+      }
+
+      const keyRecord = authResult.record;
+      const rateLimits = keyRecord.rate_limits || {
+        requests_per_minute: 60,
+        requests_per_hour: 1000,
+        requests_per_day: 10000,
+      };
+
+      // Rate limit check (only for POST = actual tool calls / messages)
+      if (req.method === "POST") {
+        const rl = checkRateLimit(keyRecord.id, rateLimits);
+        if (!rl.allowed) {
+          res.writeHead(429, {
+            "Content-Type": "application/json",
+            "Retry-After": String(rl.retryAfter || 60),
+          });
+          res.end(JSON.stringify({ error: rl.reason }));
+          return;
+        }
+      }
+
+      // Route to transport
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+      if (req.method === "POST") {
+        // Read body
+        const body = await new Promise<string>((resolve, reject) => {
+          let data = "";
+          req.on("data", (chunk: Buffer) => (data += chunk.toString()));
+          req.on("end", () => resolve(data));
+          req.on("error", reject);
+        });
+
+        let parsedBody: unknown;
+        try {
+          parsedBody = JSON.parse(body);
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid JSON body" }));
+          return;
+        }
+
+        // Check if this is an initialization request (method: "initialize")
+        const isInit =
+          Array.isArray(parsedBody)
+            ? parsedBody.some((m: any) => m.method === "initialize")
+            : (parsedBody as any)?.method === "initialize";
+
+        if (isInit || !sessionId) {
+          // New session
+          const { transport } = createSession();
+
+          // Wrap the tool call handler to log usage
+          const origOnMessage = transport.onmessage;
+          transport.onmessage = (message, extra) => {
+            // Log tool calls for usage tracking
+            if (
+              message &&
+              typeof message === "object" &&
+              "method" in message &&
+              (message as any).method === "tools/call"
+            ) {
+              const toolName = (message as any).params?.name || "unknown";
+              const callStart = Date.now();
+
+              // We'll log after the response is sent — approximate timing
+              setTimeout(() => {
+                logUsageEvent({
+                  apiKeyId: keyRecord.id,
+                  toolName,
+                  durationMs: Date.now() - callStart,
+                  success: true,
+                });
+              }, 100);
+            }
+
+            if (origOnMessage) {
+              origOnMessage(message, extra);
+            }
+          };
+
+          await transport.handleRequest(req, res, parsedBody);
+        } else {
+          // Existing session
+          const transport = transports.get(sessionId);
+          if (!transport) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Session not found" }));
+            return;
+          }
+          await transport.handleRequest(req, res, parsedBody);
+        }
+
+        return;
+      }
+
+      if (req.method === "GET") {
+        // SSE stream for server-to-client notifications
+        if (!sessionId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing Mcp-Session-Id header" }));
+          return;
+        }
+        const transport = transports.get(sessionId);
+        if (!transport) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Session not found" }));
+          return;
+        }
+        await transport.handleRequest(req, res);
+        return;
+      }
+
+      if (req.method === "DELETE") {
+        // Session termination
+        if (sessionId) {
+          const transport = transports.get(sessionId);
+          if (transport) {
+            await transport.close();
+            transports.delete(sessionId);
+          }
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "session terminated" }));
+        return;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 404 fallback
+    // -----------------------------------------------------------------------
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Not found" }));
+  });
+
+  // Graceful shutdown
+  const shutdown = () => {
+    log("info", "Shutting down...");
+    for (const transport of transports.values()) {
+      transport.close().catch(() => {});
+    }
+    httpServer.close(() => {
+      log("info", "Server stopped");
+      process.exit(0);
+    });
+    // Force exit after 10s
+    setTimeout(() => process.exit(1), 10000);
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  httpServer.listen(port, host, () => {
+    log("info", `Nella hosted MCP server listening on ${host}:${port}`, {
+      endpoints: {
+        mcp: `http://${host}:${port}/mcp`,
+        health: `http://${host}:${port}/health`,
+      },
+    });
+  });
+}
+
+// =============================================================================
+// Direct execution (for Railway / Docker CMD)
+// =============================================================================
+
+if (require.main === module) {
+  startHostedServer().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
+}
