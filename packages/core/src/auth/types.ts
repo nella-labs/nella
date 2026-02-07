@@ -4,6 +4,9 @@
  * Types for API key management and agent authentication.
  */
 
+import type { RateLimiterConfig as RateLimitConfig } from "../rate-limit/types";
+import { DEFAULT_RATE_LIMITER_CONFIG } from "../rate-limit/types";
+
 // =============================================================================
 // API Key Types
 // =============================================================================
@@ -86,7 +89,7 @@ export interface ApiKeyPermissions {
  * Rate limit configuration — canonical type from rate-limit module.
  * Re-exported here for backward compatibility.
  */
-export type { RateLimiterConfig as RateLimitConfig } from "../rate-limit/types";
+export type { RateLimitConfig };
 
 // =============================================================================
 // Agent Types
@@ -271,8 +274,6 @@ export type AuthEvent =
 // =============================================================================
 // Defaults
 // =============================================================================
-
-import { DEFAULT_RATE_LIMITER_CONFIG } from "../rate-limit/types";
 
 /**
  * Default rate limit — re-exported from rate-limit module for backward compatibility.

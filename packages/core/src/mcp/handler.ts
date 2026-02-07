@@ -108,7 +108,7 @@ export class McpToolHandler {
     try {
       // Check authentication if configured
       if (this.authenticator && this.apiKey) {
-        const authResult = this.authenticator.authenticate({
+        const authResult = await this.authenticator.authenticate({
           apiKey: this.apiKey,
           action: this.getActionForTool(call.name),
         });

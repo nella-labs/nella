@@ -11,6 +11,17 @@
 export type {
   SyncTier,
   SyncConfig,
+  ConflictResolution,
+  CloudSyncMode,
+  CloudSyncOptions,
+  CloudSyncRunStatus,
+  CloudSyncFileStatus,
+  CloudSyncFileState,
+  CloudSyncPendingChange,
+  CloudSyncConflict,
+  CloudSyncStats,
+  CloudSyncHistoryEntry,
+  CloudSyncState,
   Workspace,
   WorkspaceConfig,
   WorkspaceStats,
@@ -32,6 +43,8 @@ export type {
   SyncManagerEventHandler,
 } from "./types";
 
+export { DEFAULT_CLOUD_SYNC_OPTIONS } from "./types";
+
 // Adapters
 export {
   LocalSyncAdapter,
@@ -50,3 +63,28 @@ export {
   getSyncStatus,
   disconnectSync,
 } from "./manager";
+
+// Cloud Sync Engine
+export {
+  WorkspaceCloudSyncManager,
+  createWorkspaceCloudSyncManager,
+  CloudSyncStateStore,
+  computeLocalManifest,
+  rebuildFromChunks,
+  splitBuffer,
+  sha256,
+  encodePathForObject,
+  collectWorkspaceFiles,
+  shouldSyncPath,
+  loadIgnorePatterns,
+  toPosixPath,
+  BandwidthThrottle,
+  buildConflict,
+} from "./cloud";
+
+export type {
+  CloudObjectStorage,
+  FileManifest,
+  DeltaChunk,
+  LocalManifestWithChunks,
+} from "./cloud";

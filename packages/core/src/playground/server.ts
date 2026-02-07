@@ -239,7 +239,7 @@ export class PlaygroundServer {
   private workspaces: Map<string, Workspace> = new Map();
   private toolHandlers: Map<string, McpToolHandler> = new Map();
   private registry: WorkspaceRegistry;
-  private authenticator: Authenticator;
+  private authenticator: Authenticator | null = null;
   private rateLimiter: RateLimiter;
   private contextManager: ContextManager;
   private costConfig: CostConfig;
@@ -253,7 +253,6 @@ export class PlaygroundServer {
     this.costConfig = DEFAULT_COST_CONFIG;
     this.sessionManager = new SessionManager(this.config);
     this.registry = getWorkspaceRegistry(this.config.storagePath);
-    this.authenticator = createAuthenticator(this.config.storagePath);
     this.rateLimiter = createRateLimiter();
     this.contextManager = createContextManager(this.config.storagePath);
   }
@@ -283,6 +282,10 @@ export class PlaygroundServer {
         "Playground server requires 'express' and 'ws' packages. " +
         "Install them with: npm install express ws"
       );
+    }
+
+    if (this.config.authEnabled && !this.authenticator) {
+      this.authenticator = await createAuthenticator(this.config.storagePath);
     }
 
     const app = express();
@@ -856,7 +859,7 @@ export class PlaygroundServer {
     if (!handler) {
       handler = createMcpToolHandler({
         workspace,
-        authenticator: this.config.authEnabled ? this.authenticator : undefined,
+        authenticator: this.config.authEnabled ? (this.authenticator || undefined) : undefined,
         rateLimiter: this.rateLimiter,
         contextManager: this.contextManager,
       });

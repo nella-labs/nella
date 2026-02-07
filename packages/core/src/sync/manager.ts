@@ -10,6 +10,9 @@ import type {
   SyncConfig,
   SyncTier,
   SyncStatus,
+  CloudSyncOptions,
+  CloudSyncStats,
+  CloudSyncState,
   SyncManagerEvent,
   SyncManagerEventHandler,
   Workspace,
@@ -26,6 +29,10 @@ import type {
 import { createLocalAdapter } from "./adapters/local";
 import { createSupabaseAdapter } from "./adapters/supabase";
 import { createGCPAdapter } from "./adapters/gcp";
+import {
+  createWorkspaceCloudSyncManager,
+  type WorkspaceCloudSyncManager,
+} from "./cloud";
 
 // ============================================================================
 // Sync Manager
@@ -37,6 +44,7 @@ export class SyncManager {
   private primaryAdapter: SyncAdapter | null = null;
   private handlers: Set<SyncManagerEventHandler> = new Set();
   private lastSyncAt: Date | null = null;
+  private cloudSyncManagers: Map<string, WorkspaceCloudSyncManager> = new Map();
   
   /**
    * Initialize the sync manager with configuration
@@ -83,12 +91,16 @@ export class SyncManager {
    */
   getStatus(): SyncStatus {
     const tier = this.primaryAdapter?.tier || "local";
+    const pendingChanges = Array.from(this.cloudSyncManagers.values()).reduce(
+      (sum, manager) => sum + manager.getState().pending.length,
+      0
+    );
     
     return {
       tier,
       isConnected: this.primaryAdapter?.isReady() || false,
       lastSyncAt: this.lastSyncAt,
-      pendingChanges: 0, // TODO: Track pending changes
+      pendingChanges,
     };
   }
   
@@ -120,6 +132,11 @@ export class SyncManager {
    * Disconnect all adapters
    */
   async disconnect(): Promise<void> {
+    for (const manager of this.cloudSyncManagers.values()) {
+      await manager.destroy();
+    }
+    this.cloudSyncManagers.clear();
+
     for (const [tier, adapter] of this.adapters) {
       await adapter.disconnect();
       this.emit({ type: "disconnected", tier });
@@ -153,6 +170,88 @@ export class SyncManager {
       default:
         throw new Error(`Unknown sync tier: ${tier}`);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cloud File Sync Operations
+  // ---------------------------------------------------------------------------
+
+  async createCloudSync(
+    workspaceId: string,
+    workspacePath: string,
+    options: Partial<CloudSyncOptions> = {}
+  ): Promise<WorkspaceCloudSyncManager> {
+    if (!this.config) {
+      throw new Error("SyncManager not initialized. Call init() first.");
+    }
+    if (!this.config.cloudStorageConfig) {
+      throw new Error("cloudStorageConfig is required to create cloud sync");
+    }
+
+    const existing = this.cloudSyncManagers.get(workspaceId);
+    if (existing) {
+      return existing;
+    }
+
+    const manager = createWorkspaceCloudSyncManager(
+      workspaceId,
+      workspacePath,
+      this.config,
+      options
+    );
+    manager.onEvent((event) => this.emit(event));
+    await manager.init();
+    this.cloudSyncManagers.set(workspaceId, manager);
+    return manager;
+  }
+
+  async syncWorkspace(workspaceId: string): Promise<CloudSyncStats> {
+    const manager = await this.getOrCreateCloudSync(workspaceId);
+    const stats = await manager.sync();
+    this.lastSyncAt = new Date();
+    return stats;
+  }
+
+  async pushWorkspace(workspaceId: string): Promise<CloudSyncStats> {
+    const manager = await this.getOrCreateCloudSync(workspaceId);
+    const stats = await manager.push();
+    this.lastSyncAt = new Date();
+    return stats;
+  }
+
+  async pullWorkspace(workspaceId: string): Promise<CloudSyncStats> {
+    const manager = await this.getOrCreateCloudSync(workspaceId);
+    const stats = await manager.pull();
+    this.lastSyncAt = new Date();
+    return stats;
+  }
+
+  getCloudSyncState(workspaceId: string): CloudSyncState | null {
+    const manager = this.cloudSyncManagers.get(workspaceId);
+    return manager ? manager.getState() : null;
+  }
+
+  async resolveCloudConflict(
+    workspaceId: string,
+    conflictId: string,
+    resolution: "local-wins" | "remote-wins"
+  ): Promise<void> {
+    const manager = await this.getOrCreateCloudSync(workspaceId);
+    await manager.resolveConflict(conflictId, resolution);
+  }
+
+  private async getOrCreateCloudSync(
+    workspaceId: string
+  ): Promise<WorkspaceCloudSyncManager> {
+    const existing = this.cloudSyncManagers.get(workspaceId);
+    if (existing) {
+      return existing;
+    }
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+    return await this.createCloudSync(workspaceId, workspace.rootPath);
   }
   
   // ---------------------------------------------------------------------------
