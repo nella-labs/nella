@@ -14,6 +14,9 @@ export type { ServerContext } from "./server";
 // Re-export the server start function
 export { startMcpServer } from "./server";
 
+// Re-export the hosted (HTTP) server
+export { startHostedServer } from "./hosted-server";
+
 // Re-export tool registration for custom servers
 export {
   registerValidationTools,
