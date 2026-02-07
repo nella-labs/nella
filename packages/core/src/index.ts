@@ -388,17 +388,30 @@ export {
   initSync,
   getSyncStatus,
   disconnectSync,
+  DEFAULT_CLOUD_SYNC_OPTIONS,
   LocalSyncAdapter,
   SupabaseSyncAdapter,
   GCPSyncAdapter,
   createLocalAdapter,
   createSupabaseAdapter,
   createGCPAdapter,
+  createWorkspaceCloudSyncManager,
 } from "./sync";
 
 export type {
   SyncAdapter,
   SyncConfig,
+  ConflictResolution as SyncConflictResolution,
+  CloudSyncMode,
+  CloudSyncOptions,
+  CloudSyncRunStatus,
+  CloudSyncFileStatus,
+  CloudSyncFileState,
+  CloudSyncPendingChange,
+  CloudSyncConflict,
+  CloudSyncStats,
+  CloudSyncHistoryEntry,
+  CloudSyncState,
   SyncStatus,
   SyncEvent,
   Workspace as SyncWorkspace,
@@ -411,7 +424,25 @@ export type {
   VectorSearchParams,
   TextSearchParams,
   HybridSearchParams,
+  CloudObjectStorage,
+  FileManifest,
+  DeltaChunk,
+  LocalManifestWithChunks,
 } from "./sync";
+
+// Legacy Cloud Sync Compatibility
+export { CloudSyncManager, createCloudSyncManager } from "./cloud-sync/manager";
+export type {
+  CloudSyncConfig,
+  ConflictResolution,
+  SyncFileState,
+  PendingChange,
+  SyncHistoryEntry,
+  SyncStats as LegacyCloudSyncStats,
+  SyncState as LegacyCloudSyncState,
+  SyncEvent as LegacyCloudSyncEvent,
+  SyncError as LegacyCloudSyncError,
+} from "./cloud-sync/types";
 
 // =============================================================================
 // MCP Tools

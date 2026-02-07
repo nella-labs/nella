@@ -128,11 +128,15 @@ export type BackendType = "memory" | "redis" | "sqlite" | "auto";
 
 /** Redis connection options */
 export interface RedisOptions {
+  /** Redis URL (redis:// or rediss:// for TLS). Falls back to REDIS_URL env var. */
+  url?: string;
   host?: string;
   port?: number;
   password?: string;
   db?: number;
   keyPrefix?: string;
+  /** Enable TLS (automatically set when using rediss:// URLs) */
+  tls?: boolean;
   cluster?: boolean;
   sentinels?: Array<{ host: string; port: number }>;
 }

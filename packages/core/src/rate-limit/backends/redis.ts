@@ -10,6 +10,43 @@ import type { RateLimitState, RateLimitBucket, RedisOptions } from "../types";
 import { RATE_WINDOWS } from "../types";
 import type { RateLimitBackend } from "./interface";
 
+/**
+ * Parse a Redis URL (redis:// or rediss://) into connection options.
+ * Supports formats:
+ *   redis://[:password@]host[:port][/db]
+ *   rediss://[:password@]host[:port][/db]  (TLS)
+ *   redis://username:password@host[:port][/db]
+ */
+function parseRedisUrl(url: string): RedisOptions & { tls?: boolean } {
+  try {
+    const parsed = new URL(url);
+    const options: RedisOptions & { tls?: boolean } = {};
+
+    options.host = parsed.hostname || "localhost";
+    options.port = parsed.port ? parseInt(parsed.port, 10) : 6379;
+
+    // Password from URL (redis://default:PASSWORD@host or redis://:PASSWORD@host)
+    if (parsed.password) {
+      options.password = decodeURIComponent(parsed.password);
+    }
+
+    // Database number from path (e.g., /0, /1)
+    const dbPath = parsed.pathname?.replace(/^\//, "");
+    if (dbPath && /^\d+$/.test(dbPath)) {
+      options.db = parseInt(dbPath, 10);
+    }
+
+    // TLS for rediss:// scheme (used by Redis Cloud, Upstash, etc.)
+    if (parsed.protocol === "rediss:") {
+      options.tls = true;
+    }
+
+    return options;
+  } catch {
+    return {};
+  }
+}
+
 /** Lua script for atomic bucket increment with window expiry */
 const INCREMENT_SCRIPT = `
 local key = KEYS[1]
@@ -43,10 +80,34 @@ export class RedisBackend implements RateLimitBackend {
 
   constructor(options: RedisOptions = {}) {
     this.keyPrefix = options.keyPrefix || "nella:ratelimit:";
-    this.init(options);
+
+    // Resolve connection options:
+    // 1. Explicit url in options
+    // 2. REDIS_URL environment variable
+    // 3. Explicit host/port/password in options
+    // 4. Defaults (localhost:6379)
+    const envUrl = process.env.REDIS_URL;
+    const url = options.url || envUrl;
+
+    if (url) {
+      const parsed = parseRedisUrl(url);
+      // Merge: explicit options override URL-parsed values
+      this.init({
+        host: options.host || parsed.host,
+        port: options.port || parsed.port,
+        password: options.password || parsed.password,
+        db: options.db ?? parsed.db,
+        keyPrefix: options.keyPrefix,
+        cluster: options.cluster,
+        sentinels: options.sentinels,
+        tls: options.tls ?? parsed.tls,
+      });
+    } else {
+      this.init(options);
+    }
   }
 
-  private init(options: RedisOptions): void {
+  private init(options: RedisOptions & { tls?: boolean }): void {
     try {
       const Redis = require("ioredis");
 
@@ -55,6 +116,7 @@ export class RedisBackend implements RateLimitBackend {
           redisOptions: {
             password: options.password,
             db: options.db || 0,
+            ...(options.tls ? { tls: {} } : {}),
           },
         });
       } else {
@@ -64,6 +126,7 @@ export class RedisBackend implements RateLimitBackend {
           password: options.password,
           db: options.db || 0,
           lazyConnect: true,
+          ...(options.tls ? { tls: {} } : {}),
         });
       }
 
