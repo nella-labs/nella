@@ -3,7 +3,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@10
 
 # Copy workspace config files first (for layer caching)
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.json ./
@@ -31,7 +31,7 @@ FROM node:20-slim AS production
 
 WORKDIR /app
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@10
 
 # Copy workspace config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./

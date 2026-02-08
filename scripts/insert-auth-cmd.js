@@ -10,7 +10,7 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
   console.log(logo);
   console.log(tagline);
 
-  const serverUrl = args.serverUrl || "https://nella-mcp-production.up.railway.app/mcp";`;
+  const serverUrl = args.serverUrl || "https://mcp.getnella.dev/mcp";\`;
 
 if (!cli.includes(searchStr)) {
   console.error('ERROR: search string not found in cli.ts');
@@ -83,7 +83,7 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
   console.log(logo);
   console.log(tagline);
 
-  const serverUrl = args.serverUrl || "https://nella-mcp-production.up.railway.app/mcp";`;
+  const serverUrl = args.serverUrl || "https://mcp.getnella.dev/mcp";\`;
 
 const updated = cli.replace(searchStr, authCommandBlock);
 fs.writeFileSync('packages/nella/src/cli.ts', updated);

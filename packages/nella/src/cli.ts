@@ -777,7 +777,7 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
     return;
   }
 
-  const serverUrl = args.serverUrl || "https://nella-mcp-production.up.railway.app/mcp";
+  const serverUrl = args.serverUrl || "https://mcp.getnella.dev/mcp";
   let apiKey = args.apiKey || process.env.NELLA_API_KEY;
   const client = args.client || "all";
 
