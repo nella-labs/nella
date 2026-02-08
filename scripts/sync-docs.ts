@@ -88,6 +88,31 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     transform: transformGeneric,
   },
   {
+    source: "core/agents.md",
+    target: "guides/agents.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "core/playground.md",
+    target: "guides/playground.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "core/export.md",
+    target: "guides/export.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "core/sync.md",
+    target: "guides/cloud-sync.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "core/rate-limiting.md",
+    target: "guides/rate-limiting.mdx",
+    transform: transformGeneric,
+  },
+  {
     source: "core/types.md",
     target: "api-reference/types.mdx",
     transform: transformGeneric,
@@ -179,7 +204,7 @@ function transformGeneric(content: string, filename: string): string {
   const description = extractDescription(content);
 
   // Remove the first H1 title (we'll use frontmatter title)
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   // Add imports for MDX components
   const imports = [
@@ -200,11 +225,11 @@ function transformToolsReference(content: string, filename: string): string {
   const title = "MCP Tools Reference";
   const description = "Complete reference for all tools exposed by the Nella MCP Server.";
 
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   const imports = [
-    "import Callout from '../../../../components/mdx/Callout.astro';",
-    "import APITable from '../../../../components/mdx/APITable.astro';",
+    "import Callout from '../../../components/mdx/Callout.astro';",
+    "import APITable from '../../../components/mdx/APITable.astro';",
     "",
   ].join("\n");
 
@@ -218,11 +243,11 @@ function transformCoreApi(content: string, filename: string): string {
   const title = "Core API Reference";
   const description = "Complete API documentation for @usenella/core TypeScript library.";
 
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   const imports = [
-    "import Callout from '../../../../components/mdx/Callout.astro';",
-    "import APITable from '../../../../components/mdx/APITable.astro';",
+    "import Callout from '../../../components/mdx/Callout.astro';",
+    "import APITable from '../../../components/mdx/APITable.astro';",
     "",
   ].join("\n");
 
@@ -236,7 +261,7 @@ function transformConfiguration(content: string, filename: string): string {
   const title = "Configuration Reference";
   const description = "Configuration options and task definition schema for @usenella/core.";
 
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   const imports = [
     "import Callout from '../../../components/mdx/Callout.astro';",
@@ -253,7 +278,7 @@ function transformUsageGuide(content: string, filename: string): string {
   const title = "How to Use Nella";
   const description = "End-to-end guide for using Nella to validate agent changes.";
 
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   const imports = [
     "import Callout from '../../../components/mdx/Callout.astro';",
@@ -270,10 +295,10 @@ function transformCliCommands(content: string, filename: string): string {
   const title = "CLI Commands";
   const description = "Complete reference for the Nella CLI commands.";
 
-  let transformed = content.replace(/^#\s+.+\n+/, "");
+  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   const imports = [
-    "import Callout from '../../components/mdx/Callout.astro';",
+    "import Callout from '../../../components/mdx/Callout.astro';",
     "",
   ].join("\n");
 
@@ -290,19 +315,19 @@ function transformCliCommands(content: string, filename: string): string {
 function convertCallouts(content: string): string {
   // Convert > **Note:** ... to <Callout type="info">
   content = content.replace(
-    />\s*\*\*Note:\*\*\s*(.+?)(?=\n\n|\n>|\n#|$)/gs,
+    />\s*\*\*Note:\*\*\s*(.+?)(?=\r?\n\r?\n|\r?\n>|\r?\n#|$)/gs,
     '<Callout type="info" title="Note">\n  $1\n</Callout>'
   );
 
   // Convert > **Warning:** ... to <Callout type="warning">
   content = content.replace(
-    />\s*\*\*Warning:\*\*\s*(.+?)(?=\n\n|\n>|\n#|$)/gs,
+    />\s*\*\*Warning:\*\*\s*(.+?)(?=\r?\n\r?\n|\r?\n>|\r?\n#|$)/gs,
     '<Callout type="warning" title="Warning">\n  $1\n</Callout>'
   );
 
   // Convert > **Tip:** ... to <Callout type="tip">
   content = content.replace(
-    />\s*\*\*Tip:\*\*\s*(.+?)(?=\n\n|\n>|\n#|$)/gs,
+    />\s*\*\*Tip:\*\*\s*(.+?)(?=\r?\n\r?\n|\r?\n#|$)/gs,
     '<Callout type="tip" title="Tip">\n  $1\n</Callout>'
   );
 
