@@ -26,7 +26,6 @@ import { McpToolHandler, createMcpToolHandler } from "../mcp";
 import { Authenticator, createAuthenticator } from "../auth";
 import { RateLimiter, createRateLimiter } from "../rate-limit";
 import { ContextManager, createContextManager } from "../context-sharing";
-import { AgentRunner } from "../agents";
 
 // Dynamic imports for express and ws (they may not be installed)
 let express: typeof import("express") | null = null;
@@ -239,7 +238,6 @@ export class PlaygroundServer {
   private clients: Map<string, WebSocketClient> = new Map();
   private workspaces: Map<string, Workspace> = new Map();
   private toolHandlers: Map<string, McpToolHandler> = new Map();
-  private agentRunners: Map<string, AgentRunner> = new Map();
   private registry: WorkspaceRegistry;
   private authenticator: Authenticator | null = null;
   private rateLimiter: RateLimiter;
@@ -812,12 +810,6 @@ export class PlaygroundServer {
         case "context:set":
           await this.handleContextSet(client, message.key, message.value);
           break;
-        case "agent:start":
-          await this.handleAgentStart(client, message);
-          break;
-        case "agent:stop":
-          this.handleAgentStop(client);
-          break;
       }
     } catch (error) {
       client.send({
@@ -1050,144 +1042,6 @@ export class PlaygroundServer {
   }
 
   // =============================================================================
-  // Agent Handlers
-  // =============================================================================
-
-  private async handleAgentStart(
-    client: WebSocketClient,
-    message: { provider: string; model: string; apiKey: string; prompt: string; maxTurns?: number; maxTokens?: number }
-  ): Promise<void> {
-    if (!client.sessionId) {
-      throw new Error("Not subscribed to a session");
-    }
-
-    const session = this.sessionManager.get(client.sessionId);
-    if (!session) {
-      throw new Error("Session not found");
-    }
-
-    // Stop any existing runner for this session
-    const existingRunner = this.agentRunners.get(session.id);
-    if (existingRunner && existingRunner.getStatus() === "running") {
-      existingRunner.stop();
-    }
-
-    const workspace = this.workspaces.get(this.config.workspacePath);
-    if (!workspace) {
-      throw new Error("Workspace not found");
-    }
-
-    // Get or create tool handler
-    let handler = this.toolHandlers.get(session.id);
-    if (!handler) {
-      handler = createMcpToolHandler({
-        workspace,
-        authenticator: this.config.authEnabled ? (this.authenticator || undefined) : undefined,
-        rateLimiter: this.rateLimiter,
-        contextManager: this.contextManager,
-      });
-      this.toolHandlers.set(session.id, handler);
-    }
-
-    const runner = new AgentRunner(handler);
-    this.agentRunners.set(session.id, runner);
-
-    // Wire events to WS broadcast
-    runner.onEvent((event) => {
-      switch (event.type) {
-        case "status":
-          this.broadcast(session.id, { type: "agent:status", status: event.status });
-          break;
-        case "turn:start":
-          this.broadcast(session.id, { type: "agent:turn:start", turnNumber: event.turnNumber });
-          break;
-        case "turn:thinking":
-          this.broadcast(session.id, {
-            type: "agent:turn:thinking",
-            turnNumber: event.turnNumber,
-            content: event.content,
-          });
-          // Also add as chain of thought
-          this.sessionManager.addChainOfThought(session.id, {
-            id: crypto.randomBytes(4).toString("hex"),
-            type: "thought",
-            content: event.content,
-            timestamp: new Date().toISOString(),
-          });
-          break;
-        case "turn:tool_call":
-          this.broadcast(session.id, {
-            type: "agent:turn:tool_call",
-            turnNumber: event.turnNumber,
-            toolName: event.toolName,
-            args: event.args,
-          });
-          break;
-        case "turn:tool_result":
-          this.broadcast(session.id, {
-            type: "agent:turn:tool_result",
-            turnNumber: event.turnNumber,
-            toolName: event.toolName,
-            result: event.result,
-            success: event.success,
-          });
-          break;
-        case "turn:end":
-          this.broadcast(session.id, {
-            type: "agent:turn:end",
-            turnNumber: event.turn.turnNumber,
-            tokenUsage: event.turn.tokenUsage,
-            cost: event.turn.cost,
-            durationMs: event.turn.durationMs,
-          });
-          break;
-        case "done":
-          this.broadcast(session.id, {
-            type: "agent:done",
-            status: event.result.status,
-            totalTokens: event.result.totalTokenUsage.totalTokens,
-            totalCost: event.result.totalCost,
-            totalDurationMs: event.result.totalDurationMs,
-            turns: event.result.turns.length,
-            error: event.result.error,
-          });
-          this.agentRunners.delete(session.id);
-          break;
-        case "error":
-          this.broadcast(session.id, {
-            type: "error",
-            message: `Agent error: ${event.message}`,
-          });
-          break;
-      }
-    });
-
-    // Run asynchronously — don't await, let the event stream handle progress
-    runner.run({
-      provider: message.provider as "anthropic" | "openai",
-      model: message.model,
-      apiKey: message.apiKey,
-      prompt: message.prompt,
-      maxTurns: message.maxTurns,
-      maxTokens: message.maxTokens,
-    }).catch((error) => {
-      this.broadcast(session.id, {
-        type: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    });
-  }
-
-  private handleAgentStop(client: WebSocketClient): void {
-    if (!client.sessionId) return;
-
-    const runner = this.agentRunners.get(client.sessionId);
-    if (runner) {
-      runner.stop();
-      this.agentRunners.delete(client.sessionId);
-    }
-  }
-
   // =============================================================================
   // Helpers
   // =============================================================================
