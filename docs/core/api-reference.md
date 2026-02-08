@@ -9,6 +9,16 @@ Complete API documentation for `@usenella/core`.
 - [Safety](#safety)
 - [Utilities](#utilities)
 - [Context Tracking](#context-tracking)
+- [Indexing & RAG](#indexing--rag)
+- [Workspace Management](#workspace-management)
+- [Auth](#auth)
+- [Rate Limiting](#rate-limiting)
+- [Context Sharing](#context-sharing)
+- [Sync](#sync)
+- [MCP Tools](#mcp-tools)
+- [Export](#export)
+- [Playground](#playground)
+- [Agents](#agents)
 
 ---
 
@@ -554,6 +564,688 @@ const conflicts = manager.assumptions.getConflicts(['src/users.ts']);
 
 Store file change history across runs.
 
-## Advanced Modules
+## Advanced Module APIs
 
-Nella Core also ships additional modules for indexing, workspace management, auth, and export workflows. See the [Core Modules Guide](./modules.md) for setup and examples.
+The following modules are documented in detail below. See also the [Core Modules Guide](./modules.md) for setup and usage examples.
+
+---
+
+## Indexing & RAG
+
+```typescript
+import {
+  IndexManager,
+  createIndexManager,
+  Chunker,
+  Embedder,
+  VectorStore,
+  LexicalIndex,
+  HybridSearcher,
+  CodeVerifier
+} from '@usenella/core';
+```
+
+### `IndexManager`
+
+Manages incremental code indexing with hybrid search (vector + lexical).
+
+```typescript
+const manager = createIndexManager({
+  embedder: 'voyage-code-2',   // 'voyage-code-2' | 'openai' | 'local'
+  dimensions: 1536,
+  chunkStrategy: 'ast'         // AST-based code chunking
+});
+
+// Index a workspace (incremental — skips unchanged files)
+await manager.index('/path/to/repo');
+
+// Search the index
+const results = await manager.search('user authentication middleware');
+
+// Verify code against the index
+const verification = await manager.verify(codeSnippet);
+```
+
+**Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `index(repoPath)` | Incrementally index a workspace |
+| `search(query, options?)` | Hybrid search (vector + lexical with RRF fusion) |
+| `verify(code)` | Verify code imports/symbols against indexed codebase |
+
+### `Chunker`
+
+AST-based code chunking that respects function/class boundaries.
+
+### `Embedder`
+
+Embedding provider with support for:
+- **Voyage-code-2** (default) — optimized for code
+- **OpenAI** — text-embedding-ada-002 / text-embedding-3-small
+- **Local ONNX** — offline-capable
+
+### `VectorStore`
+
+In-memory vector store with JSON persistence for embeddings.
+
+### `LexicalIndex`
+
+BM25-based lexical index for keyword search.
+
+### `HybridSearcher`
+
+Combines vector and lexical search using Reciprocal Rank Fusion (RRF).
+
+- Default weights: 0.4 vector / 0.6 lexical
+- Fusion constant k=60
+- Optional Cohere reranking
+
+### `CodeVerifier`
+
+Verifies generated code against the indexed codebase:
+- **Import verification** — checks that imported modules exist
+- **Symbol verification** — checks that referenced symbols are exported
+- **API verification** — checks function signatures and types
+
+```typescript
+const verifier = new CodeVerifier(indexManager);
+const result = await verifier.verify({
+  code: agentGeneratedCode,
+  filePath: 'src/users.ts'
+});
+
+console.log(result.issues); // VerifyIssue[]
+```
+
+---
+
+## Workspace Management
+
+```typescript
+import {
+  WorkspaceRegistry,
+  Workspace,
+  WorkspaceSwitcher,
+  FileLock,
+  RegistryBackupManager,
+  RegistryMigrationManager,
+  WorkspaceValidator,
+  FileWatcher,
+  LRUCache
+} from '@usenella/core';
+```
+
+### `WorkspaceRegistry`
+
+Multi-workspace management with CRUD operations and persistence to `workspaces.json`.
+
+```typescript
+const registry = new WorkspaceRegistry();
+
+// Register a workspace
+const ws = await registry.register('/path/to/project', { name: 'my-project' });
+
+// List all workspaces
+const all = registry.list();
+
+// Get by path
+const found = registry.get('/path/to/project');
+
+// Remove a workspace
+registry.remove(ws.id);
+```
+
+### `Workspace`
+
+Individual workspace with integrated indexing, context, and file watching.
+
+```typescript
+const workspace = new Workspace('/path/to/project');
+
+// Get workspace status
+const status = workspace.getStatus();
+
+// Start file watching
+workspace.startWatching();
+workspace.stopWatching();
+```
+
+### `WorkspaceSwitcher`
+
+Switch the active workspace in multi-workspace environments.
+
+### `FileLock`
+
+Concurrent file access safety with lock/unlock operations.
+
+### `RegistryBackupManager`
+
+Automatic backup and restore for the workspace registry.
+
+### `RegistryMigrationManager`
+
+Schema migration for workspace registry data across versions.
+
+### `WorkspaceValidator`
+
+Integrity checks for workspace configuration and state.
+
+### `FileWatcher`
+
+Debounced file change detection for triggering re-indexing.
+
+### `LRUCache`
+
+Memory-bounded LRU cache for workspace data.
+
+---
+
+## Auth
+
+```typescript
+import {
+  KeyManager,
+  AgentManager,
+  Authenticator,
+  TokenManager,
+  AuditLogManager,
+  IPFilter,
+  RequestSigner
+} from '@usenella/core';
+```
+
+### `KeyManager`
+
+CRUD for API keys with permissions, rate limits, expiry, and revocation.
+
+```typescript
+const keyManager = new KeyManager(store);
+
+// Create a key
+const key = await keyManager.create({
+  name: 'production-key',
+  permissions: ['read', 'write', 'admin'],
+  rateLimit: { maxRequests: 1000, windowMs: 60000 },
+  expiresAt: new Date('2026-12-31')
+});
+
+// Validate a key
+const valid = await keyManager.validate('nella_abc123...');
+
+// Revoke a key
+await keyManager.revoke(key.id);
+
+// List all keys
+const keys = await keyManager.list();
+```
+
+### `AgentManager`
+
+Manage registered AI agents.
+
+```typescript
+const agentManager = new AgentManager(store);
+
+// Register an agent
+const agent = await agentManager.register({
+  name: 'my-claude',
+  type: 'copilot', // 'copilot' | 'cursor' | 'cline' | 'aider' | 'continue' | 'custom'
+  apiKeyId: key.id
+});
+
+// List agents
+const agents = await agentManager.list();
+```
+
+### `Authenticator`
+
+Validates API keys, checks permissions, and enforces rate limits.
+
+```typescript
+const auth = new Authenticator(keyManager, rateLimiter);
+
+const result = await auth.authenticate(request);
+if (!result.authenticated) {
+  console.log('Denied:', result.reason);
+}
+```
+
+### `TokenManager`
+
+JWT token creation and verification.
+
+```typescript
+const tokenManager = new TokenManager(secret);
+
+// Create a token
+const token = tokenManager.create({ userId: '123', permissions: ['read'] });
+
+// Verify a token
+const payload = tokenManager.verify(token);
+```
+
+### `AuditLogManager`
+
+Full audit trail of all auth operations.
+
+```typescript
+const audit = new AuditLogManager(store);
+
+audit.log({
+  action: 'key.created',
+  userId: '123',
+  details: { keyName: 'production-key' }
+});
+
+const entries = await audit.query({ action: 'key.created', limit: 50 });
+```
+
+### `IPFilter`
+
+IP-based access control with allow/deny lists.
+
+```typescript
+const filter = new IPFilter({
+  allowList: ['192.168.1.0/24'],
+  denyList: ['10.0.0.1']
+});
+
+const allowed = filter.check('192.168.1.100'); // true
+```
+
+### `RequestSigner`
+
+HMAC request signing for secure API communication.
+
+```typescript
+const signer = new RequestSigner(secret);
+
+// Sign a request
+const signature = signer.sign({ method: 'POST', path: '/api/validate', body });
+
+// Verify a signature
+const valid = signer.verify(request, signature);
+```
+
+---
+
+## Rate Limiting
+
+```typescript
+import {
+  RateLimiter,
+  MemoryBackend,
+  RedisBackend,
+  SQLiteBackend,
+  SlidingWindowAlgorithm,
+  TokenBucketAlgorithm,
+  PriorityHandler,
+  DynamicLimitAdjuster
+} from '@usenella/core';
+```
+
+### `RateLimiter`
+
+Main rate limiter with pluggable backend and algorithm.
+
+```typescript
+// In-memory (default)
+const limiter = new RateLimiter({
+  backend: new MemoryBackend(),
+  algorithm: new SlidingWindowAlgorithm(),
+  maxRequests: 100,
+  windowMs: 60000
+});
+
+// Redis-backed (production)
+const limiter = new RateLimiter({
+  backend: new RedisBackend('redis://localhost:6379'),
+  algorithm: new TokenBucketAlgorithm({ refillRate: 10, capacity: 100 }),
+  maxRequests: 1000,
+  windowMs: 60000
+});
+
+// Check rate limit
+const result = await limiter.check('user-123');
+if (!result.allowed) {
+  console.log('Rate limited. Retry after:', result.retryAfterMs);
+}
+```
+
+### Backends
+
+| Backend | Use Case | Persistence |
+|---------|----------|-------------|
+| `MemoryBackend` | Development, single-process | In-memory (lost on restart) |
+| `RedisBackend` | Production, multi-process | Redis (persistent) |
+| `SQLiteBackend` | Single-server production | SQLite file (persistent) |
+
+### Algorithms
+
+| Algorithm | Description |
+|-----------|-------------|
+| `SlidingWindowAlgorithm` | Sliding window counter with smooth rate limiting |
+| `TokenBucketAlgorithm` | Token bucket with configurable refill rate and capacity |
+
+### `PriorityHandler`
+
+Priority-based request handling.
+
+```typescript
+const handler = new PriorityHandler(limiter);
+
+// Requests with higher priority get through first
+const result = await handler.handle(request, 'critical');
+// Priority levels: 'critical' | 'high' | 'normal' | 'low'
+```
+
+### `DynamicLimitAdjuster`
+
+Adaptive rate limits with graceful degradation.
+
+```typescript
+const adjuster = new DynamicLimitAdjuster(limiter, {
+  degradation: {
+    enabled: true,
+    thresholds: [
+      { load: 0.8, reduction: 0.2 },  // At 80% load, reduce limits by 20%
+      { load: 0.95, reduction: 0.5 }   // At 95% load, reduce by 50%
+    ]
+  }
+});
+
+// Adjust limits based on current system load
+await adjuster.adjust();
+```
+
+---
+
+## Context Sharing
+
+```typescript
+import {
+  SharedContextManager,
+  LocalTransport,
+  SupabaseTransport
+} from '@usenella/core';
+```
+
+### `SharedContextManager`
+
+Cross-agent context sharing with versioning, encryption, and channels.
+
+```typescript
+const shared = new SharedContextManager({
+  transport: new LocalTransport('/path/to/.nella/shared'),
+  encryption: true
+});
+
+// Share context
+await shared.set({
+  key: 'auth-approach',
+  value: { strategy: 'JWT', library: 'jsonwebtoken' },
+  type: 'decision',
+  visibility: 'workspace',
+  channel: 'architecture'
+});
+
+// Get shared context
+const entry = await shared.get('auth-approach');
+
+// List all context in a channel
+const entries = await shared.list({ channel: 'architecture' });
+```
+
+**Context Types:** `decision`, `snippet`, `schema`, `api`, `config`, `dependency`, `test`, `error`, `note`, `reference`
+
+**Visibility Levels:** `private`, `workspace`, `shared`, `global`
+
+### Transports
+
+| Transport | Description |
+|-----------|-------------|
+| `LocalTransport` | File-based, no network required |
+| `SupabaseTransport` | Supabase-backed with real-time sync |
+
+---
+
+## Sync
+
+```typescript
+import {
+  SyncManager,
+  LocalSyncAdapter,
+  SupabaseSyncAdapter,
+  GCPSyncAdapter,
+  WorkspaceCloudSyncManager
+} from '@usenella/core';
+```
+
+### `SyncManager`
+
+Unified sync with auto-fallback across tiers: local → Supabase → GCP.
+
+```typescript
+const sync = new SyncManager({
+  adapters: [
+    new LocalSyncAdapter('/path/to/.nella'),
+    new SupabaseSyncAdapter({ url: SUPABASE_URL, key: SUPABASE_KEY }),
+    new GCPSyncAdapter({ projectId: 'my-project' })
+  ]
+});
+
+// Sync workspace state
+await sync.push(workspaceState);
+const state = await sync.pull();
+```
+
+### `WorkspaceCloudSyncManager`
+
+Advanced cloud sync engine with:
+- **Delta chunking** — Only sync changed blocks
+- **AES-256-GCM encryption** — End-to-end encryption at rest
+- **Gzip compression** — Bandwidth optimization
+- **Bandwidth throttling** — Configurable throughput limits
+- **Offline queue** — Queue operations when disconnected
+- **Conflict resolution** — 4 strategies: `last-write-wins`, `merge`, `manual`, `server-wins`
+
+```typescript
+const cloudSync = new WorkspaceCloudSyncManager({
+  encryption: { enabled: true, key: process.env.SYNC_KEY },
+  compression: true,
+  bandwidth: { maxBytesPerSecond: 1048576 },
+  conflictStrategy: 'merge'
+});
+```
+
+### Adapters
+
+| Adapter | Backend | Description |
+|---------|---------|-------------|
+| `LocalSyncAdapter` | JSON files | Default, no setup required |
+| `SupabaseSyncAdapter` | PostgreSQL + pgvector | Cloud sync with real-time |
+| `GCPSyncAdapter` | Cloud SQL + Cloud Storage | Enterprise deployments |
+
+> **Note:** The `cloud-sync/` module (`CloudSyncManager`) is deprecated. Use `SyncManager` from the `sync/` module instead.
+
+---
+
+## MCP Tools
+
+```typescript
+import { McpToolHandler, NELLA_TOOLS, createMcpToolHandler } from '@usenella/core';
+```
+
+### `McpToolHandler`
+
+Routes MCP tool calls with authentication and rate limiting.
+
+```typescript
+const handler = createMcpToolHandler({
+  workspace: '/path/to/repo',
+  auth: authenticator,
+  rateLimiter: limiter
+});
+
+const result = await handler.handle('nella_search', { query: 'user auth' });
+```
+
+### `NELLA_TOOLS` (Core-Level — 6 tools)
+
+| Tool | Description |
+|------|-------------|
+| `nella_search` | Search indexed codebase (hybrid vector + lexical) |
+| `nella_verify` | Verify code against indexed codebase |
+| `nella_index` | Index or re-index the workspace |
+| `nella_get_context` | Get shared context entries |
+| `nella_set_context` | Set shared context entries |
+| `nella_status` | Get server/workspace status |
+
+These are the core-level tools. The `@usenella/nella` package exposes an additional 12 tools (validation, safety, context) — see the [MCP Tools Reference](../mcp/tools.md).
+
+---
+
+## Export
+
+```typescript
+import { ExportManager, createExportManager } from '@usenella/core';
+```
+
+### `ExportManager`
+
+Export data in multiple formats.
+
+```typescript
+const exporter = createExportManager('/path/to/output');
+
+// Export tool calls
+await exporter.exportToolCalls(toolCalls, { format: 'json' });
+
+// Export search results
+await exporter.exportSearchResults(results, { format: 'csv' });
+
+// Export verification results
+await exporter.exportVerifications(verifications, { format: 'markdown' });
+
+// Create a bundle (all data)
+await exporter.createBundle({ format: 'html' });
+```
+
+**Supported Formats:** `json`, `csv`, `markdown`, `html`
+
+---
+
+## Playground
+
+```typescript
+import { PlaygroundServer, createPlaygroundServer } from '@usenella/core';
+```
+
+### `PlaygroundServer`
+
+WebSocket + HTTP server for real-time agent debugging.
+
+```typescript
+const server = createPlaygroundServer({
+  port: 3847,
+  host: 'localhost'
+});
+
+await server.start();
+```
+
+**Features:**
+- Real-time session tracking via WebSocket
+- Chain-of-thought visualization
+- Tool call history and timing
+- Token usage and cost tracking
+- HTML dashboard at `http://localhost:3847`
+- WebSocket endpoint at `ws://localhost:3847/ws`
+
+Default port: `3847`
+
+---
+
+## Agents
+
+```typescript
+import {
+  AgentRunner,
+  AgentAdapter,
+  AnthropicAdapter,
+  OpenAIAdapter,
+  createAgentAdapter,
+  MODEL_PRICING
+} from '@usenella/core';
+```
+
+### `AgentRunner`
+
+Tool-use loop runner for multi-turn agent conversations.
+
+```typescript
+const adapter = createAgentAdapter({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+const runner = new AgentRunner(adapter, {
+  maxIterations: 10,
+  tools: nellaTools
+});
+
+const result = await runner.run({
+  prompt: 'Add a GET /users/:id endpoint',
+  systemPrompt: 'You are a coding assistant.'
+});
+
+console.log(result.response);
+console.log(result.toolCalls);
+console.log(result.tokenUsage);
+console.log(result.cost);
+```
+
+### `AgentAdapter`
+
+Base adapter class. Extended by provider-specific adapters.
+
+### `AnthropicAdapter`
+
+Claude API integration (Claude Sonnet 4, Claude Opus 4).
+
+### `OpenAIAdapter`
+
+OpenAI API integration (GPT-4 Turbo, GPT-4o, GPT-4o-mini).
+
+### `createAgentAdapter(config) → AgentAdapter`
+
+Factory function to create the right adapter.
+
+```typescript
+const adapter = createAgentAdapter({
+  provider: 'openai',           // 'anthropic' | 'openai'
+  model: 'gpt-4o',
+  apiKey: process.env.OPENAI_API_KEY
+});
+```
+
+### `MODEL_PRICING`
+
+Cost per token for supported models.
+
+```typescript
+const pricing = MODEL_PRICING['claude-sonnet-4-20250514'];
+// { inputPer1k: 0.003, outputPer1k: 0.015 }
+```
+
+**Supported Models:**
+
+| Model | Provider |
+|-------|----------|
+| `claude-sonnet-4-20250514` | Anthropic |
+| `claude-opus-4-20250514` | Anthropic |
+| `gpt-4-turbo` | OpenAI |
+| `gpt-4o` | OpenAI |
+| `gpt-4o-mini` | OpenAI |

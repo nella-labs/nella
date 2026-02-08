@@ -588,3 +588,248 @@ const task: Task = {
 runAgentWithNella(task, './my-repo', mockAgent)
   .then(result => console.log('Result:', result));
 ```
+
+---
+
+## Agent Runner Examples
+
+### Multi-Turn Tool-Use Loop
+
+```typescript
+import {
+  AgentRunner,
+  createAgentAdapter,
+  MODEL_PRICING,
+  NELLA_TOOLS
+} from '@usenella/core';
+
+// Create an adapter for Claude
+const adapter = createAgentAdapter({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+// Set up the runner with Nella tools
+const runner = new AgentRunner(adapter, {
+  maxIterations: 15,
+  tools: NELLA_TOOLS
+});
+
+// Run the agent
+const result = await runner.run({
+  prompt: 'Add a GET /users/:id endpoint that returns a user by ID. Return 404 if not found.',
+  systemPrompt: 'You are a senior TypeScript developer. Use Nella tools to verify your work.'
+});
+
+console.log('Completed in', result.iterations, 'iterations');
+console.log('Tool calls:', result.toolCalls.map(tc => tc.name));
+console.log('Token usage:', result.tokenUsage);
+console.log('Cost: $' + result.cost.toFixed(4));
+```
+
+### Cost Estimation
+
+```typescript
+import { MODEL_PRICING, estimateAgentCost } from '@usenella/core';
+
+// Estimate cost before running
+const estimated = estimateAgentCost({
+  model: 'gpt-4o',
+  inputTokens: 10000,
+  outputTokens: 5000
+});
+console.log('Estimated cost: $' + estimated.toFixed(4));
+
+// Compare model costs
+for (const [model, pricing] of Object.entries(MODEL_PRICING)) {
+  console.log(`${model}: $${pricing.inputPer1k}/1K in, $${pricing.outputPer1k}/1K out`);
+}
+```
+
+---
+
+## Playground Examples
+
+### Start Playground Server
+
+```typescript
+import { createPlaygroundServer } from '@usenella/core';
+
+const server = createPlaygroundServer({
+  workspacePath: '/path/to/repo',
+  storagePath: '/path/to/repo/.nella/playground',
+  port: 3847,
+});
+
+await server.start();
+console.log('Dashboard: http://localhost:3847');
+console.log('WebSocket: ws://localhost:3847/ws');
+```
+
+### Connect via WebSocket
+
+```typescript
+const ws = new WebSocket('ws://localhost:3847/ws');
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  switch (msg.type) {
+    case 'session-start':
+      console.log('New session:', msg.sessionId);
+      break;
+    case 'tool-call':
+      console.log('Tool:', msg.data.name, '→', msg.data.duration + 'ms');
+      break;
+    case 'cost-update':
+      console.log('Cost so far: $' + msg.data.totalCost.toFixed(4));
+      break;
+  }
+};
+```
+
+---
+
+## Export Examples
+
+### Export Run Data
+
+```typescript
+import { createExportManager } from '@usenella/core';
+
+const exporter = createExportManager();
+
+// Export tool calls as CSV
+await exporter.exportToolCalls(toolCalls, {
+  format: 'csv',
+  outputPath: './reports'
+});
+
+// Create an HTML bundle with all data
+await exporter.export(
+  {
+    toolCalls: allToolCalls,
+    searches: allSearchResults,
+    verifications: allVerifications,
+  },
+  { format: 'html', outputPath: './reports/full-run' }
+);
+```
+
+---
+
+## Sync Examples
+
+### Configure Multi-Tier Sync
+
+```typescript
+import { SyncManager } from '@usenella/core';
+
+const sync = new SyncManager();
+
+// Initialize with GCP tier
+await sync.init({
+  tier: 'gcp',
+  cloudStorageConfig: {
+    bucket: 'nella-artifacts',
+    projectId: 'my-gcp-project',
+  },
+  cloudSync: {
+    conflictResolution: 'merge',
+    include: ['**/*'],
+    exclude: ['**/node_modules/**', '**/.git/**'],
+  },
+});
+
+// Set up cloud sync for a workspace
+await sync.createCloudSync('repo-1', '/path/to/repo', {
+  compression: true,
+  bandwidthLimitKBps: 512,
+});
+
+// Sync the workspace
+await sync.syncWorkspace('repo-1');
+
+// Check sync state
+const state = sync.getCloudSyncState('repo-1');
+console.log('Last sync:', state?.lastSync);
+console.log('Pending changes:', state?.pendingChanges);
+```
+
+---
+
+## Rate Limiting Examples
+
+### Redis-Backed Token Bucket
+
+```typescript
+import {
+  RateLimiter,
+  RedisBackend,
+  TokenBucketAlgorithm,
+  PriorityHandler,
+  DynamicLimitAdjuster,
+} from '@usenella/core';
+
+// Production rate limiter with Redis
+const limiter = new RateLimiter({
+  backend: new RedisBackend(process.env.REDIS_URL),
+  algorithm: new TokenBucketAlgorithm({
+    refillRate: 10,
+    capacity: 100
+  }),
+  maxRequests: 1000,
+  windowMs: 60000
+});
+
+// Priority-based handling
+const handler = new PriorityHandler(limiter);
+await handler.handle(criticalRequest, 'critical');  // Never throttled
+await handler.handle(normalRequest, 'normal');       // Standard limits
+await handler.handle(bulkRequest, 'low');            // Throttled first
+
+// Dynamic adjustment under load
+const adjuster = new DynamicLimitAdjuster(limiter, {
+  degradation: {
+    enabled: true,
+    thresholds: [
+      { load: 0.8, reduction: 0.2 },
+      { load: 0.95, reduction: 0.5 }
+    ]
+  }
+});
+```
+
+---
+
+## Workspace Management Examples
+
+### Multi-Workspace Registry
+
+```typescript
+import {
+  createWorkspaceRegistry,
+  createWorkspaceSwitcher,
+  RegistryBackupManager,
+} from '@usenella/core';
+
+const registry = createWorkspaceRegistry('/path/to/.nella');
+
+// Register multiple workspaces
+const backend = registry.register('/repos/backend', 'Backend API');
+const frontend = registry.register('/repos/frontend', 'Frontend App');
+const shared = registry.register('/repos/shared-libs', 'Shared Libraries');
+
+// Switch between them
+const switcher = createWorkspaceSwitcher({ registry });
+
+for (const ws of registry.list()) {
+  const workspace = await switcher.switchTo(ws.id);
+  console.log(`Indexing ${ws.name}...`);
+  await workspace.index();
+}
+
+// Backup the registry
+const backup = new RegistryBackupManager(registry);
+await backup.create();
+```

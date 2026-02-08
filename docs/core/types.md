@@ -8,6 +8,15 @@ Complete type definitions for `@usenella/core`.
 - [Result Types](#result-types)
 - [Agent Types](#agent-types)
 - [Context Types](#context-types)
+- [Indexing Types](#indexing-types)
+- [Auth Types](#auth-types)
+- [Rate Limiting Types](#rate-limiting-types)
+- [Context Sharing Types](#context-sharing-types)
+- [Sync Types](#sync-types)
+- [Workspace Types](#workspace-types)
+- [Export Types](#export-types)
+- [Playground Types](#playground-types)
+- [Agent Runner Types](#agent-runner-types)
 
 ---
 
@@ -481,5 +490,599 @@ interface DependencyDiff {
     to?: string;
     type: "added" | "removed" | "updated";
   }>;
+}
+```
+
+---
+
+## Indexing Types
+
+```typescript
+import type {
+  CodeChunk,
+  ChunkType,
+  CodeSymbol,
+  SearchQuery,
+  SearchFilter,
+  SearchResponse,
+  SearchResult,
+  VerifyCodeRequest,
+  VerifyCodeResult,
+  VerifyIssue,
+  IndexConfig
+} from '@usenella/core';
+```
+
+### `CodeChunk`
+
+A chunk of code produced by the AST-based chunker.
+
+```typescript
+interface CodeChunk {
+  id: string;                      // Unique chunk identifier
+  filePath: string;                // Source file path
+  content: string;                 // Chunk content
+  type: ChunkType;                 // Type of code element
+  name: string;                    // Symbol name (function, class, etc.)
+  startLine: number;               // Start line in source file
+  endLine: number;                 // End line in source file
+  symbols: CodeSymbol[];           // Symbols defined in chunk
+  embedding?: number[];            // Vector embedding (if computed)
+}
+```
+
+### `ChunkType`
+
+```typescript
+type ChunkType =
+  | 'function'
+  | 'class'
+  | 'method'
+  | 'interface'
+  | 'type'
+  | 'enum'
+  | 'variable'
+  | 'import'
+  | 'export'
+  | 'module'
+  | 'other';
+```
+
+### `CodeSymbol`
+
+```typescript
+interface CodeSymbol {
+  name: string;                    // Symbol name
+  kind: string;                    // Symbol kind (function, class, etc.)
+  exported: boolean;               // Whether the symbol is exported
+  filePath: string;                // File where symbol is defined
+  line: number;                    // Line number
+}
+```
+
+### `SearchQuery`
+
+```typescript
+interface SearchQuery {
+  query: string;                   // Search text
+  filter?: SearchFilter;           // Optional filter criteria
+  limit?: number;                  // Max results (default: 10)
+  hybrid?: boolean;                // Use hybrid search (default: true)
+}
+```
+
+### `SearchFilter`
+
+```typescript
+interface SearchFilter {
+  filePatterns?: string[];         // Glob patterns to include
+  excludePatterns?: string[];      // Glob patterns to exclude
+  chunkTypes?: ChunkType[];        // Filter by chunk type
+  minScore?: number;               // Minimum relevance score
+}
+```
+
+### `SearchResponse`
+
+```typescript
+interface SearchResponse {
+  results: SearchResult[];
+  totalCount: number;
+  queryTimeMs: number;
+}
+```
+
+### `VerifyCodeRequest`
+
+```typescript
+interface VerifyCodeRequest {
+  code: string;                    // Code to verify
+  filePath?: string;               // File context
+  checkImports?: boolean;          // Verify imports exist
+  checkSymbols?: boolean;          // Verify symbols exist
+  checkAPIs?: boolean;             // Verify API signatures
+}
+```
+
+### `VerifyCodeResult`
+
+```typescript
+interface VerifyCodeResult {
+  valid: boolean;                  // Overall validity
+  issues: VerifyIssue[];           // List of issues found
+  checkedImports: number;          // Number of imports checked
+  checkedSymbols: number;          // Number of symbols checked
+}
+```
+
+### `VerifyIssue`
+
+```typescript
+interface VerifyIssue {
+  type: 'missing-import' | 'missing-symbol' | 'wrong-signature' | 'deprecated';
+  message: string;
+  line?: number;
+  suggestion?: string;
+}
+```
+
+### `DEFAULT_INDEX_CONFIG`
+
+```typescript
+const DEFAULT_INDEX_CONFIG: IndexConfig = {
+  embedder: 'voyage-code-2',
+  dimensions: 1536,
+  chunkStrategy: 'ast',
+  hybridWeights: { vector: 0.4, lexical: 0.6 },
+  fusionK: 60,
+  reranker: 'cohere'
+};
+```
+
+---
+
+## Auth Types
+
+```typescript
+import type {
+  ApiKey,
+  ApiKeyPermission,
+  AgentConfig,
+  AgentType,
+  AuditEntry,
+  TokenPayload
+} from '@usenella/core';
+```
+
+### `ApiKey`
+
+```typescript
+interface ApiKey {
+  id: string;
+  name: string;
+  key: string;                     // Prefixed with 'nella_'
+  permissions: ApiKeyPermission[];
+  rateLimit?: {
+    maxRequests: number;
+    windowMs: number;
+  };
+  expiresAt?: Date;
+  revoked: boolean;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+```
+
+### `ApiKeyPermission`
+
+```typescript
+type ApiKeyPermission = 'read' | 'write' | 'admin';
+```
+
+### `AgentConfig`
+
+```typescript
+interface AgentConfig {
+  id: string;
+  name: string;
+  type: AgentType;
+  apiKeyId: string;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### `AgentType`
+
+```typescript
+type AgentType = 'copilot' | 'cursor' | 'cline' | 'aider' | 'continue' | 'custom';
+```
+
+### `AuditEntry`
+
+```typescript
+interface AuditEntry {
+  id: string;
+  timestamp: string;
+  action: string;
+  userId?: string;
+  apiKeyId?: string;
+  details: Record<string, unknown>;
+  ip?: string;
+}
+```
+
+### `TokenPayload`
+
+```typescript
+interface TokenPayload {
+  userId: string;
+  permissions: ApiKeyPermission[];
+  exp: number;                     // Expiry timestamp
+  iat: number;                     // Issued at timestamp
+}
+```
+
+---
+
+## Rate Limiting Types
+
+```typescript
+import type {
+  RateLimitConfig,
+  RateLimitResult,
+  PriorityLevel,
+  GracefulDegradationConfig
+} from '@usenella/core';
+```
+
+### `RateLimitConfig`
+
+```typescript
+interface RateLimitConfig {
+  maxRequests: number;             // Maximum requests per window
+  windowMs: number;                // Window size in milliseconds
+  backend: 'memory' | 'redis' | 'sqlite';
+  algorithm: 'sliding-window' | 'token-bucket';
+}
+```
+
+### `RateLimitResult`
+
+```typescript
+interface RateLimitResult {
+  allowed: boolean;                // Whether the request is allowed
+  remaining: number;               // Remaining requests in window
+  resetMs: number;                 // Time until window reset (ms)
+  retryAfterMs?: number;           // Time to wait before retrying
+}
+```
+
+### `PriorityLevel`
+
+```typescript
+type PriorityLevel = 'critical' | 'high' | 'normal' | 'low';
+```
+
+### `GracefulDegradationConfig`
+
+```typescript
+interface GracefulDegradationConfig {
+  enabled: boolean;
+  thresholds: Array<{
+    load: number;                  // Load threshold (0.0-1.0)
+    reduction: number;             // Limit reduction factor (0.0-1.0)
+  }>;
+}
+```
+
+---
+
+## Context Sharing Types
+
+```typescript
+import type {
+  ContextEntry,
+  ContextType,
+  ContextVisibility,
+  ContextChannel
+} from '@usenella/core';
+```
+
+### `ContextEntry`
+
+```typescript
+interface ContextEntry {
+  key: string;                     // Unique key
+  value: unknown;                  // Context data
+  type: ContextType;               // Entry type
+  visibility: ContextVisibility;   // Access scope
+  channel?: string;                // Optional channel for grouping
+  etag?: string;                   // Version tag for conflict detection
+  encrypted?: boolean;             // Whether value is encrypted
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;              // Agent/user ID
+}
+```
+
+### `ContextType`
+
+```typescript
+type ContextType =
+  | 'decision'      // Architectural decisions
+  | 'snippet'       // Code snippets
+  | 'schema'        // Schema information
+  | 'api'           // API definitions
+  | 'config'        // Configuration values
+  | 'dependency'    // Dependency information
+  | 'test'          // Test-related context
+  | 'error'         // Error patterns
+  | 'note'          // General notes
+  | 'reference';    // External references
+```
+
+### `ContextVisibility`
+
+```typescript
+type ContextVisibility =
+  | 'private'       // Only the creating agent
+  | 'workspace'     // All agents in the workspace
+  | 'shared'        // Explicitly shared agents
+  | 'global';       // All agents everywhere
+```
+
+### `ContextChannel`
+
+```typescript
+interface ContextChannel {
+  name: string;
+  description?: string;
+  subscribers: string[];           // Agent/user IDs
+}
+```
+
+---
+
+## Sync Types
+
+```typescript
+import type {
+  SyncTier,
+  SyncConfig,
+  ConflictStrategy,
+  SyncState
+} from '@usenella/core';
+```
+
+### `SyncTier`
+
+```typescript
+type SyncTier = 'local' | 'supabase' | 'gcp';
+```
+
+### `SyncConfig`
+
+```typescript
+interface SyncConfig {
+  tiers: SyncTier[];               // Ordered list (auto-fallback)
+  encryption?: {
+    enabled: boolean;
+    key?: string;                  // AES-256-GCM key
+  };
+  compression?: boolean;           // Gzip compression
+  bandwidth?: {
+    maxBytesPerSecond: number;
+  };
+  conflictStrategy: ConflictStrategy;
+}
+```
+
+### `ConflictStrategy`
+
+```typescript
+type ConflictStrategy =
+  | 'last-write-wins'
+  | 'merge'
+  | 'manual'
+  | 'server-wins';
+```
+
+### `SyncState`
+
+```typescript
+interface SyncState {
+  lastSyncAt: string;
+  pendingChanges: number;
+  offlineQueue: number;
+  currentTier: SyncTier;
+}
+```
+
+---
+
+## Workspace Types
+
+```typescript
+import type {
+  WorkspaceConfig,
+  WorkspaceState,
+  WorkspaceInfo
+} from '@usenella/core';
+```
+
+### `WorkspaceConfig`
+
+```typescript
+interface WorkspaceConfig {
+  name?: string;
+  path: string;
+  indexConfig?: IndexConfig;
+  syncConfig?: SyncConfig;
+  watchEnabled?: boolean;
+}
+```
+
+### `WorkspaceState`
+
+```typescript
+interface WorkspaceState {
+  id: string;
+  path: string;
+  name: string;
+  indexed: boolean;
+  lastIndexedAt?: string;
+  fileCount: number;
+  chunkCount: number;
+}
+```
+
+### `WorkspaceInfo`
+
+```typescript
+interface WorkspaceInfo {
+  id: string;
+  path: string;
+  name: string;
+  createdAt: string;
+  lastAccessedAt: string;
+  state: WorkspaceState;
+}
+```
+
+---
+
+## Export Types
+
+```typescript
+import type {
+  ExportFormat,
+  ExportOptions,
+  ExportBundle
+} from '@usenella/core';
+```
+
+### `ExportFormat`
+
+```typescript
+type ExportFormat = 'json' | 'csv' | 'markdown' | 'html';
+```
+
+### `ExportOptions`
+
+```typescript
+interface ExportOptions {
+  format: ExportFormat;
+  outputPath?: string;
+  includeTimestamps?: boolean;
+  includeMetrics?: boolean;
+}
+```
+
+### `ExportBundle`
+
+```typescript
+interface ExportBundle {
+  toolCalls: unknown[];
+  searches: unknown[];
+  verifications: unknown[];
+  exportedAt: string;
+  format: ExportFormat;
+}
+```
+
+---
+
+## Playground Types
+
+```typescript
+import type {
+  PlaygroundMessage,
+  PlaygroundSession,
+  PlaygroundOptions
+} from '@usenella/core';
+```
+
+### `PlaygroundMessage`
+
+```typescript
+interface PlaygroundMessage {
+  type: 'session-start' | 'tool-call' | 'tool-result' | 'chain-of-thought' | 'cost-update' | 'session-end';
+  sessionId: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+```
+
+### `PlaygroundSession`
+
+```typescript
+interface PlaygroundSession {
+  id: string;
+  startedAt: string;
+  endedAt?: string;
+  toolCalls: number;
+  tokenUsage: { input: number; output: number };
+  cost: number;
+}
+```
+
+### `PlaygroundOptions`
+
+```typescript
+interface PlaygroundOptions {
+  port?: number;                   // Default: 3847
+  host?: string;                   // Default: 'localhost'
+  workspace?: string;
+  repo?: string;
+}
+```
+
+---
+
+## Agent Runner Types
+
+```typescript
+import type {
+  AgentAdapterConfig,
+  AgentRunResult,
+  ModelPricing
+} from '@usenella/core';
+```
+
+### `AgentAdapterConfig`
+
+```typescript
+interface AgentAdapterConfig {
+  provider: 'anthropic' | 'openai';
+  model: string;
+  apiKey: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+```
+
+### `AgentRunResult`
+
+```typescript
+interface AgentRunResult {
+  response: string;
+  toolCalls: Array<{
+    name: string;
+    input: Record<string, unknown>;
+    output: unknown;
+  }>;
+  iterations: number;
+  tokenUsage: { input: number; output: number };
+  cost: number;
+  durationMs: number;
+}
+```
+
+### `ModelPricing`
+
+```typescript
+interface ModelPricing {
+  inputPer1k: number;              // Cost per 1K input tokens
+  outputPer1k: number;             // Cost per 1K output tokens
 }
 ```
