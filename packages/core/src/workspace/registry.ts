@@ -529,7 +529,24 @@ export class WorkspaceRegistry {
     if (fs.existsSync(this.registryPath)) {
       try {
         const content = fs.readFileSync(this.registryPath, "utf-8");
-        const registry = JSON.parse(content) as IWorkspaceRegistry;
+        let registry = JSON.parse(content) as IWorkspaceRegistry;
+
+        // Handle malformed registry (e.g., bare array or non-object)
+        if (Array.isArray(registry) || typeof registry !== "object" || registry === null) {
+          console.warn("Registry file has invalid structure, reinitializing");
+          registry = {
+            workspaces: Array.isArray(registry) ? [] : [],
+            activeWorkspaceId: null,
+            settings: this.getDefaultSettings(),
+            version: "1.0.0",
+            updatedAt: new Date().toISOString(),
+          } as IWorkspaceRegistry;
+        }
+
+        // Ensure workspaces is a valid array before any migration
+        if (!Array.isArray(registry.workspaces)) {
+          registry.workspaces = [];
+        }
 
         // Ensure settings have defaults
         registry.settings = {

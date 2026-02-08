@@ -40,6 +40,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ContextManager } from "@usenella/core";
+import { WebSocketServer, WebSocket } from "ws";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
@@ -256,6 +257,88 @@ async function logUsageEvent(params: {
 }
 
 // =============================================================================
+// Playground Types & Session Management
+// =============================================================================
+
+interface PlaygroundSessionState {
+  activeAgent: string | null;
+  chainOfThought: PlaygroundCotEntry[];
+  recentToolCalls: PlaygroundToolCall[];
+  recentSearches: PlaygroundSearchEntry[];
+  indexStatus: "none" | "indexing" | "ready" | "error";
+  rateLimitStatus: {
+    minute: { used: number; limit: number };
+    hour: { used: number; limit: number };
+  };
+}
+
+interface PlaygroundCotEntry {
+  id: string;
+  type: "thought" | "action" | "observation" | "result";
+  content: string;
+  timestamp: string;
+  duration?: number;
+}
+
+interface PlaygroundToolCall {
+  id: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  result?: unknown;
+  success: boolean;
+  error?: string;
+  duration: number;
+  timestamp: string;
+  tokens?: number;
+  cost?: number;
+}
+
+interface PlaygroundSearchEntry {
+  id: string;
+  query: string;
+  resultsCount: number;
+  confidence: number;
+  duration: number;
+  timestamp: string;
+}
+
+interface PlaygroundClient {
+  id: string;
+  ws: WebSocket;
+  sessionId: string | null;
+  apiKeyId: string;
+  userId: string;
+  rateLimits: { requests_per_minute: number; requests_per_hour: number; requests_per_day: number };
+}
+
+interface PlaygroundSession {
+  id: string;
+  userId: string;
+  state: PlaygroundSessionState;
+  clients: Set<string>;
+  lastActivity: number;
+}
+
+const DEFAULT_COST_CONFIG = {
+  inputCostPer1k: 0.01,
+  outputCostPer1k: 0.03,
+};
+
+function createEmptySessionState(): PlaygroundSessionState {
+  return {
+    activeAgent: null,
+    chainOfThought: [],
+    recentToolCalls: [],
+    recentSearches: [],
+    indexStatus: "none",
+    rateLimitStatus: {
+      minute: { used: 0, limit: 60 },
+      hour: { used: 0, limit: 1000 },
+    },
+  };
+}
+
+// =============================================================================
 // Server
 // =============================================================================
 
@@ -445,6 +528,29 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     }
 
     // -----------------------------------------------------------------------
+    // GET /api/tools — tool definitions for Playground UI
+    // -----------------------------------------------------------------------
+    if (pathname === "/api/tools" && req.method === "GET") {
+      const toolsWithCategory = allTools.map((tool) => {
+        let category = "context";
+        if (tool.name.startsWith("nella_check") || tool.name.startsWith("nella_validate") || tool.name.startsWith("nella_run")) {
+          category = "validation";
+        } else if (tool.name.startsWith("nella_safety") || tool.name.startsWith("nella_should_refuse") || tool.name.startsWith("nella_guardrails")) {
+          category = "safety";
+        }
+        return {
+          name: tool.name,
+          category,
+          description: tool.description || "",
+          inputSchema: tool.inputSchema,
+        };
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ tools: toolsWithCategory }));
+      return;
+    }
+
+    // -----------------------------------------------------------------------
     // MCP endpoint: POST/GET/DELETE /mcp
     // -----------------------------------------------------------------------
     if (pathname === "/mcp") {
@@ -598,9 +704,321 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     res.end(JSON.stringify({ error: "Not found" }));
   });
 
+  // =========================================================================
+  // WebSocket Playground Server
+  // =========================================================================
+
+  const playgroundSessions = new Map<string, PlaygroundSession>();
+  const playgroundClients = new Map<string, PlaygroundClient>();
+
+  // Cleanup stale sessions every 60s
+  const playgroundCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [id, session] of playgroundSessions) {
+      if (session.clients.size === 0 && now - session.lastActivity > 30 * 60 * 1000) {
+        playgroundSessions.delete(id);
+        log("debug", "Cleaned up stale playground session", { sessionId: id });
+      }
+    }
+  }, 60000);
+
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+
+  wss.on("connection", async (ws, req) => {
+    // Authenticate via ?token= query parameter
+    const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const token = reqUrl.searchParams.get("token");
+
+    if (!token) {
+      ws.close(4001, "Missing ?token= parameter");
+      return;
+    }
+
+    const authResult = await validateApiKey(token);
+    if (!authResult.success) {
+      ws.close(4001, authResult.error);
+      return;
+    }
+
+    const keyRecord = authResult.record;
+    const rateLimits = keyRecord.rate_limits || {
+      requests_per_minute: 60,
+      requests_per_hour: 1000,
+      requests_per_day: 10000,
+    };
+
+    const clientId = crypto.randomUUID();
+    const client: PlaygroundClient = {
+      id: clientId,
+      ws,
+      sessionId: null,
+      apiKeyId: keyRecord.id,
+      userId: keyRecord.user_id,
+      rateLimits,
+    };
+    playgroundClients.set(clientId, client);
+
+    log("info", "Playground client connected", { clientId, userId: keyRecord.user_id });
+
+    ws.on("message", async (raw) => {
+      try {
+        const message = JSON.parse(raw.toString());
+        await handlePlaygroundMessage(client, message);
+      } catch (err) {
+        sendToClient(ws, { type: "error", message: "Invalid message format" });
+      }
+    });
+
+    ws.on("close", () => {
+      if (client.sessionId) {
+        const session = playgroundSessions.get(client.sessionId);
+        if (session) {
+          session.clients.delete(clientId);
+        }
+      }
+      playgroundClients.delete(clientId);
+      log("info", "Playground client disconnected", { clientId });
+    });
+
+    ws.on("error", (err) => {
+      log("error", "Playground WebSocket error", { clientId, error: String(err) });
+    });
+  });
+
+  function sendToClient(ws: WebSocket, message: unknown): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    }
+  }
+
+  function broadcastToSession(sessionId: string, message: unknown): void {
+    const session = playgroundSessions.get(sessionId);
+    if (!session) return;
+    for (const cid of session.clients) {
+      const c = playgroundClients.get(cid);
+      if (c) sendToClient(c.ws, message);
+    }
+  }
+
+  async function handlePlaygroundMessage(client: PlaygroundClient, message: any): Promise<void> {
+    switch (message.type) {
+      case "subscribe": {
+        const sessionKey = `${client.userId}:${message.sessionId || "default"}`;
+        let session = playgroundSessions.get(sessionKey);
+        if (!session) {
+          session = {
+            id: sessionKey,
+            userId: client.userId,
+            state: createEmptySessionState(),
+            clients: new Set(),
+            lastActivity: Date.now(),
+          };
+          // Set rate limit info from the client's key
+          session.state.rateLimitStatus = {
+            minute: { used: 0, limit: client.rateLimits.requests_per_minute },
+            hour: { used: 0, limit: client.rateLimits.requests_per_hour },
+          };
+          playgroundSessions.set(sessionKey, session);
+        }
+        client.sessionId = sessionKey;
+        session.clients.add(client.id);
+        session.lastActivity = Date.now();
+
+        sendToClient(client.ws, { type: "connected", sessionId: sessionKey, clientId: client.id });
+        sendToClient(client.ws, { type: "session:state", state: session.state });
+        break;
+      }
+
+      case "unsubscribe": {
+        if (client.sessionId) {
+          const session = playgroundSessions.get(client.sessionId);
+          if (session) session.clients.delete(client.id);
+          client.sessionId = null;
+        }
+        break;
+      }
+
+      case "tool:call": {
+        if (!client.sessionId) {
+          sendToClient(client.ws, { type: "error", message: "Not subscribed to a session" });
+          return;
+        }
+        const session = playgroundSessions.get(client.sessionId);
+        if (!session) return;
+
+        // Rate limit check
+        const rl = checkRateLimit(client.apiKeyId, client.rateLimits);
+        if (!rl.allowed) {
+          sendToClient(client.ws, { type: "error", message: rl.reason || "Rate limit exceeded" });
+          return;
+        }
+
+        const { toolName, arguments: toolArgs, callId } = message;
+        const resolvedCallId = callId || `pg-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+        const callStart = Date.now();
+
+        // Broadcast tool:start
+        broadcastToSession(client.sessionId, {
+          type: "tool:start",
+          callId: resolvedCallId,
+          toolName,
+        });
+
+        // Add CoT action entry
+        const actionEntry: PlaygroundCotEntry = {
+          id: `cot-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+          type: "action",
+          content: `Calling tool: ${toolName}`,
+          timestamp: new Date().toISOString(),
+        };
+        session.state.chainOfThought = [...session.state.chainOfThought.slice(-99), actionEntry];
+        broadcastToSession(client.sessionId, { type: "cot:entry", entry: actionEntry });
+
+        // Execute tool
+        const tmpDir = path.join(os.tmpdir(), `nella-pg-${crypto.randomBytes(4).toString("hex")}`);
+        let success = false;
+        let result: unknown = null;
+        let error: string | undefined;
+
+        try {
+          if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+          const contextManager = new ContextManager(tmpDir);
+          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager };
+
+          const validationResult = await handleValidationTool(toolName, toolArgs || {}, serverContext);
+          if (validationResult !== null) { result = validationResult; success = true; }
+
+          if (result === null) {
+            const safetyResult = await handleSafetyTool(toolName, toolArgs || {}, serverContext);
+            if (safetyResult !== null) { result = safetyResult; success = true; }
+          }
+
+          if (result === null) {
+            const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
+            if (contextResult !== null) { result = contextResult; success = true; }
+          }
+
+          if (result === null) {
+            error = `Unknown tool: ${toolName}`;
+            success = false;
+          }
+        } catch (err) {
+          error = err instanceof Error ? err.message : String(err);
+          success = false;
+        } finally {
+          try { if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+        }
+
+        const duration = Date.now() - callStart;
+
+        // Estimate tokens & cost
+        const resultText = typeof result === "string" ? result : JSON.stringify(result || "");
+        const argsText = JSON.stringify(toolArgs || {});
+        const inputTokens = Math.ceil(argsText.length / 4);
+        const outputTokens = Math.ceil(resultText.length / 4);
+        const cost = (inputTokens / 1000) * DEFAULT_COST_CONFIG.inputCostPer1k +
+                     (outputTokens / 1000) * DEFAULT_COST_CONFIG.outputCostPer1k;
+
+        // Build tool call entry
+        const toolCallEntry: PlaygroundToolCall = {
+          id: resolvedCallId,
+          toolName,
+          arguments: toolArgs || {},
+          result,
+          success,
+          error,
+          duration,
+          timestamp: new Date().toISOString(),
+          tokens: inputTokens + outputTokens,
+          cost,
+        };
+
+        session.state.recentToolCalls = [...session.state.recentToolCalls.slice(-49), toolCallEntry];
+
+        // Broadcast tool:end
+        broadcastToSession(client.sessionId, { type: "tool:end", callId: resolvedCallId, entry: toolCallEntry });
+
+        // Add CoT observation entry
+        const obsEntry: PlaygroundCotEntry = {
+          id: `cot-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+          type: "observation",
+          content: success ? `Tool ${toolName} completed in ${duration}ms` : `Tool ${toolName} failed: ${error}`,
+          timestamp: new Date().toISOString(),
+          duration,
+        };
+        session.state.chainOfThought = [...session.state.chainOfThought.slice(-99), obsEntry];
+        broadcastToSession(client.sessionId, { type: "cot:entry", entry: obsEntry });
+
+        // Update rate limit display
+        const minuteAgo = Date.now() - 60000;
+        const hourAgo = Date.now() - 3600000;
+        const rlEntry = rateLimitStore.get(client.apiKeyId);
+        if (rlEntry) {
+          session.state.rateLimitStatus = {
+            minute: {
+              used: rlEntry.timestamps.filter(t => t > minuteAgo).length,
+              limit: client.rateLimits.requests_per_minute,
+            },
+            hour: {
+              used: rlEntry.timestamps.filter(t => t > hourAgo).length,
+              limit: client.rateLimits.requests_per_hour,
+            },
+          };
+        }
+
+        // Check rate limit warning at 80%
+        const minuteUsed = session.state.rateLimitStatus.minute.used;
+        const minuteLimit = session.state.rateLimitStatus.minute.limit;
+        if (minuteUsed / minuteLimit >= 0.8) {
+          broadcastToSession(client.sessionId, {
+            type: "rate:warning",
+            window: "minute",
+            percentUsed: (minuteUsed / minuteLimit) * 100,
+          });
+        }
+
+        session.lastActivity = Date.now();
+
+        // Log usage
+        logUsageEvent({
+          apiKeyId: client.apiKeyId,
+          toolName,
+          durationMs: duration,
+          success,
+          error,
+          tokensUsed: inputTokens + outputTokens,
+        });
+        break;
+      }
+
+      case "session:clear": {
+        if (!client.sessionId) return;
+        const session = playgroundSessions.get(client.sessionId);
+        if (!session) return;
+        session.state = createEmptySessionState();
+        session.state.rateLimitStatus = {
+          minute: { used: 0, limit: client.rateLimits.requests_per_minute },
+          hour: { used: 0, limit: client.rateLimits.requests_per_hour },
+        };
+        broadcastToSession(client.sessionId, { type: "session:state", state: session.state });
+        break;
+      }
+
+      default:
+        sendToClient(client.ws, { type: "error", message: `Unknown message type: ${message.type}` });
+    }
+  }
+
   // Graceful shutdown
   const shutdown = () => {
     log("info", "Shutting down...");
+    clearInterval(playgroundCleanupInterval);
+    // Close all playground WebSocket connections
+    for (const client of playgroundClients.values()) {
+      client.ws.close(1001, "Server shutting down");
+    }
+    wss.close();
     for (const transport of transports.values()) {
       transport.close().catch(() => {});
     }
@@ -620,6 +1038,8 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       endpoints: {
         mcp: `http://${host}:${port}/mcp`,
         health: `http://${host}:${port}/health`,
+        playground: `ws://${host}:${port}/ws`,
+        tools: `http://${host}:${port}/api/tools`,
       },
     });
   });
