@@ -41,6 +41,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ContextManager } from "@usenella/core";
 import { WebSocketServer, WebSocket } from "ws";
+import Redis from "ioredis";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
@@ -114,12 +115,119 @@ function getSupabase() {
 }
 
 // =============================================================================
-// In-Memory Rate Limiter (backed by Redis when available)
+// Rate Limiter (Redis when available, in-memory fallback)
 // =============================================================================
 
+let redisClient: Redis | null = null;
+
+function initRedis(): void {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    console.log("[rate-limit] No REDIS_URL set — using in-memory rate limiting");
+    return;
+  }
+
+  try {
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times: number) {
+        if (times > 5) return null; // stop retrying after 5 attempts
+        return Math.min(times * 200, 2000);
+      },
+      enableReadyCheck: true,
+      lazyConnect: false,
+    });
+
+    redisClient.on("connect", () => {
+      console.log("[rate-limit] Connected to Redis");
+    });
+
+    redisClient.on("error", (err: Error) => {
+      console.error("[rate-limit] Redis error:", err.message);
+    });
+
+    redisClient.on("close", () => {
+      console.log("[rate-limit] Redis connection closed");
+    });
+  } catch (err) {
+    console.error(
+      "[rate-limit] Failed to create Redis client:",
+      err instanceof Error ? err.message : err
+    );
+    redisClient = null;
+  }
+}
+
+// In-memory fallback store
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-function checkRateLimit(
+async function checkRateLimitRedis(
+  apiKeyId: string,
+  limits: AuthenticatedRequest["rateLimits"]
+): Promise<{ allowed: boolean; retryAfter?: number; reason?: string }> {
+  if (!redisClient) return checkRateLimitMemory(apiKeyId, limits);
+
+  const key = `ratelimit:${apiKeyId}`;
+  const now = Date.now();
+
+  try {
+    // Use a pipeline for atomicity and performance
+    const pipe = redisClient.pipeline();
+    // Remove entries older than 24h
+    pipe.zremrangebyscore(key, 0, now - 86400000);
+    // Count entries in each window
+    pipe.zcount(key, now - 60000, "+inf"); // per-minute
+    pipe.zcount(key, now - 3600000, "+inf"); // per-hour
+    pipe.zcount(key, now - 86400000, "+inf"); // per-day
+
+    const results = await pipe.exec();
+    if (!results) return checkRateLimitMemory(apiKeyId, limits);
+
+    const perMinute = (results[1]?.[1] as number) || 0;
+    const perHour = (results[2]?.[1] as number) || 0;
+    const perDay = (results[3]?.[1] as number) || 0;
+
+    if (perMinute >= limits.requests_per_minute) {
+      return {
+        allowed: false,
+        retryAfter: 60,
+        reason: `Rate limit exceeded: ${perMinute}/${limits.requests_per_minute} requests per minute`,
+      };
+    }
+    if (perHour >= limits.requests_per_hour) {
+      return {
+        allowed: false,
+        retryAfter: 3600,
+        reason: `Rate limit exceeded: ${perHour}/${limits.requests_per_hour} requests per hour`,
+      };
+    }
+    if (perDay >= limits.requests_per_day) {
+      return {
+        allowed: false,
+        retryAfter: 86400,
+        reason: `Rate limit exceeded: ${perDay}/${limits.requests_per_day} requests per day`,
+      };
+    }
+
+    // Record this request — use timestamp as both score and unique member
+    const uniqueMember = `${now}:${Math.random().toString(36).slice(2, 8)}`;
+    await redisClient
+      .pipeline()
+      .zadd(key, now, uniqueMember)
+      .expire(key, 86400) // TTL 24h
+      .exec();
+
+    return { allowed: true };
+  } catch (err) {
+    console.error(
+      "[rate-limit] Redis check failed, falling back to memory:",
+      err instanceof Error ? err.message : err
+    );
+    return checkRateLimitMemory(apiKeyId, limits);
+  }
+}
+
+function checkRateLimitMemory(
   apiKeyId: string,
   limits: AuthenticatedRequest["rateLimits"]
 ): { allowed: boolean; retryAfter?: number; reason?: string } {
@@ -162,6 +270,16 @@ function checkRateLimit(
   entry.timestamps.push(now);
   rateLimitStore.set(apiKeyId, entry);
   return { allowed: true };
+}
+
+// Unified entry point — async to support Redis
+async function checkRateLimit(
+  apiKeyId: string,
+  limits: AuthenticatedRequest["rateLimits"]
+): Promise<{ allowed: boolean; retryAfter?: number; reason?: string }> {
+  return redisClient
+    ? checkRateLimitRedis(apiKeyId, limits)
+    : checkRateLimitMemory(apiKeyId, limits);
 }
 
 // =============================================================================
@@ -366,6 +484,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     process.exit(1);
   }
 
+  // Initialize Redis (if REDIS_URL is set)
+  initRedis();
+
   // Collect all tools
   const allTools: Tool[] = [
     ...registerValidationTools(),
@@ -521,6 +642,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         version: "0.2.2",
         uptime: Math.floor((Date.now() - startTime) / 1000),
         activeSessions: transports.size,
+        redis: redisClient ? redisClient.status : "disabled",
       };
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(health));
@@ -579,7 +701,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
       // Rate limit check (only for POST = actual tool calls / messages)
       if (req.method === "POST") {
-        const rl = checkRateLimit(keyRecord.id, rateLimits);
+        const rl = await checkRateLimit(keyRecord.id, rateLimits);
         if (!rl.allowed) {
           res.writeHead(429, {
             "Content-Type": "application/json",
@@ -847,7 +969,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         if (!session) return;
 
         // Rate limit check
-        const rl = checkRateLimit(client.apiKeyId, client.rateLimits);
+        const rl = await checkRateLimit(client.apiKeyId, client.rateLimits);
         if (!rl.allowed) {
           sendToClient(client.ws, { type: "error", message: rl.reason || "Rate limit exceeded" });
           return;
@@ -1019,6 +1141,11 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       client.ws.close(1001, "Server shutting down");
     }
     wss.close();
+    // Disconnect Redis
+    if (redisClient) {
+      redisClient.disconnect();
+      redisClient = null;
+    }
     for (const transport of transports.values()) {
       transport.close().catch(() => {});
     }
