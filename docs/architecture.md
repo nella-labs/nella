@@ -1,6 +1,6 @@
 # Nella Architecture
 
-> Reliability layer for AI coding agents - v0.2.2
+> Reliability layer for AI coding agents - v0.0.0
 
 ---
 
@@ -11,11 +11,13 @@ graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
     subgraph nella_pkg["@usenella/nella v0.2.2"]
-        CLI["CLI<br/>nella check | validate | run | mcp | playground"]
+        CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
+        HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
+        AuthCLI["Auth CLI<br/>login | logout | status"]
     end
 
-    subgraph core_pkg["@usenella/core v0.2.2"]
+    subgraph core_pkg["@usenella/core v0.0.0"]
         RunEngine["Run Engine<br/>runTask() | check() | validate()"]
         Validators["Validators"]
         Safety["Safety"]
@@ -24,8 +26,13 @@ graph TB
         Workspace["Workspace Management"]
         Auth["Auth & Rate Limiting"]
         Sync["Cloud Sync"]
+        ContextSharing["Context Sharing"]
         Playground["Playground Server"]
         Export["Export Manager"]
+        Agents["Agent Runner"]
+        RateLimit["Rate Limiting"]
+        GCP["GCP Backend"]
+        Supabase["Supabase Backend"]
     end
 
     subgraph benchmark_pkg["@usenella/benchmark v0.1.0"]
@@ -1202,3 +1209,139 @@ graph LR
     style P3_Solution fill:#93c5fd
     style P4_Solution fill:#6ee7b7
 ```
+
+---
+
+## 17. Agent Runner Architecture
+
+```mermaid
+graph TB
+    subgraph AgentModule["Agent Runner Module"]
+        Runner["AgentRunner<br/>Tool-use loop orchestrator"]
+        
+        subgraph Adapters["LLM Adapters"]
+            Anthropic["AnthropicAdapter<br/>Claude Sonnet 4, Opus 4"]
+            OpenAI["OpenAIAdapter<br/>GPT-4 Turbo, GPT-4o, GPT-4o-mini"]
+        end
+        
+        Factory["createAgentAdapter()"]
+        Pricing["MODEL_PRICING<br/>Cost per token"]
+        Estimator["estimateAgentCost()"]
+    end
+    
+    Runner --> Adapters
+    Factory --> Adapters
+    Runner --> Pricing
+    Pricing --> Estimator
+    
+    style AgentModule fill:#f5f3ff,stroke:#7c3aed
+    style Runner fill:#c4b5fd
+    style Factory fill:#ddd6fe
+    style Pricing fill:#ede9fe
+```
+
+---
+
+## 18. Sync Module Architecture
+
+```mermaid
+graph TB
+    subgraph SyncModule["Sync Module"]
+        SyncMgr["SyncManager<br/>Auto-fallback across tiers"]
+        
+        subgraph Tiers["Sync Tiers"]
+            Local["LocalSyncAdapter<br/>JSON files"]
+            SupaSync["SupabaseSyncAdapter<br/>PostgreSQL + pgvector"]
+            GCPSync["GCPSyncAdapter<br/>Cloud SQL + Cloud Storage"]
+        end
+        
+        subgraph CloudSync["WorkspaceCloudSyncManager"]
+            Delta["Delta Chunking"]
+            Encrypt["AES-256-GCM Encryption"]
+            Compress["Gzip Compression"]
+            Throttle["Bandwidth Throttling"]
+            Offline["Offline Queue"]
+            Conflict["Conflict Resolution<br/>LWW | Merge | Manual | Server"]
+        end
+    end
+    
+    SyncMgr --> Local
+    SyncMgr --> SupaSync
+    SyncMgr --> GCPSync
+    SyncMgr --> CloudSync
+    
+    style SyncModule fill:#ecfdf5,stroke:#10b981
+    style SyncMgr fill:#6ee7b7
+    style CloudSync fill:#a7f3d0
+```
+
+---
+
+## 19. Hosted MCP Server Architecture
+
+```mermaid
+graph TB
+    subgraph HostedServer["Hosted MCP Server (nella serve)"]
+        HTTP["Streamable HTTP<br/>POST /mcp"]
+        Health["GET /health"]
+        WS["WebSocket<br/>/ws"]
+        
+        subgraph Auth["Authentication"]
+            APIKey["API Key Validation<br/>(Supabase)"]
+            RateLimit["Rate Limiting<br/>(Redis / In-Memory)"]
+        end
+        
+        subgraph Tools["MCP Tools"]
+            Validation["Validation Tools<br/>check, validate, run"]
+            SafetyTools["Safety Tools<br/>detect_risks, should_refuse"]
+            ContextTools["Context Tools<br/>get_context, add_assumption, ..."]
+        end
+    end
+    
+    HTTP --> Auth
+    Auth --> Tools
+    WS --> Tools
+    
+    style HostedServer fill:#eff6ff,stroke:#3b82f6
+    style Auth fill:#bfdbfe
+    style Tools fill:#93c5fd
+```
+
+---
+
+## 20. CLI Auth & Connect Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as nella CLI
+    participant Browser
+    participant Nella as app.getnella.dev
+    participant MCP as MCP Server
+    
+    User->>CLI: nella auth login
+    CLI->>CLI: Start local HTTP server
+    CLI->>Browser: Open auth URL
+    Browser->>Nella: Sign in
+    Nella->>CLI: Redirect with tokens
+    CLI->>CLI: Save to ~/.nella/auth.json
+    
+    User->>CLI: nella connect
+    CLI->>CLI: Load session
+    CLI->>Nella: Create API key
+    Nella-->>CLI: nella_abc123...
+    CLI->>MCP: Health check
+    MCP-->>CLI: OK (version)
+    CLI->>CLI: Write MCP config (Claude/VSCode)
+    CLI-->>User: ✓ Connected
+```
+
+---
+
+## Deprecated Modules
+
+| Module | Status | Replacement |
+|--------|--------|-------------|
+| `cloud-sync/` | Deprecated | Use `sync/` module (`SyncManager`) |
+
+The `CloudSyncManager` from `cloud-sync/` is a legacy compatibility wrapper. New code should use `SyncManager` from the `sync/` module.
