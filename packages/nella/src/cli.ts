@@ -128,6 +128,8 @@ interface CliArgs {
   client?: "claude" | "vscode" | "all";
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
+  // Help flag (per-command)
+  showHelp?: boolean;
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -171,7 +173,13 @@ function parseArgs(args: string[]): CliArgs {
     } else if (arg === "--json") {
       result.output = "json";
     } else if (arg === "--help" || arg === "-h") {
-      result.command = "help";
+      if (result.command === "help") {
+        // No command set yet — show global help
+        result.command = "help";
+      } else {
+        // Command already set — show command-specific help
+        result.showHelp = true;
+      }
     } else if (arg === "--workspace" || arg === "-w") {
       result.workspace = args[++i];
     } else if (arg.startsWith("--workspace=")) {
@@ -466,8 +474,19 @@ function formatMetricValue(
 // =============================================================================
 
 async function runCheckCommand(args: CliArgs): Promise<void> {
-  if (!args.taskPath || !args.repoPath) {
-    console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task and --repo\n`));
+  if (args.showHelp || (!args.taskPath || !args.repoPath)) {
+    console.log(logo);
+    console.log(tagline);
+    console.log(`  ${theme.secondary.bold("nella check")} — Pre-flight check: can the task proceed?\n`);
+    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella check --task <path> --repo <path>")}\n`);
+    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}    Path to task.yaml or task directory`);
+    console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}    Path to repository`);
+    console.log(`    ${theme.accent("--skip-prerequisites")}    Skip prerequisite checks`);
+    console.log(`    ${theme.accent("--json")}                Output as JSON`);
+    console.log("");
+    if (args.showHelp) return;
     process.exit(1);
   }
 
@@ -508,8 +527,20 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
 }
 
 async function runValidateCommand(args: CliArgs): Promise<void> {
-  if (!args.taskPath || !args.repoPath || !args.changesPath) {
-    console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task, --repo, and --changes\n`));
+  if (args.showHelp || (!args.taskPath || !args.repoPath || !args.changesPath)) {
+    console.log(logo);
+    console.log(tagline);
+    console.log(`  ${theme.secondary.bold("nella validate")} — Validate changes against task constraints\n`);
+    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella validate --task <path> --repo <path> --changes <path>")}\n`);
+    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}       Path to task.yaml or task directory`);
+    console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}       Path to repository`);
+    console.log(`    ${theme.accent("--changes, -c")} ${theme.muted("<path>")}    Path to changes.json file`);
+    console.log(`    ${theme.accent("--skip-validation")}        Skip test/lint/compile commands`);
+    console.log(`    ${theme.accent("--json")}                   Output as JSON`);
+    console.log("");
+    if (args.showHelp) return;
     process.exit(1);
   }
 
@@ -536,6 +567,22 @@ async function runValidateCommand(args: CliArgs): Promise<void> {
 }
 
 async function runRunCommand(args: CliArgs): Promise<void> {
+  if (args.showHelp) {
+    console.log(logo);
+    console.log(tagline);
+    console.log(`  ${theme.secondary.bold("nella run")} — Full run: check + validate + metrics\n`);
+    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella run --task <path> --repo <path> [--changes <path>]")}\n`);
+    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}       Path to task.yaml or task directory`);
+    console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}       Path to repository`);
+    console.log(`    ${theme.accent("--changes, -c")} ${theme.muted("<path>")}    Path to changes.json file (optional)`);
+    console.log(`    ${theme.accent("--skip-validation")}        Skip test/lint/compile commands`);
+    console.log(`    ${theme.accent("--skip-prerequisites")}     Skip prerequisite checks`);
+    console.log(`    ${theme.accent("--json")}                   Output as JSON`);
+    console.log("");
+    return;
+  }
   if (!args.taskPath || !args.repoPath) {
     console.error(theme.error(`\n  ${theme.icons.error}  Missing required options: --task and --repo\n`));
     process.exit(1);
@@ -663,7 +710,8 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
 
   const sub = args.authSubcommand;
 
-  if (!sub) {
+  if (!sub || args.showHelp) {
+    console.log(`  ${theme.secondary.bold("nella auth")} — Manage authentication\n`);
     console.log(`  ${theme.secondary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella auth login")}    ${theme.muted("Log in with your Nella account")}`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella auth logout")}   ${theme.muted("Clear stored credentials")}`);
@@ -714,6 +762,20 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
 async function runConnectCommand(args: CliArgs): Promise<void> {
   console.log(logo);
   console.log(tagline);
+
+  if (args.showHelp) {
+    console.log(`  ${theme.secondary.bold("nella connect")} — Configure MCP clients to use Nella\n`);
+    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --api-key nella_your_key")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --client claude")}\n`);
+    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--api-key, -k")} ${theme.muted("<key>")}       API key (auto-created if logged in)`);
+    console.log(`    ${theme.accent("--server-url, -u")} ${theme.muted("<url>")}    Server URL (default: production)`);
+    console.log(`    ${theme.accent("--client")} ${theme.muted("<name>")}            Target client: claude, vscode, or all (default: all)`);
+    console.log("");
+    return;
+  }
 
   const serverUrl = args.serverUrl || "https://nella-mcp-production.up.railway.app/mcp";
   let apiKey = args.apiKey || process.env.NELLA_API_KEY;
@@ -923,9 +985,32 @@ async function main(): Promise<void> {
       await runRunCommand(args);
       break;
     case "mcp":
+      if (args.showHelp) {
+        console.log(logo);
+        console.log(tagline);
+        console.log(`  ${theme.secondary.bold("nella mcp")} — Start MCP server for AI agent integration (stdio)\n`);
+        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`    ${theme.muted("$")} ${theme.primary("nella mcp [--workspace <path>]")}\n`);
+        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}    Workspace path`);
+        console.log("");
+        break;
+      }
       await startMcpServer({ workspace: args.workspace });
       break;
     case "serve":
+      if (args.showHelp) {
+        console.log(logo);
+        console.log(tagline);
+        console.log(`  ${theme.secondary.bold("nella serve")} — Start hosted MCP server (HTTP)\n`);
+        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`    ${theme.muted("$")} ${theme.primary("nella serve [--port <number>] [--host <host>]")}\n`);
+        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}    Port (default: 3847)`);
+        console.log(`    ${theme.accent("--host")} ${theme.muted("<host>")}           Host (default: localhost)`);
+        console.log("");
+        break;
+      }
       await startHostedServer({ port: args.port, host: args.host });
       break;
     case "auth":
@@ -935,6 +1020,19 @@ async function main(): Promise<void> {
       await runConnectCommand(args);
       break;
     case "playground":
+      if (args.showHelp) {
+        console.log(logo);
+        console.log(tagline);
+        console.log(`  ${theme.secondary.bold("nella playground")} — Start playground server with real-time dashboard\n`);
+        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`    ${theme.muted("$")} ${theme.primary("nella playground [--workspace <path>] [--port <number>] [--host <host>]")}\n`);
+        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}      Workspace path`);
+        console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}         Port (default: 3847)`);
+        console.log(`    ${theme.accent("--host")} ${theme.muted("<host>")}               Host (default: localhost)`);
+        console.log("");
+        break;
+      }
       await startPlaygroundServer({
         workspace: args.workspace,
         port: args.port,

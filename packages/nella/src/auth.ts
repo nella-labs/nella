@@ -108,12 +108,14 @@ function openBrowser(url: string): void {
         ? `open "${url}"`
         : `xdg-open "${url}"`;
 
-  exec(cmd, (err) => {
+  const child = exec(cmd, (err) => {
     if (err) {
       // If open fails, user can manually open the URL
       // (the URL is printed to the console by the caller)
     }
   });
+  // Don't let the spawned browser process keep the CLI alive
+  child.unref();
 }
 
 function getRandomPort(): Promise<number> {
@@ -364,6 +366,10 @@ export async function login(): Promise<{
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
+        // Force-close any keep-alive connections so the process can exit
+        if (typeof server.closeAllConnections === "function") {
+          server.closeAllConnections();
+        }
         server.close();
       }
 
