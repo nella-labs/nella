@@ -121,7 +121,10 @@ function getSupabase() {
 let redisClient: Redis | null = null;
 
 function initRedis(): void {
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl =
+    process.env.REDIS_URL ||
+    process.env.REDIS_PRIVATE_URL ||
+    process.env.REDIS_PUBLIC_URL;
   if (!redisUrl) {
     console.log("[rate-limit] No REDIS_URL set — using in-memory rate limiting");
     return;
