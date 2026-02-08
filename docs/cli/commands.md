@@ -9,6 +9,10 @@ Complete command reference for `@usenella/nella`.
   - [nella validate](#nella-validate)
   - [nella run](#nella-run)
   - [nella mcp](#nella-mcp)
+  - [nella serve](#nella-serve)
+  - [nella connect](#nella-connect)
+  - [nella auth](#nella-auth)
+  - [nella playground](#nella-playground)
 - [Options](#options)
 - [Task Loading](#task-loading)
 - [Changes File Format](#changes-file-format)
@@ -182,14 +186,212 @@ Add to `~/.config/Claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%
 
 ---
 
+### `nella serve`
+
+Start a hosted MCP server using Streamable HTTP transport.
+
+```bash
+nella serve [--port <number>] [--host <host>]
+```
+
+**Purpose:** Run Nella as a hosted MCP server accessible over HTTP. This is the production-ready server with API key authentication (via Supabase), Redis-backed rate limiting, and WebSocket support for real-time events.
+
+**Example:**
+```bash
+# Start on default port
+nella serve
+
+# Start on custom port and host
+nella serve --port 8080 --host 0.0.0.0
+```
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL (required for auth) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (required for auth) |
+| `REDIS_URL` | Redis URL for rate limiting (falls back to in-memory) |
+| `PORT` | Override port (default: 3847) |
+| `NELLA_LOG_LEVEL` | Log verbosity level |
+
+**Server Endpoint:** `http://localhost:3847/mcp` (Streamable HTTP)
+
+**Health Check:** `http://localhost:3847/health`
+
+**Production URL:** `https://mcp.getnella.dev/mcp`
+
+---
+
+### `nella connect`
+
+Configure MCP clients to use Nella's hosted server.
+
+```bash
+nella connect [--api-key <key>] [--server-url <url>] [--client <name>]
+```
+
+**Purpose:** Automatically configure Claude Desktop and/or VS Code to connect to the Nella hosted MCP server. If you're logged in, it auto-creates an API key for you.
+
+**Example:**
+```bash
+# Auto-configure all clients (creates API key if logged in)
+nella connect
+
+# Configure with an existing API key
+nella connect --api-key nella_your_key_here
+
+# Configure only Claude Desktop
+nella connect --client claude
+
+# Connect to a custom server URL
+nella connect --server-url http://localhost:3847/mcp --api-key nella_your_key
+```
+
+**What it does:**
+1. Verifies authentication (or uses provided API key)
+2. If logged in with no key, auto-creates an API key
+3. Checks server health/reachability
+4. Writes MCP config to Claude Desktop config file and/or VS Code settings
+5. Reports success per client
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--api-key` | `-k` | API key (must start with `nella_`). Auto-created if logged in. |
+| `--server-url` | `-u` | Server URL (default: `https://mcp.getnella.dev/mcp`) |
+| `--client` | | Target client: `claude`, `vscode`, or `all` (default: `all`) |
+
+**Prerequisite:** Either run `nella auth login` first, or provide `--api-key` directly.
+
+---
+
+### `nella auth`
+
+Manage authentication for the Nella hosted service.
+
+```bash
+nella auth <subcommand>
+```
+
+**Subcommands:**
+
+#### `nella auth login`
+
+Open a browser for authentication via your Nella account.
+
+```bash
+nella auth login
+
+# Flow:
+# 1. Opens browser to app.getnella.dev/auth/cli
+# 2. Sign in with your account
+# 3. CLI receives session tokens via local redirect
+# 4. Session saved to ~/.nella/auth.json
+```
+
+**Output on success:**
+```
+✓ Logged in as you@example.com
+  Session saved to ~/.nella/auth.json
+
+  Next: nella connect to configure your MCP clients
+```
+
+#### `nella auth logout`
+
+Clear stored credentials.
+
+```bash
+nella auth logout
+
+# Output:
+# ✓ Logged out — credentials removed
+```
+
+#### `nella auth status`
+
+Show current login state.
+
+```bash
+nella auth status
+
+# Output (if logged in):
+# ✓ Authenticated
+#   Email:   you@example.com
+#   User ID: abc-123-...
+#   Expires: 2/10/2026, 3:00:00 PM
+
+# Output (if not logged in):
+# ⚠ Not logged in
+#   Run nella auth login to authenticate
+```
+
+**Session Storage:** `~/.nella/auth.json` — contains access token, refresh token, expiry, and user info.
+
+---
+
+### `nella playground`
+
+Start the playground server with a real-time debugging dashboard.
+
+```bash
+nella playground [--workspace <path>] [--repo <url|path>] [--port <number>] [--host <host>]
+```
+
+**Purpose:** Launch an interactive dashboard for debugging agent sessions in real-time. Includes WebSocket support for live updates, chain-of-thought visualization, tool call tracking, and cost estimation.
+
+**Example:**
+```bash
+# Start playground for current directory
+nella playground
+
+# Start for a specific workspace
+nella playground --workspace /path/to/project
+
+# Clone and use a git repo
+nella playground --repo https://github.com/user/repo
+
+# Custom port
+nella playground --port 4000
+```
+
+**Dashboard:** Opens at `http://localhost:3847` (HTML dashboard)
+
+**WebSocket:** `ws://localhost:3847/ws` (real-time session events)
+
+**Features:**
+- Real-time session tracking
+- Chain-of-thought visualization
+- Tool call history and timing
+- Token usage and cost tracking
+- Live validation results
+
+**Options:**
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--workspace` | `-w` | Workspace path |
+| `--repo` | `-r` | Git repo URL or local path (auto-clones URLs) |
+| `--port` | `-p` | Port (default: 3847) |
+| `--host` | | Host (default: localhost) |
+
+---
+
 ## Options
 
 | Option | Short | Description | Commands |
 |--------|-------|-------------|----------|
 | `--task <path>` | `-t` | Path to task.yaml or task directory | check, validate, run |
-| `--workspace <path>` | `-w` | Path to workspace/project | mcp |
-| `--repo <path>` | `-r` | Path to repository | All |
+| `--workspace <path>` | `-w` | Path to workspace/project | mcp, playground |
+| `--repo <path>` | `-r` | Path to repository or git URL | check, validate, run, playground |
 | `--changes <path>` | `-c` | Path to changes.json file | validate, run |
+| `--port <number>` | `-p` | Port for HTTP server (default: 3847) | serve, playground |
+| `--host <host>` | | Host for HTTP server (default: localhost) | serve, playground |
+| `--api-key <key>` | `-k` | API key for connect command | connect |
+| `--server-url <url>` | `-u` | Server URL for connect | connect |
+| `--client <name>` | | Target MCP client: claude, vscode, all | connect |
 | `--skip-validation` | | Skip test/lint/compile commands | validate, run |
 | `--skip-prerequisites` | | Skip package.json/node_modules checks | check, run |
 | `--json` | | Output as JSON (for programmatic use) | All |
