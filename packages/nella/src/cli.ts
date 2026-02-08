@@ -1025,9 +1025,10 @@ async function main(): Promise<void> {
         console.log(tagline);
         console.log(`  ${theme.secondary.bold("nella playground")} — Start playground server with real-time dashboard\n`);
         console.log(`  ${theme.secondary.bold("Usage:")}\n`);
-        console.log(`    ${theme.muted("$")} ${theme.primary("nella playground [--workspace <path>] [--port <number>] [--host <host>]")}\n`);
+        console.log(`    ${theme.muted("$")} ${theme.primary("nella playground [--workspace <path>] [--repo <url>] [--port <number>] [--host <host>]")}\n`);
         console.log(`  ${theme.secondary.bold("Options:")}\n`);
         console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}      Workspace path`);
+        console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<url|path>")}       Git repo URL or local path to use as workspace`);
         console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}         Port (default: 3847)`);
         console.log(`    ${theme.accent("--host")} ${theme.muted("<host>")}               Host (default: localhost)`);
         console.log("");
@@ -1037,6 +1038,7 @@ async function main(): Promise<void> {
         workspace: args.workspace,
         port: args.port,
         host: args.host,
+        repo: args.repoPath,
       });
       break;
     case "help":
