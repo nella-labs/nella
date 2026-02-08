@@ -642,4 +642,4 @@ console.log(ctx.getSummary());
 ctx.save();
 ```
 
-> Looking for shared, cross-agent context? See the Context Sharing section in [Core Modules](./modules.md).
+> Looking for shared, cross-agent context? See the Context Sharing section in [Core Modules](./modules.md). The `ContextManager` documented on this page tracks a single agent's **session state** (assumptions, changes, dependencies). The `SharedContextManager` manages **cross-agent context** with channels, encryption, and multiple transports (local, Supabase).

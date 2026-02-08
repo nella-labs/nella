@@ -318,3 +318,132 @@ const passed =
   result.metrics.constraintViolations === 0 &&
   (result.validation === null || result.validation.allPassed);
 ```
+
+---
+
+## Agent Configuration
+
+Configure the built-in agent runner for automated benchmarking or tool-use loops.
+
+```typescript
+import { createAgentAdapter, AgentRunner } from '@usenella/core';
+
+const adapter = createAgentAdapter({
+  provider: 'anthropic',          // 'anthropic' | 'openai'
+  model: 'claude-sonnet-4-20250514',
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  maxTokens: 4096,
+  temperature: 0
+});
+
+const runner = new AgentRunner(adapter, {
+  maxIterations: 10,
+  tools: nellaTools
+});
+```
+
+### Supported Models
+
+| Model | Provider |
+|-------|----------|
+| `claude-sonnet-4-20250514` | Anthropic |
+| `claude-opus-4-20250514` | Anthropic |
+| `gpt-4-turbo` | OpenAI |
+| `gpt-4o` | OpenAI |
+| `gpt-4o-mini` | OpenAI |
+
+---
+
+## Sync Configuration
+
+Configure cloud sync across tiers.
+
+```typescript
+const syncConfig = {
+  tier: 'gcp',                     // 'local' | 'supabase' | 'gcp'
+  cloudStorageConfig: {
+    bucket: 'nella-artifacts',
+    projectId: 'my-gcp-project'
+  },
+  cloudSync: {
+    conflictResolution: 'merge',   // 'last-write-wins' | 'merge' | 'manual' | 'server-wins'
+    compression: true,
+    bandwidthLimitKBps: 512,
+    include: ['**/*'],
+    exclude: ['**/node_modules/**', '**/.git/**']
+  }
+};
+```
+
+---
+
+## Rate Limit Configuration
+
+```typescript
+const rateLimitConfig = {
+  maxRequests: 1000,              // Max requests per window
+  windowMs: 60000,               // Window duration (ms)
+  backend: 'redis',              // 'memory' | 'redis' | 'sqlite'
+  algorithm: 'token-bucket',     // 'sliding-window' | 'token-bucket'
+  degradation: {
+    enabled: true,
+    thresholds: [
+      { load: 0.8, reduction: 0.2 },
+      { load: 0.95, reduction: 0.5 }
+    ]
+  }
+};
+```
+
+---
+
+## Workspace Configuration
+
+```typescript
+const workspaceConfig = {
+  name: 'my-project',
+  path: '/path/to/repo',
+  indexConfig: {
+    embedder: 'voyage-code-2',
+    dimensions: 1536,
+    chunkStrategy: 'ast',
+    hybridWeights: { vector: 0.4, lexical: 0.6 }
+  },
+  syncConfig: { tier: 'local' },
+  watchEnabled: true
+};
+```
+
+---
+
+## Indexing Configuration
+
+```typescript
+const indexConfig = {
+  embedder: 'voyage-code-2',      // 'voyage-code-2' | 'openai' | 'local'
+  dimensions: 1536,               // Embedding dimensions
+  chunkStrategy: 'ast',           // AST-based chunking
+  hybridWeights: {
+    vector: 0.4,                  // Vector search weight
+    lexical: 0.6                  // Lexical search weight
+  },
+  fusionK: 60,                    // RRF fusion constant
+  reranker: 'cohere'              // Optional reranker
+};
+```
+
+---
+
+## Environment Variables
+
+| Variable | Module | Description |
+|----------|--------|-------------|
+| `ANTHROPIC_API_KEY` | Agents | Anthropic API key for Claude models |
+| `OPENAI_API_KEY` | Agents | OpenAI API key for GPT models |
+| `VOYAGE_API_KEY` | Indexing | Voyage AI API key for embeddings |
+| `COHERE_API_KEY` | Indexing | Cohere API key for reranking |
+| `SUPABASE_URL` | Sync, Auth | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Sync, Auth | Supabase service role key |
+| `REDIS_URL` | Rate Limiting | Redis connection URL |
+| `NELLA_API_KEY` | CLI | Default API key for connect command |
+| `NELLA_LOG_LEVEL` | All | Log verbosity level |
