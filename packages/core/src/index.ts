@@ -513,3 +513,26 @@ export type {
   WebSocketClient,
   ServerEventHandlers,
 } from "./playground";
+
+// =============================================================================
+// Agents Module
+// =============================================================================
+
+export { AgentRunner, createAgentAdapter, AgentAdapter, AnthropicAdapter, OpenAIAdapter, MODEL_PRICING, estimateAgentCost } from "./agents";
+
+export type {
+  AgentProvider as LLMAgentProvider,
+  AgentConfig as LLMAgentConfig,
+  AgentMessage,
+  ToolUseRequest,
+  ToolDefinition,
+  TokenUsage as AgentTokenUsage,
+  LLMCallResult,
+  AgentStatus,
+  AgentRunConfig,
+  AgentTurn,
+  AgentRunResult,
+  AgentRunnerEvent,
+  AgentRunnerEventHandler,
+  LLMCallOptions,
+} from "./agents";

@@ -2,21 +2,74 @@
  * Playground Server Launcher
  *
  * Starts the Nella playground server for real-time agent monitoring.
+ * Optionally clones a Git repo to use as the workspace.
  */
 
 import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+import { execSync } from "child_process";
 import { createPlaygroundServer } from "@usenella/core";
 
 export interface PlaygroundOptions {
   workspace?: string;
   port?: number;
   host?: string;
+  /** Git repo URL or local path to clone / use */
+  repo?: string;
+}
+
+/**
+ * If `repo` looks like a Git URL, clone it to a temp directory and return the path.
+ * If it's a local path, just resolve and return it.
+ */
+function resolveRepo(repo: string): string {
+  const isGitUrl =
+    repo.startsWith("https://") ||
+    repo.startsWith("git@") ||
+    repo.startsWith("http://") ||
+    repo.endsWith(".git");
+
+  if (!isGitUrl) {
+    // Treat as local path
+    const resolved = path.resolve(repo);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`Repo path does not exist: ${resolved}`);
+    }
+    return resolved;
+  }
+
+  // Extract repo name from URL
+  const repoName = path.basename(repo, ".git").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const cloneDir = path.join(os.tmpdir(), "nella-playground", repoName);
+
+  if (fs.existsSync(path.join(cloneDir, ".git"))) {
+    console.log(`[Playground] Repo already cloned, pulling latest...`);
+    try {
+      execSync("git pull --ff-only", { cwd: cloneDir, stdio: "pipe" });
+    } catch {
+      console.log(`[Playground] Pull failed, using existing clone`);
+    }
+    return cloneDir;
+  }
+
+  console.log(`[Playground] Cloning ${repo}...`);
+  fs.mkdirSync(path.dirname(cloneDir), { recursive: true });
+  execSync(`git clone --depth 1 ${repo} ${cloneDir}`, { stdio: "inherit" });
+  return cloneDir;
 }
 
 export async function startPlaygroundServer(options: PlaygroundOptions): Promise<void> {
-  const workspacePath = options.workspace
-    ? path.resolve(options.workspace)
-    : process.cwd();
+  let workspacePath: string;
+
+  if (options.repo) {
+    workspacePath = resolveRepo(options.repo);
+    console.log(`[Playground] Using repo workspace: ${workspacePath}`);
+  } else {
+    workspacePath = options.workspace
+      ? path.resolve(options.workspace)
+      : process.cwd();
+  }
 
   const storagePath = path.join(workspacePath, ".nella");
 

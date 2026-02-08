@@ -117,7 +117,9 @@ export type ClientMessage =
   | { type: "session:clear" }
   | { type: "index:start"; incremental?: boolean }
   | { type: "context:get"; key?: string }
-  | { type: "context:set"; key: string; value: unknown };
+  | { type: "context:set"; key: string; value: unknown }
+  | { type: "agent:start"; provider: string; model: string; apiKey: string; prompt: string; maxTurns?: number; maxTokens?: number }
+  | { type: "agent:stop" };
 
 /**
  * Server to client messages
@@ -133,7 +135,15 @@ export type ServerMessage =
   | { type: "index:complete"; stats: { files: number; chunks: number; tokens: number } }
   | { type: "rate:warning"; window: string; percentUsed: number }
   | { type: "error"; message: string; code?: string }
-  | { type: "connected"; sessionId: string; clientId: string };
+  | { type: "connected"; sessionId: string; clientId: string }
+  | { type: "agent:status"; status: string }
+  | { type: "agent:turn:start"; turnNumber: number }
+  | { type: "agent:turn:thinking"; turnNumber: number; content: string }
+  | { type: "agent:turn:tool_call"; turnNumber: number; toolName: string; args: Record<string, unknown> }
+  | { type: "agent:turn:tool_result"; turnNumber: number; toolName: string; result: string; success: boolean }
+  | { type: "agent:turn:end"; turnNumber: number; tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number }; cost: number; durationMs: number }
+  | { type: "agent:done"; status: string; totalTokens: number; totalCost: number; totalDurationMs: number; turns: number; error?: string }
+  | { type: "workspace:info"; workspace: { name: string; path: string; indexStatus: string; filesIndexed: number; chunksCount: number } };
 
 // =============================================================================
 // Server Config
