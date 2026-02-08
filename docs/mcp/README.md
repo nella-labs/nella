@@ -1,23 +1,28 @@
 # MCP Server Documentation
 
-The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude through the Model Context Protocol.
+The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude through the Model Context Protocol. It supports both local stdio mode and hosted HTTP mode, providing 18 tools across 4 categories.
 
 ## Overview
 
-The `@usenella/nella` package provides both a CLI and an MCP server that allows AI agents to:
+The `@usenella/nella` package provides a CLI and MCP server that allows AI agents to:
 
 - **Validate changes** against constraints before/after making them
 - **Detect risks** in proposed code modifications
 - **Track context** across conversation sessions
 - **Check prerequisites** before starting work
+- **Search & index** codebases with hybrid semantic/lexical search
+- **Share context** across multiple agents via channels
+- **Verify code** against the indexed codebase for type and API correctness
+- **Monitor status** of the server, workspaces, and connected agents
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Tools Reference](./tools.md) | Complete reference for all 12 MCP tools |
-| [Integration Guide](./integration.md) | Setup for Claude Desktop, Claude Code, and custom clients |
+| [Tools Reference](./tools.md) | Complete reference for all 18 MCP tools |
+| [Integration Guide](./integration.md) | Setup for Claude Desktop, Claude Code, hosted/self-hosted, and custom clients |
 | [Context Management](../core/context.md) | Session persistence, assumptions, and dependency tracking |
+| [CLI Commands](../cli/commands.md) | Full CLI reference (`serve`, `connect`, `auth`, etc.) |
 | [Examples](../core/examples.md) | Practical code examples |
 
 ## Quick Start
@@ -82,32 +87,48 @@ Track state across sessions:
 - `nella_check_dependencies` — Detect dependency changes
 - `nella_record_change` — Manual change recording
 
+### Core Tools
+Indexing, search, shared context, and server management (available via `nella serve` or direct import):
+- `nella_search` — Hybrid semantic + lexical codebase search
+- `nella_verify` — Verify code against indexed codebase
+- `nella_index` — Index a workspace directory
+- `nella_get_context` (core) — Read shared cross-agent context
+- `nella_set_context` — Publish context to shared channels
+- `nella_status` — Server status, workspace health, connected agents
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Claude / Agent                        │
+│                    Claude / Agent / Client                    │
 └─────────────────────────────────────────────────────────────┘
                               │
-                    MCP Protocol (stdio)
+              MCP Protocol (stdio OR Streamable HTTP)
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                     @usenella/nella                        │
+│                     @usenella/nella                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ Validation  │  │   Safety    │  │      Context        │  │
-│  │   Tools     │  │   Tools     │  │       Tools         │  │
+│  │  (3 tools)  │  │  (3 tools)  │  │     (6 tools)       │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                     @usenella/core                         │
+│                     @usenella/core                           │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │Validators│  │  Safety  │  │  Utils   │  │   Context   │  │
+│  │Validators│  │ Indexing │  │  Auth &  │  │   Context   │  │
+│  │ & Safety │  │ & Search │  │Rate Limit│  │  Sharing    │  │
 │  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
+│  │  Agents  │  │  Export  │  │   Sync   │  │ Playground  │  │
+│  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
+│────────────────── Core MCP Tools (6) ──────────────────────│  │
 └─────────────────────────────────────────────────────────────┘
                               │
-                         Workspace
-                      .nella/session.json
+                ┌─────────────┼─────────────┐
+                │             │             │
+           Workspace      GCP/Supabase    Redis
+        .nella/session    (cloud sync)  (rate limits)
 ```
 
 ## Session Persistence

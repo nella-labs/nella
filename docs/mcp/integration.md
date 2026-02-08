@@ -4,12 +4,40 @@ How to set up and configure the Nella MCP Server with various clients.
 
 ## Table of Contents
 
+- [Quick Start with CLI](#quick-start-with-cli)
 - [Hosted (Cloud)](#hosted-cloud)
+- [Self-Hosted Server (nella serve)](#self-hosted-server-nella-serve)
 - [Claude Desktop](#claude-desktop)
 - [Claude Code (CLI)](#claude-code-cli)
 - [Custom MCP Clients](#custom-mcp-clients)
+- [Authentication (nella auth)](#authentication-nella-auth)
 - [Configuration Options](#configuration-options)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Quick Start with CLI
+
+The fastest way to connect any MCP client to a self-hosted Nella server:
+
+```bash
+# 1. Start the server in the background
+nella serve --port 3001
+
+# 2. Auto-configure your MCP client
+nella connect --client claude-desktop
+
+# Or for Claude Code:
+nella connect --client claude-code
+```
+
+The `nella connect` command automatically:
+- Creates an API key for the client
+- Generates the correct MCP configuration
+- Writes it to the client's config file
+- Prints the config for verification
+
+See [CLI Commands](../cli/commands.md) for full details.
 
 ---
 
@@ -89,7 +117,7 @@ docker run -p 3001:3001 \
   ghcr.io/nella-labs/nella-mcp:latest
 ```
 
-Or use the CLI:
+Or use the CLI (recommended for self-hosting):
 
 ```bash
 nella serve --port 3001
@@ -100,6 +128,82 @@ Required environment variables:
 - `SUPABASE_SERVICE_ROLE_KEY` — Service role key for API key validation
 - `PORT` — Server port (default: 3001)
 - `REDIS_URL` — (Optional) Redis connection for distributed rate limiting
+
+---
+
+## Self-Hosted Server (nella serve)
+
+Run your own Nella MCP server with full access to all 18 tools, authentication, rate limiting, and workspace indexing.
+
+### Starting the Server
+
+```bash
+# Basic — binds to localhost:3001
+nella serve
+
+# Custom port and host
+nella serve --port 8080 --host 0.0.0.0
+
+# With API key authentication required
+nella serve --port 3001 --api-key nella_my_secret_key
+```
+
+### Server Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/mcp` | POST | MCP Streamable HTTP transport |
+| `/health` | GET | Health check (returns `{ status: "ok" }`) |
+| `/status` | GET | Server status and metrics |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | For cloud features | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | For cloud features | Service role key |
+| `PORT` | No | Server port (default: 3001) |
+| `REDIS_URL` | No | Redis for distributed rate limiting |
+| `NELLA_API_KEY` | No | API key for authentication |
+| `ANTHROPIC_API_KEY` | For agents | Anthropic API key |
+| `OPENAI_API_KEY` | For agents | OpenAI API key |
+
+### Connecting Clients
+
+Use `nella connect` to auto-configure MCP clients:
+
+```bash
+# Connect Claude Desktop to a running server
+nella connect --client claude-desktop --server-url http://localhost:3001
+
+# Connect Claude Code
+nella connect --client claude-code --server-url http://localhost:3001
+
+# Connect with a specific API key
+nella connect --client claude-desktop --api-key nella_my_key
+```
+
+### Docker Deployment
+
+```yaml
+# docker-compose.yml
+services:
+  nella:
+    image: ghcr.io/nella-labs/nella-mcp:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+```
 
 ---
 
@@ -224,7 +328,7 @@ After configuring, restart Claude Desktop and ask Claude:
 
 > "What Nella tools do you have available?"
 
-Claude should list all 12 tools if configured correctly.
+Claude should list all 18 tools (12 standard + 6 core) if configured correctly.
 
 ---
 
@@ -318,10 +422,60 @@ The server maintains a context object:
 
 ```typescript
 interface ServerContext {
-  workspacePath: string;      // Configured workspace path
-  contextManager: ContextManager;  // Session state manager
+  workspacePath: string;          // Configured workspace path
+  contextManager: ContextManager; // Session state manager
 }
 ```
+
+For hosted/self-hosted servers, the context also includes:
+
+```typescript
+interface HostedServerContext extends ServerContext {
+  authenticator: Authenticator;       // API key validation
+  rateLimiter: RateLimiter;           // Per-key rate limiting
+  sharedContext: SharedContextManager; // Cross-agent context
+  indexManager: IndexManager;          // Workspace indexing
+  syncManager: SyncManager;           // Cloud sync
+}
+```
+
+---
+
+## Authentication (nella auth)
+
+The `nella auth` command manages authentication for hosted and self-hosted servers.
+
+### Login
+
+```bash
+# Interactive login (opens browser for OAuth)
+nella auth login
+
+# Login with API key directly
+nella auth login --api-key nella_YOUR_KEY
+
+# Login to a self-hosted server
+nella auth login --server-url http://localhost:3001
+```
+
+### Check Session
+
+```bash
+nella auth status
+# Output:
+# ✅ Authenticated
+# Server: https://mcp.getnella.dev
+# Key: nella_abc...xyz (masked)
+# Expires: 2026-03-15T00:00:00Z
+```
+
+### Logout
+
+```bash
+nella auth logout
+```
+
+Session data is stored in `~/.nella/auth.json` (macOS/Linux) or `%APPDATA%\nella\auth.json` (Windows).
 
 ---
 
