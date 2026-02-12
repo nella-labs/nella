@@ -7,6 +7,7 @@
 
 import * as crypto from "crypto";
 import * as http from "http";
+import * as https from "https";
 import * as fs from "fs";
 import * as path from "path";
 import type {
@@ -26,6 +27,14 @@ import { McpToolHandler, createMcpToolHandler } from "../mcp";
 import { Authenticator, createAuthenticator } from "../auth";
 import { RateLimiter, createRateLimiter } from "../rate-limit";
 import { ContextManager, createContextManager } from "../context-sharing";
+import { createLogger, generateCorrelationId } from "./logger";
+import type { Logger } from "./logger";
+import { createPlaygroundMetrics } from "./metrics";
+import type { PlaygroundMetrics } from "./metrics";
+import { createAuthMiddleware } from "./middleware/auth";
+import type { AuthMiddleware } from "./middleware/auth";
+import { createSessionStore } from "./session-store";
+import type { SessionStore } from "./session-store";
 
 // Dynamic imports for express and ws (they may not be installed)
 let express: typeof import("express") | null = null;
@@ -245,8 +254,14 @@ export class PlaygroundServer {
   private costConfig: CostConfig;
   private isRunning: boolean = false;
   private eventHandlers: ServerEventHandlers = {};
-  private httpServer: http.Server | null = null;
+  private httpServer: http.Server | https.Server | null = null;
   private wss: InstanceType<typeof import("ws").WebSocketServer> | null = null;
+  private logger: Logger;
+  private metrics: PlaygroundMetrics;
+  private authMiddleware: AuthMiddleware | null = null;
+  private sessionStore: SessionStore;
+  private startTime: number = 0;
+  private draining: boolean = false;
 
   constructor(config: Partial<PlaygroundServerConfig> & { workspacePath: string; storagePath: string }) {
     this.config = { ...DEFAULT_SERVER_CONFIG, ...config };
@@ -255,6 +270,9 @@ export class PlaygroundServer {
     this.registry = getWorkspaceRegistry(this.config.storagePath);
     this.rateLimiter = createRateLimiter();
     this.contextManager = createContextManager(this.config.storagePath);
+    this.logger = createLogger("PlaygroundServer");
+    this.metrics = createPlaygroundMetrics();
+    this.sessionStore = createSessionStore(this.config.storagePath, this.logger);
   }
 
   // =============================================================================
@@ -288,6 +306,15 @@ export class PlaygroundServer {
       this.authenticator = await createAuthenticator(this.config.storagePath);
     }
 
+    // Initialize auth middleware if enabled
+    if (this.config.authEnabled) {
+      this.authMiddleware = createAuthMiddleware({
+        supabaseUrl: process.env.SUPABASE_URL,
+        supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      }, this.logger);
+    }
+
+    this.startTime = Date.now();
     const app = express();
 
     // CORS middleware
@@ -321,6 +348,26 @@ export class PlaygroundServer {
       });
     });
 
+    // Readiness probe
+    app.get("/ready", (_req, res) => {
+      const ready = this.isRunning && !this.draining;
+      res.status(ready ? 200 : 503).json({
+        ready,
+        draining: this.draining,
+        clients: this.clients.size,
+      });
+    });
+
+    // Prometheus-compatible metrics endpoint
+    app.get("/metrics", (_req, res) => {
+      // Update runtime gauges
+      this.metrics.uptimeSeconds.set((Date.now() - this.startTime) / 1000);
+      this.metrics.wsConnectionsActive.set(this.clients.size);
+
+      res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+      res.send(this.metrics.registry.serialize());
+    });
+
     // Context health smoke test
     app.get("/context-health", (_req, res) => {
       try {
@@ -348,6 +395,11 @@ export class PlaygroundServer {
         });
       }
     });
+
+    // Auth middleware for /api/* routes
+    if (this.authMiddleware) {
+      app.use("/api", this.authMiddleware.expressMiddleware);
+    }
 
     // List available MCP tools
     app.get("/api/tools", (_req, res) => {
@@ -661,24 +713,69 @@ export class PlaygroundServer {
       `);
     });
 
-    // Create HTTP server
-    this.httpServer = http.createServer(app);
+    // Create HTTP or HTTPS server
+    if (this.config.tls && this.config.tlsCert && this.config.tlsKey) {
+      const tlsOptions = {
+        cert: fs.readFileSync(this.config.tlsCert),
+        key: fs.readFileSync(this.config.tlsKey),
+      };
+      this.httpServer = https.createServer(tlsOptions, app);
+      this.logger.info("TLS enabled", { cert: this.config.tlsCert });
+    } else {
+      this.httpServer = http.createServer(app);
+    }
 
     // Create WebSocket server
     this.wss = new WebSocketServer({ server: this.httpServer, path: "/ws" });
 
-    this.wss.on("connection", (ws) => {
+    this.wss.on("connection", async (ws, req) => {
+      // Connection limit check
+      const maxConn = this.config.maxConnections || 0;
+      if (maxConn > 0 && this.clients.size >= maxConn) {
+        this.logger.warn("Connection rejected: max connections reached", { max: maxConn });
+        ws.close(1013, "Max connections reached");
+        return;
+      }
+
+      // Reject during draining
+      if (this.draining) {
+        ws.close(1001, "Server is shutting down");
+        return;
+      }
+
+      // WebSocket auth via ?token= query param
+      if (this.authMiddleware) {
+        const url = new URL(req.url || "/", `http://${req.headers.host}`);
+        const token = url.searchParams.get("token");
+        if (!token) {
+          ws.close(4001, "Authentication required");
+          return;
+        }
+        const authResult = await this.authMiddleware.validateToken(token);
+        if (!authResult.valid) {
+          ws.close(4003, authResult.error || "Invalid token");
+          return;
+        }
+      }
+
+      const correlationId = generateCorrelationId();
       const clientId = this.handleConnect((message: ServerMessage) => {
         if (ws.readyState === ws.OPEN) {
           ws.send(JSON.stringify(message));
         }
       });
 
+      this.logger.info("Client connected", { clientId: clientId.slice(0, 16), correlationId });
+      this.metrics.wsConnectionsActive.inc();
+
       ws.on("message", async (data) => {
+        this.metrics.wsMessagesTotal.inc({ direction: "in" });
         try {
           const message = JSON.parse(data.toString()) as ClientMessage;
+          this.metrics.wsMessagesTotal.inc({ direction: "in", type: message.type });
           await this.handleMessage(clientId, message);
         } catch (error) {
+          this.metrics.errorsTotal.inc({ type: "ws_message_parse" });
           const client = this.clients.get(clientId);
           client?.send({
             type: "error",
@@ -688,11 +785,16 @@ export class PlaygroundServer {
       });
 
       ws.on("close", () => {
+        this.logger.info("Client disconnected", { clientId: clientId.slice(0, 16) });
+        this.metrics.wsConnectionsActive.dec();
         this.handleDisconnect(clientId);
       });
 
       ws.on("error", (error) => {
+        this.logger.error("WebSocket error", { clientId: clientId.slice(0, 16), error: error.message });
+        this.metrics.errorsTotal.inc({ type: "ws_error" });
         this.eventHandlers.onError?.(error);
+        this.metrics.wsConnectionsActive.dec();
         this.handleDisconnect(clientId);
       });
     });
@@ -706,20 +808,50 @@ export class PlaygroundServer {
     });
 
     this.isRunning = true;
-    console.log(`[Playground] Server started on http://${this.config.host}:${this.config.port}`);
-    console.log(`[Playground] WebSocket endpoint: ws://${this.config.host}:${this.config.port}/ws`);
-    console.log(`[Playground] Dashboard: http://${this.config.host}:${this.config.port}/`);
+    const proto = this.config.tls ? "https" : "http";
+    const wsproto = this.config.tls ? "wss" : "ws";
+    this.logger.info("Server started", {
+      url: `${proto}://${this.config.host}:${this.config.port}`,
+      ws: `${wsproto}://${this.config.host}:${this.config.port}/ws`,
+      tls: !!this.config.tls,
+      auth: this.config.authEnabled,
+      maxConnections: this.config.maxConnections || "unlimited",
+    });
     this.eventHandlers.onStart?.(this.config.port);
   }
 
   async stop(): Promise<void> {
     if (!this.isRunning) return;
 
-    // Close WebSocket connections
-    if (this.wss) {
-      for (const client of this.wss.clients) {
-        client.close();
+    this.logger.info("Graceful shutdown initiated");
+    this.draining = true;
+
+    // Save active sessions to the store
+    for (const client of this.clients.values()) {
+      if (client.sessionId) {
+        const session = this.sessionManager.get(client.sessionId);
+        if (session) {
+          this.sessionStore.save(session);
+        }
       }
+    }
+
+    // Tell WS clients we're going away, give them 5s to finish
+    if (this.wss) {
+      for (const wsClient of this.wss.clients) {
+        wsClient.close(1001, "Server shutting down");
+      }
+      // Wait up to 5s for clients to disconnect
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 5000);
+        const check = setInterval(() => {
+          if (this.clients.size === 0) {
+            clearTimeout(timeout);
+            clearInterval(check);
+            resolve();
+          }
+        }, 100);
+      });
       this.wss.close();
       this.wss = null;
     }
@@ -740,9 +872,12 @@ export class PlaygroundServer {
     this.sessionManager.destroy();
     this.rateLimiter.destroy();
     this.contextManager.destroy();
+    this.sessionStore.close();
+    this.authMiddleware?.destroy();
 
     this.isRunning = false;
-    console.log("[Playground] Server stopped");
+    this.draining = false;
+    this.logger.info("Server stopped");
     this.eventHandlers.onStop?.();
   }
 
@@ -917,10 +1052,18 @@ export class PlaygroundServer {
       arguments: args,
     });
     const duration = Date.now() - startTime;
+    const durationSec = duration / 1000;
+
+    // Track metrics
+    this.metrics.toolCallsTotal.inc({ tool: toolName, status: result.isError ? "error" : "success" });
+    this.metrics.toolDurationSeconds.observe(durationSec, { tool: toolName });
 
     // Estimate tokens and cost
     const tokens = this.estimateTokens(args, result);
     const cost = this.estimateCost(tokens);
+
+    this.metrics.tokensTotal.inc({ tool: toolName }, tokens);
+    this.metrics.costTotal.inc({ tool: toolName }, cost);
 
     // Create entry
     const entry: ToolCallEntry = {
@@ -1015,7 +1158,11 @@ export class PlaygroundServer {
     });
 
     try {
+      const indexStart = Date.now();
       await workspace.index({ incremental });
+
+      const indexDuration = (Date.now() - indexStart) / 1000;
+      this.metrics.indexingDurationSeconds.observe(indexDuration);
 
       const stats = workspace.stats;
       this.sessionManager.updateState(session.id, { indexStatus: "ready" });
@@ -1034,11 +1181,89 @@ export class PlaygroundServer {
   }
 
   private async handleContextGet(client: WebSocketClient, key?: string): Promise<void> {
-    // Implementation would use contextManager
+    if (!client.sessionId) {
+      throw new Error("Not subscribed to a session");
+    }
+
+    const session = this.sessionManager.get(client.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    try {
+      if (key) {
+        // Get a specific context entry
+        const entry = this.contextManager.get(key, session.workspaceId);
+        client.send({
+          type: "context:data",
+          key,
+          value: entry ? entry.value : null,
+        });
+      } else {
+        // List all entries for the workspace via wildcard query
+        const result = this.contextManager.query(session.workspaceId, { keyPattern: "*" });
+        for (const entry of result.entries) {
+          client.send({
+            type: "context:data",
+            key: entry.key,
+            value: entry.value,
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error("Context get failed", { key, error: String(error) });
+      client.send({
+        type: "error",
+        message: error instanceof Error ? error.message : String(error),
+        code: "CONTEXT_GET_ERROR",
+      });
+    }
   }
 
   private async handleContextSet(client: WebSocketClient, key: string, value: unknown): Promise<void> {
-    // Implementation would use contextManager
+    if (!client.sessionId) {
+      throw new Error("Not subscribed to a session");
+    }
+
+    const session = this.sessionManager.get(client.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    try {
+      this.contextManager.set({
+        key,
+        value,
+        type: typeof value === "object" ? "object" : "string",
+        sourceAgentId: client.id,
+        workspaceId: session.workspaceId,
+      });
+
+      client.send({
+        type: "context:updated",
+        key,
+        success: true,
+      });
+
+      // Broadcast to other clients in the session
+      const others = session.clients.filter((id) => id !== client.id);
+      for (const otherId of others) {
+        const other = this.clients.get(otherId);
+        other?.send({
+          type: "context:data",
+          key,
+          value,
+        });
+      }
+    } catch (error) {
+      this.logger.error("Context set failed", { key, error: String(error) });
+      client.send({
+        type: "context:updated",
+        key,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   // =============================================================================
@@ -1052,7 +1277,10 @@ export class PlaygroundServer {
 
     for (const clientId of session.clients) {
       const client = this.clients.get(clientId);
-      client?.send(message);
+      if (client) {
+        client.send(message);
+        this.metrics.wsMessagesTotal.inc({ direction: "out", type: message.type });
+      }
     }
   }
 

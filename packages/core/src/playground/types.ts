@@ -134,7 +134,9 @@ export type ServerMessage =
   | { type: "rate:warning"; window: string; percentUsed: number }
   | { type: "error"; message: string; code?: string }
   | { type: "connected"; sessionId: string; clientId: string }
-  | { type: "workspace:info"; workspace: { name: string; path: string; indexStatus: string; filesIndexed: number; chunksCount: number } };
+  | { type: "workspace:info"; workspace: { name: string; path: string; indexStatus: string; filesIndexed: number; chunksCount: number } }
+  | { type: "context:data"; key: string; value: unknown; version?: number }
+  | { type: "context:updated"; key: string; success: boolean; error?: string };
 
 // =============================================================================
 // Server Config
@@ -167,6 +169,18 @@ export interface PlaygroundServerConfig {
   
   /** Storage path for nella data */
   storagePath: string;
+
+  /** Enable TLS (HTTPS) */
+  tls?: boolean;
+
+  /** Path to TLS certificate file */
+  tlsCert?: string;
+
+  /** Path to TLS private key file */
+  tlsKey?: string;
+
+  /** Max concurrent WebSocket connections (0 = unlimited) */
+  maxConnections?: number;
 }
 
 // =============================================================================
