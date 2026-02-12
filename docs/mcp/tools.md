@@ -28,6 +28,12 @@ Complete reference for all tools exposed by the Nella MCP Server.
   - [nella_get_context (core)](#nella_get_context-core)
   - [nella_set_context](#nella_set_context)
   - [nella_status](#nella_status)
+  - [nella_explain](#nella_explain)
+  - [nella_docs](#nella_docs)
+  - [nella_history](#nella_history)
+- [Code Tools](#code-tools)
+  - [nella_refactor](#nella_refactor)
+  - [nella_test](#nella_test)
 
 ---
 
@@ -999,6 +1005,166 @@ Returns the current status of the Nella server, including loaded workspaces, ind
 
 ---
 
+### nella_explain
+
+> **Category:** Analysis | **Version:** 1.0.0 | **Timeout:** 30s
+
+Explains code by searching the workspace index and returning structured explanations. Chains internally to `nella_search`.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | `string` | ✅ | Code snippet or symbol name to explain |
+| `mode` | `"brief"` \| `"detailed"` | ❌ | Explanation depth (default: `"brief"`) |
+
+**Example Request:**
+```json
+{
+  "name": "nella_explain",
+  "arguments": {
+    "code": "LRUCache",
+    "mode": "detailed"
+  }
+}
+```
+
+**Example Response:**
+```markdown
+## 📖 Explanation: LRUCache
+
+**Type**: Class
+**Location**: workspace/lru-cache.ts
+
+### Summary
+Generic LRU (Least Recently Used) cache implementation with TTL support...
+
+### Related Symbols
+- workspace/workspace.ts — used for file content caching
+- mcp/cache.ts — used for tool result caching
+```
+
+---
+
+### nella_docs
+
+> **Category:** Search | **Version:** 1.0.0 | **Timeout:** 30s
+
+Searches workspace for documentation, comments, and README content.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | `string` | ✅ | Documentation search query |
+| `scope` | `"comments"` \| `"readme"` \| `"all"` | ❌ | Scope of search (default: `"all"`) |
+
+**Example Request:**
+```json
+{
+  "name": "nella_docs",
+  "arguments": {
+    "query": "rate limiting",
+    "scope": "readme"
+  }
+}
+```
+
+---
+
+### nella_history
+
+> **Category:** System | **Version:** 1.0.0 | **Timeout:** 5s
+
+Returns recent tool call history. Useful for debugging and understanding what tools have been invoked recently.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | `number` | ❌ | Maximum entries to return (default: `20`) |
+| `toolName` | `string` | ❌ | Filter by specific tool name |
+| `since` | `string` | ❌ | ISO date — only show calls after this time |
+
+**Example Request:**
+```json
+{
+  "name": "nella_history",
+  "arguments": {
+    "limit": 5,
+    "toolName": "nella_search"
+  }
+}
+```
+
+**Example Response:**
+```markdown
+## 📜 Call History (5 entries)
+
+| # | Tool | Duration | Status | Time |
+|---|------|----------|--------|------|
+| 1 | nella_search | 42ms | ✅ | 2m ago |
+| 2 | nella_search | 38ms | ✅ | 5m ago |
+| 3 | nella_search | 127ms | ❌ | 8m ago |
+```
+
+---
+
+## Code Tools
+
+### nella_refactor
+
+> **Category:** Code | **Package:** `@usenella/nella`
+
+Analyzes code for refactoring opportunities including deep nesting, long functions, repeated patterns, complex conditionals, magic numbers, TODO comments, and unused imports.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | `string` | ✅ | Code to analyze |
+| `language` | `string` | ❌ | Programming language hint |
+| `intent` | `"simplify"` \| `"extract"` \| `"rename"` | ❌ | Refactoring intent |
+
+**Example Request:**
+```json
+{
+  "name": "nella_refactor",
+  "arguments": {
+    "code": "function process(data) {\n  if (data) {\n    if (data.valid) {\n      if (data.items) {\n        // deep nesting...\n      }\n    }\n  }\n}",
+    "intent": "simplify"
+  }
+}
+```
+
+---
+
+### nella_test
+
+> **Category:** Code | **Package:** `@usenella/nella`
+
+Generates test skeletons for functions, classes, and methods found in the provided code.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `code` | `string` | ✅ | Code to generate tests for |
+| `framework` | `"jest"` \| `"vitest"` \| `"mocha"` | ❌ | Testing framework (default: `"jest"`) |
+
+**Example Request:**
+```json
+{
+  "name": "nella_test",
+  "arguments": {
+    "code": "export function add(a: number, b: number): number { return a + b; }",
+    "framework": "vitest"
+  }
+}
+```
+
+---
+
 ## Tool Response Format
 
 All tools return markdown-formatted text responses that include:
@@ -1020,6 +1186,7 @@ Responses are designed to be:
 | Validation | `nella_check`, `nella_validate`, `nella_run` | `@usenella/nella` | Code quality validation |
 | Safety | `nella_detect_risks`, `nella_should_refuse`, `nella_check_prerequisites` | `@usenella/nella` | Risk detection and safety |
 | Context | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_get_file_history`, `nella_check_dependencies`, `nella_record_change` | `@usenella/nella` | Session context tracking |
-| Core | `nella_search`, `nella_verify`, `nella_index`, `nella_get_context (core)`, `nella_set_context`, `nella_status` | `@usenella/core` | Indexing, search, shared context, status |
+| Code | `nella_refactor`, `nella_test` | `@usenella/nella` | Code analysis and test generation |
+| Core | `nella_search`, `nella_verify`, `nella_index`, `nella_get_context`, `nella_set_context`, `nella_status`, `nella_explain`, `nella_docs`, `nella_history` | `@usenella/core` | Indexing, search, shared context, explanation, docs, history, status |
 
-**Total: 18 MCP tools** across 4 categories.
+**Total: 23 MCP tools** across 5 categories.
