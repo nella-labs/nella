@@ -221,4 +221,4 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 
 ---
 
-Built by [Nella Labs](https://github.com/usenella)
+Built by [Nella Labs](https://github.com/nella-labs) 
