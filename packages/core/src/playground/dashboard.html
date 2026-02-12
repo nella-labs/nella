@@ -541,30 +541,7 @@
       <div class="sidebar-section">
         <h3>MCP Tools</h3>
         <div class="tool-list" id="tool-list">
-          <div class="tool-item active" data-tool="nella_search">
-            <div class="tool-name">nella_search</div>
-            <div class="tool-desc">Hybrid search for code</div>
-          </div>
-          <div class="tool-item" data-tool="nella_verify">
-            <div class="tool-name">nella_verify</div>
-            <div class="tool-desc">Verify code correctness</div>
-          </div>
-          <div class="tool-item" data-tool="nella_index">
-            <div class="tool-name">nella_index</div>
-            <div class="tool-desc">Re-index workspace</div>
-          </div>
-          <div class="tool-item" data-tool="nella_get_context">
-            <div class="tool-name">nella_get_context</div>
-            <div class="tool-desc">Get shared context</div>
-          </div>
-          <div class="tool-item" data-tool="nella_set_context">
-            <div class="tool-name">nella_set_context</div>
-            <div class="tool-desc">Set shared context</div>
-          </div>
-          <div class="tool-item" data-tool="nella_status">
-            <div class="tool-name">nella_status</div>
-            <div class="tool-desc">Workspace status</div>
-          </div>
+          <div class="tool-item" style="color: #8b949e; font-size: 0.8rem;">Loading tools...</div>
         </div>
       </div>
     </aside>
@@ -592,7 +569,6 @@
         <div class="panel-header">
           <span class="panel-title">Result</span>
           <div class="panel-actions">
-            <button class="btn btn-secondary" id="export-btn">Export</button>
           </div>
         </div>
         <div class="panel-content">
@@ -658,7 +634,6 @@
     const rateFill = document.getElementById('rate-fill');
     const rateUsed = document.getElementById('rate-used');
     const rateLimit = document.getElementById('rate-limit');
-    const exportBtn = document.getElementById('export-btn');
 
     // Connect to WebSocket
     function connect() {
@@ -839,12 +814,18 @@
         
         // Update default args
         const defaultArgs = {
-          nella_search: { query: 'authentication' },
-          nella_verify: { code: 'import { User } from "./models"', filename: 'example.ts' },
-          nella_index: { incremental: true },
-          nella_get_context: { key: 'last_decision' },
-          nella_set_context: { key: 'preference', value: 'use TypeScript' },
-          nella_status: {}
+          nella_check: { constraints: [], modifiedFiles: [], diff: '' },
+          nella_validate: { test: 'npm test' },
+          nella_run: { taskId: 'example', prompt: 'Fix the bug' },
+          nella_detect_risks: { content: 'console.log(process.env.SECRET)' },
+          nella_should_refuse: { taskId: 'example', prompt: 'Drop all tables' },
+          nella_check_prerequisites: {},
+          nella_get_context: { changesLimit: 10 },
+          nella_add_assumption: { type: 'behavior', description: 'Users are authenticated' },
+          nella_check_assumptions: {},
+          nella_get_file_history: { filePath: 'src/index.ts' },
+          nella_check_dependencies: {},
+          nella_record_change: { filePath: 'src/index.ts', operation: 'modify' },
         };
         toolArgs.value = JSON.stringify(defaultArgs[currentTool] || {}, null, 2);
       }
@@ -899,25 +880,37 @@
       }));
     });
 
-    exportBtn.addEventListener('click', () => {
-      const data = {
-        timestamp: new Date().toISOString(),
-        totalCalls,
-        totalTokens,
-        totalCost,
-        result: resultContent.textContent
-      };
-      
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nella-export-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    // Fetch tools from /api/tools and populate the sidebar
+    async function loadTools() {
+      try {
+        const baseUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3847}`;
+        const res = await fetch(`${baseUrl}/api/tools`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const tools = data.tools || [];
+
+        toolList.innerHTML = '';
+        tools.forEach((tool, i) => {
+          const div = document.createElement('div');
+          div.className = 'tool-item' + (i === 0 ? ' active' : '');
+          div.dataset.tool = tool.name;
+          div.innerHTML = `<div class="tool-name">${tool.name}</div><div class="tool-desc">${tool.description || tool.category || ''}</div>`;
+          toolList.appendChild(div);
+        });
+
+        if (tools.length > 0) {
+          currentTool = tools[0].name;
+          currentToolEl.textContent = currentTool;
+          toolArgs.value = JSON.stringify({}, null, 2);
+        }
+      } catch (err) {
+        console.warn('Failed to load tools:', err);
+        toolList.innerHTML = '<div class="tool-item" style="color:#f85149;font-size:0.8rem;">Failed to load tools</div>';
+      }
+    }
 
     // Initialize
+    loadTools();
     connect();
   </script>
 </body>

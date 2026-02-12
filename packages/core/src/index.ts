@@ -452,6 +452,23 @@ export {
   McpToolHandler,
   createMcpToolHandler,
   NELLA_TOOLS,
+  // Phase 7 additions
+  validateToolInput,
+  assertValidToolInput,
+  McpError,
+  ToolValidationError,
+  ToolTimeoutError,
+  AuthenticationError as McpAuthenticationError,
+  RateLimitError as McpRateLimitError,
+  ChainDepthError,
+  UnknownToolError,
+  RetryExhaustedError,
+  retryWithBackoff,
+  ToolResultCache,
+  TelemetryManager,
+  createTelemetryManager,
+  ToolRegistry,
+  createToolRegistry,
 } from "./mcp";
 
 export type {
@@ -464,35 +481,27 @@ export type {
   IndexToolArgs,
   GetContextToolArgs,
   SetContextToolArgs,
+  ExplainToolArgs,
+  DocsToolArgs,
+  HistoryToolArgs,
   ToolCallMetadata,
   McpEvent,
   ToolHandlerConfig,
   McpEventHandler,
+  ToolCategory,
+  ToolExample,
+  ProgressCallback,
+  ToolInputValidationResult,
+  ValidationErrorDetail,
+  RetryOptions,
+  RetryResult,
+  ToolResultCacheConfig,
+  TelemetryConfig,
+  ToolSpan,
+  ToolMetrics,
+  ToolRegistryEntry,
+  ToolFilter,
 } from "./mcp";
-
-// =============================================================================
-// Export
-// =============================================================================
-
-export {
-  ExportManager,
-  createExportManager,
-  DEFAULT_EXPORT_INCLUDE,
-  DEFAULT_EXPORT_OPTIONS,
-} from "./export";
-
-export type {
-  ExportFormat,
-  ExportConfig,
-  ExportInclude,
-  ExportOptions,
-  ToolCallExport,
-  SearchExport,
-  VerifyExport,
-  ExportBundle,
-  ExportEvent,
-  ExportEventHandler,
-} from "./export";
 
 // =============================================================================
 // Playground Module
