@@ -23,6 +23,7 @@ import { parseWorkspaceArg } from "./utils/args";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
+import { registerCodeTools, handleCodeTool } from "./tools/code";
 
 // =============================================================================
 // Types
@@ -91,6 +92,7 @@ Example:
     ...registerValidationTools(),
     ...registerSafetyTools(),
     ...registerContextTools(),
+    ...registerCodeTools(),
   ];
 
   // Handle tool listing
@@ -118,6 +120,11 @@ Example:
         const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
         if (contextResult !== null) {
           return contextResult as CallToolResult;
+        }
+
+        const codeResult = await handleCodeTool(name, toolArgs || {}, serverContext);
+        if (codeResult !== null) {
+          return codeResult as CallToolResult;
         }
 
         // Unknown tool
