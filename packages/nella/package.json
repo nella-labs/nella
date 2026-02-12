@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "test": "tsx --test src/**/__tests__/*.test.ts",
     "dev": "tsc --watch",
     "start:mcp": "node dist/mcp/server.js",
     "prepublishOnly": "npm run build"
