@@ -10,7 +10,6 @@ This guide covers all modules in **@usenella/core**. You can import the same mod
 - [Rate Limiting](#rate-limiting)
 - [Context Sharing](#context-sharing)
 - [Sync](#sync)
-- [Export Manager](#export-manager)
 - [Playground Server](#playground-server)
 - [Agent Runner](#agent-runner)
 - [MCP Tool Handler](#mcp-tool-handler)
@@ -527,40 +526,6 @@ const state = sync.getCloudSyncState('repo-1');
 | `gcp` | `GCPSyncAdapter` | Enterprise deployments, Cloud SQL + Cloud Storage |
 
 > **Deprecation Notice:** `createCloudSyncManager(...)` from `cloud-sync/` is deprecated. Use `SyncManager` from the `sync/` module instead.
-
----
-
-## Export Manager
-
-Bundle tool calls, searches, and verification results into exportable files.
-
-```ts
-import { createExportManager } from '@usenella/core';
-
-const exporter = createExportManager();
-
-// Export individual data types
-await exporter.exportToolCalls(toolCalls, {
-  format: 'json',
-  outputPath: '/path/to/reports'
-});
-
-await exporter.exportSearchResults(results, { format: 'csv' });
-
-await exporter.exportVerifications(verifications, { format: 'markdown' });
-
-// Create a full bundle
-await exporter.export(
-  {
-    toolCalls: [],
-    searches: [],
-    verifications: [],
-  },
-  { format: 'html', outputPath: '/path/to/reports/nella-run' }
-);
-```
-
-**Supported Formats:** `json`, `csv`, `markdown`, `html`
 
 ---
 

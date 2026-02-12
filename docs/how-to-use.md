@@ -169,7 +169,6 @@ Nella Core includes advanced modules for larger agent systems:
 - **Auth + rate limiting** — API key management and per-agent quotas.
 - **Context sharing** — cross-agent memory with visibility controls.
 - **Cloud sync** — push/pull run data from Google Cloud Storage.
-- **Export manager** — JSON/CSV/Markdown/HTML exports for audits.
 - **Playground server** — real-time playground with session telemetry.
 
 Start with the [Core Modules guide](./core/modules.md) for examples.

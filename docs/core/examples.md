@@ -690,34 +690,6 @@ ws.onmessage = (event) => {
 
 ---
 
-## Export Examples
-
-### Export Run Data
-
-```typescript
-import { createExportManager } from '@usenella/core';
-
-const exporter = createExportManager();
-
-// Export tool calls as CSV
-await exporter.exportToolCalls(toolCalls, {
-  format: 'csv',
-  outputPath: './reports'
-});
-
-// Create an HTML bundle with all data
-await exporter.export(
-  {
-    toolCalls: allToolCalls,
-    searches: allSearchResults,
-    verifications: allVerifications,
-  },
-  { format: 'html', outputPath: './reports/full-run' }
-);
-```
-
----
-
 ## Sync Examples
 
 ### Configure Multi-Tier Sync
