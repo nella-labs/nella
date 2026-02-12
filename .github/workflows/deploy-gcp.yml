@@ -79,6 +79,7 @@ jobs:
             --subnet=default
             --vpc-egress=private-ranges-only
             --add-cloudsql-instances=${{ vars.GCP_PROJECT_ID }}:${{ env.GCP_REGION }}:nella-db
+            --service-account=nella-deploy@nella-sync.iam.gserviceaccount.com
             --allow-unauthenticated
           env_vars: |
             NODE_ENV=production
