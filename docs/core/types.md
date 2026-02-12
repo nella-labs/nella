@@ -951,47 +951,6 @@ interface WorkspaceInfo {
 
 ---
 
-## Export Types
-
-```typescript
-import type {
-  ExportFormat,
-  ExportOptions,
-  ExportBundle
-} from '@usenella/core';
-```
-
-### `ExportFormat`
-
-```typescript
-type ExportFormat = 'json' | 'csv' | 'markdown' | 'html';
-```
-
-### `ExportOptions`
-
-```typescript
-interface ExportOptions {
-  format: ExportFormat;
-  outputPath?: string;
-  includeTimestamps?: boolean;
-  includeMetrics?: boolean;
-}
-```
-
-### `ExportBundle`
-
-```typescript
-interface ExportBundle {
-  toolCalls: unknown[];
-  searches: unknown[];
-  verifications: unknown[];
-  exportedAt: string;
-  format: ExportFormat;
-}
-```
-
----
-
 ## Playground Types
 
 ```typescript

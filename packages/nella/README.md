@@ -213,7 +213,6 @@ console.log(result.passed ? 'Validation passed!' : 'Validation failed');
 - Auth + rate limiting
 - Context sharing
 - Cloud sync (GCS)
-- Export manager
 - Playground server
 
 See the [Core Modules guide](../../docs/core/modules.md) for examples.

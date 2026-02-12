@@ -1,6 +1,6 @@
 # MCP Server Documentation
 
-The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude through the Model Context Protocol. It supports both local stdio mode and hosted HTTP mode, providing 18 tools across 4 categories.
+The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude through the Model Context Protocol. It supports both local stdio mode and hosted HTTP mode, providing 23 tools across 5 categories.
 
 ## Overview
 
@@ -19,7 +19,7 @@ The `@usenella/nella` package provides a CLI and MCP server that allows AI agent
 
 | Document | Description |
 |----------|-------------|
-| [Tools Reference](./tools.md) | Complete reference for all 18 MCP tools |
+| [Tools Reference](./tools.md) | Complete reference for all 23 MCP tools |
 | [Integration Guide](./integration.md) | Setup for Claude Desktop, Claude Code, hosted/self-hosted, and custom clients |
 | [Context Management](../core/context.md) | Session persistence, assumptions, and dependency tracking |
 | [CLI Commands](../cli/commands.md) | Full CLI reference (`serve`, `connect`, `auth`, etc.) |
@@ -95,6 +95,43 @@ Indexing, search, shared context, and server management (available via `nella se
 - `nella_get_context` (core) — Read shared cross-agent context
 - `nella_set_context` — Publish context to shared channels
 - `nella_status` — Server status, workspace health, connected agents
+- `nella_explain` — Code explanation via structured search and analysis
+- `nella_docs` — Documentation and comment search
+- `nella_history` — Recent tool call history
+
+### Code Tools
+Code analysis and test generation:
+- `nella_refactor` — Detect refactoring opportunities (nesting, duplication, magic numbers, etc.)
+- `nella_test` — Generate test skeletons for functions and classes
+
+## Phase 7 Features
+
+### Input Validation
+All tool calls are validated against JSON Schema before execution. Invalid arguments return structured error messages with field-level details.
+
+### Caching
+Read-only tool results are cached using an LRU cache with per-tool TTL. Mutating tools (`nella_index`, `nella_set_context`) automatically invalidate dependent caches. Cache stats are available via `nella_status`.
+
+### Retry with Backoff
+Retryable tools (search, verify, index) automatically retry on transient failures with exponential backoff and jitter. Max retries and backoff parameters are configurable per tool.
+
+### Tool Timeouts
+Each tool has a configurable timeout. Long-running tools like `nella_index` (60s) have longer timeouts than quick lookups like `nella_history` (5s).
+
+### Tool Chaining
+Tools can invoke other tools internally. For example, `nella_explain` chains to `nella_search` to find code before building an explanation. Chain depth is limited to 3 to prevent infinite recursion.
+
+### Streaming (Progress Notifications)
+Long-running tools like `nella_index` emit progress notifications via MCP SDK's `progressToken` mechanism, allowing clients to display real-time progress.
+
+### OpenTelemetry
+Optional tracing and metrics via OpenTelemetry SDK. Install `@opentelemetry/sdk-node` and related packages to enable. Degrades gracefully if packages are not available.
+
+### Tool Versioning
+All tools are versioned (currently `1.0.0`) and managed through a `ToolRegistry`. Supports multiple versions of the same tool, deprecation, and version-based lookup (`nella_search@1.0.0`).
+
+### Tool Metadata
+Each tool includes category, tags, examples, timeout, and retry configuration in its schema — enabling rich tool discovery and documentation generation.
 
 ## Architecture
 
@@ -107,10 +144,10 @@ Indexing, search, shared context, and server management (available via `nella se
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │                     @usenella/nella                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ Validation  │  │   Safety    │  │      Context        │  │
-│  │  (3 tools)  │  │  (3 tools)  │  │     (6 tools)       │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  ┌──────┐  │
+│  │ Validation  │  │   Safety    │  │  Context   │  │ Code │  │
+│  │  (3 tools)  │  │  (3 tools)  │  │ (6 tools)  │  │(2)   │  │
+│  └─────────────┘  └─────────────┘  └────────────┘  └──────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
@@ -119,10 +156,10 @@ Indexing, search, shared context, and server management (available via `nella se
 │  │Validators│  │ Indexing │  │  Auth &  │  │   Context   │  │
 │  │ & Safety │  │ & Search │  │Rate Limit│  │  Sharing    │  │
 │  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │  Agents  │  │  Export  │  │   Sync   │  │ Playground  │  │
-│  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
-│────────────────── Core MCP Tools (6) ──────────────────────│  │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────┐               │
+│  │  Agents  │  │   Sync   │  │ Playground  │               │
+│  └──────────┘  └──────────┘  └─────────────┘               │
+│────────────────── Core MCP Tools (9) ──────────────────────│  │
 └─────────────────────────────────────────────────────────────┘
                               │
                 ┌─────────────┼─────────────┐

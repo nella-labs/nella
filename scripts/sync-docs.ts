@@ -98,11 +98,6 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     transform: transformGeneric,
   },
   {
-    source: "core/export.md",
-    target: "guides/export.mdx",
-    transform: transformGeneric,
-  },
-  {
     source: "core/sync.md",
     target: "guides/cloud-sync.mdx",
     transform: transformGeneric,

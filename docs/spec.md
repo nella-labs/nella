@@ -88,7 +88,6 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 | **Context Sharing** | Cross-agent context with channels & encryption | `SharedContextManager`, `LocalTransport`, `SupabaseTransport` |
 | **Sync** | Cloud sync with delta chunking & encryption | `SyncManager`, `LocalSyncAdapter`, `SupabaseSyncAdapter`, `GCPSyncAdapter`, `WorkspaceCloudSyncManager` |
 | **MCP** | MCP tool handler (core-level) | `McpToolHandler`, `NELLA_TOOLS` |
-| **Export** | Export data in multiple formats | `ExportManager` |
 | **Playground** | Real-time debugging dashboard | `PlaygroundServer`, `createPlaygroundServer` |
 | **Agents** | Built-in LLM agent runners | `AgentRunner`, `AnthropicAdapter`, `OpenAIAdapter`, `MODEL_PRICING` |
 | **GCP** | Google Cloud backend (Cloud SQL + Storage) | `GCPSyncAdapter`, pgvector search |

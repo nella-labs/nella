@@ -1106,36 +1106,6 @@ These are the core-level tools. The `@usenella/nella` package exposes an additio
 
 ---
 
-## Export
-
-```typescript
-import { ExportManager, createExportManager } from '@usenella/core';
-```
-
-### `ExportManager`
-
-Export data in multiple formats.
-
-```typescript
-const exporter = createExportManager('/path/to/output');
-
-// Export tool calls
-await exporter.exportToolCalls(toolCalls, { format: 'json' });
-
-// Export search results
-await exporter.exportSearchResults(results, { format: 'csv' });
-
-// Export verification results
-await exporter.exportVerifications(verifications, { format: 'markdown' });
-
-// Create a bundle (all data)
-await exporter.createBundle({ format: 'html' });
-```
-
-**Supported Formats:** `json`, `csv`, `markdown`, `html`
-
----
-
 ## Playground
 
 ```typescript

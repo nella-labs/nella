@@ -28,7 +28,6 @@ graph TB
         Sync["Cloud Sync"]
         ContextSharing["Context Sharing"]
         Playground["Playground Server"]
-        Export["Export Manager"]
         Agents["Agent Runner"]
         RateLimit["Rate Limiting"]
         GCP["GCP Backend"]
@@ -100,7 +99,6 @@ graph LR
     Core --> C_Sync["sync/"]
     Core --> C_MCP["mcp/"]
     Core --> C_Playground["playground/"]
-    Core --> C_Export["export/"]
     Core --> C_CtxShare["context-sharing/"]
     Core --> C_Types["types/"]
     Core --> C_Utils["utils/"]
@@ -273,10 +271,6 @@ graph TB
         sharedCtxMgr["context-sharing/manager.ts"]
     end
 
-    subgraph export["Export"]
-        exportMgr["export/manager.ts<br/>JSON | CSV | MD | HTML"]
-    end
-
     run --> constraint
     run --> scope
     run --> cmdRunner
@@ -314,7 +308,6 @@ graph TB
     style networking fill:#3b82f6,color:#fff
     style sync fill:#14b8a6,color:#fff
     style ctxSharing fill:#22c55e,color:#fff
-    style export fill:#a855f7,color:#fff
 ```
 
 ---
@@ -1141,12 +1134,6 @@ graph TB
         IE5["verify:check"]
     end
 
-    subgraph export_events["Export Events"]
-        XE1["export:start"]
-        XE2["export:complete"]
-        XE3["export:error"]
-    end
-
     EventBus["EventEmitter Pattern<br/>onEvent(handler) / emit(event)"]
 
     workspace_events --> EventBus
@@ -1156,7 +1143,6 @@ graph TB
     mcp_events --> EventBus
     sync_events --> EventBus
     index_events --> EventBus
-    export_events --> EventBus
 
     style workspace_events fill:#dbeafe,stroke:#3b82f6
     style auth_events fill:#fce7f3,stroke:#ec4899
@@ -1165,7 +1151,6 @@ graph TB
     style mcp_events fill:#ede9fe,stroke:#7c3aed
     style sync_events fill:#cffafe,stroke:#06b6d4
     style index_events fill:#fef3c7,stroke:#eab308
-    style export_events fill:#f3e8ff,stroke:#a855f7
     style EventBus fill:#6366f1,color:#fff
 ```
 
