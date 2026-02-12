@@ -47,7 +47,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@supabase/supabase-js": "^2.39.0",
     "@usenella/core": "workspace:*",
     "chalk": "^4.1.2",
