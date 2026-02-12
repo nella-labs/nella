@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GCP_PROJECT_ID: nella-sync
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: us-central1
   SERVICE_NAME: nella-mcp
   ARTIFACT_REPO: nella
@@ -72,14 +72,31 @@ jobs:
             --cpu=1
             --min-instances=0
             --max-instances=3
-            --timeout=300
+            --timeout=3600
             --concurrency=80
+            --session-affinity
+            --network=default
+            --subnet=default
+            --vpc-egress=private-ranges-only
+            --add-cloudsql-instances=${{ vars.GCP_PROJECT_ID }}:${{ env.GCP_REGION }}:nella-db
             --allow-unauthenticated
           env_vars: |
             NODE_ENV=production
+            GCP_STORAGE_BUCKET=nella-sync-indexes
           secrets: |
             SUPABASE_URL=SUPABASE_URL:latest
             SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
+            REDIS_URL=REDIS_URL:latest
+            GCP_CLOUD_SQL_INSTANCE=GCP_CLOUD_SQL_INSTANCE:latest
+            GCP_DB_USER=GCP_DB_USER:latest
+            GCP_DB_PASSWORD=GCP_DB_PASSWORD:latest
+            GCP_DB_NAME=GCP_DB_NAME:latest
+            NELLA_AUTH_ENCRYPTION_KEY=NELLA_AUTH_ENCRYPTION_KEY:latest
+            NELLA_JWT_SECRET=NELLA_JWT_SECRET:latest
+            VOYAGE_API_KEY=VOYAGE_API_KEY:latest
+            # Add these when you get API keys:
+            # OPENAI_API_KEY=OPENAI_API_KEY:latest
+            # COHERE_API_KEY=COHERE_API_KEY:latest
 
       - name: Verify deployment
         run: |

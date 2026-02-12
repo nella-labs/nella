@@ -1176,7 +1176,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 }
 
 // =============================================================================
-// Direct execution (for Railway / Docker CMD)
+// Direct execution (for Docker CMD)
 // =============================================================================
 
 if (require.main === module) {
