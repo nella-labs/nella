@@ -45,6 +45,7 @@ import Redis from "ioredis";
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
+import { registerCodeTools, handleCodeTool } from "./tools/code";
 import type { ServerContext } from "./server";
 
 // =============================================================================
@@ -495,6 +496,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     ...registerValidationTools(),
     ...registerSafetyTools(),
     ...registerContextTools(),
+    ...registerCodeTools(),
   ];
 
   log("info", "Nella hosted MCP server starting", { port, tools: allTools.length });
@@ -566,6 +568,13 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             serverContext
           );
           if (contextResult !== null) return contextResult as CallToolResult;
+
+          const codeResult = await handleCodeTool(
+            name,
+            toolArgs || {},
+            serverContext
+          );
+          if (codeResult !== null) return codeResult as CallToolResult;
 
           return {
             content: [{ type: "text", text: `Unknown tool: ${name}` }],
@@ -1022,6 +1031,11 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           if (result === null) {
             const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
             if (contextResult !== null) { result = contextResult; success = true; }
+          }
+
+          if (result === null) {
+            const codeResult = await handleCodeTool(toolName, toolArgs || {}, serverContext);
+            if (codeResult !== null) { result = codeResult; success = true; }
           }
 
           if (result === null) {
