@@ -69,6 +69,8 @@ steps:
       - "NODE_ENV=production,GCP_STORAGE_BUCKET=nella-sync-indexes"
       - "--update-secrets"
       - "SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,REDIS_URL=REDIS_URL:latest,GCP_CLOUD_SQL_INSTANCE=GCP_CLOUD_SQL_INSTANCE:latest,GCP_DB_USER=GCP_DB_USER:latest,GCP_DB_PASSWORD=GCP_DB_PASSWORD:latest,GCP_DB_NAME=GCP_DB_NAME:latest,NELLA_AUTH_ENCRYPTION_KEY=NELLA_AUTH_ENCRYPTION_KEY:latest,NELLA_JWT_SECRET=NELLA_JWT_SECRET:latest,VOYAGE_API_KEY=VOYAGE_API_KEY:latest"
+      - "--service-account"
+      - "nella-deploy@nella-sync.iam.gserviceaccount.com"
       - "--allow-unauthenticated"
 
 substitutions:
