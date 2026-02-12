@@ -17,6 +17,16 @@ export interface PlaygroundOptions {
   host?: string;
   /** Git repo URL or local path to clone / use */
   repo?: string;
+  /** Enable TLS */
+  tls?: boolean;
+  /** Path to TLS certificate */
+  cert?: string;
+  /** Path to TLS private key */
+  key?: string;
+  /** Max concurrent WebSocket connections */
+  maxConnections?: number;
+  /** Enable authentication */
+  auth?: boolean;
 }
 
 /**
@@ -78,6 +88,11 @@ export async function startPlaygroundServer(options: PlaygroundOptions): Promise
     storagePath,
     port: options.port ?? 3847,
     host: options.host ?? "localhost",
+    tls: options.tls,
+    tlsCert: options.cert,
+    tlsKey: options.key,
+    maxConnections: options.maxConnections,
+    authEnabled: options.auth ?? false,
   });
 
   // Handle graceful shutdown
@@ -90,12 +105,19 @@ export async function startPlaygroundServer(options: PlaygroundOptions): Promise
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
+  const proto = options.tls ? "https" : "http";
+  const wsproto = options.tls ? "wss" : "ws";
+
   server.on({
     onStart: (port) => {
       console.log(`\n  ✓ Playground server running`);
-      console.log(`  → Dashboard: http://localhost:${port}/`);
-      console.log(`  → WebSocket: ws://localhost:${port}/ws`);
+      console.log(`  → Dashboard: ${proto}://localhost:${port}/`);
+      console.log(`  → WebSocket: ${wsproto}://localhost:${port}/ws`);
+      console.log(`  → Metrics:   ${proto}://localhost:${port}/metrics`);
       console.log(`  → Workspace: ${workspacePath}`);
+      if (options.tls) console.log(`  → TLS: enabled`);
+      if (options.auth) console.log(`  → Auth: enabled`);
+      if (options.maxConnections) console.log(`  → Max connections: ${options.maxConnections}`);
       console.log(`\n  Press Ctrl+C to stop\n`);
     },
     onClientConnect: (id) => {
