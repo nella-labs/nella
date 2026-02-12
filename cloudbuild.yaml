@@ -1,4 +1,4 @@
-# Cloud Build configuration for nella MCP server
+# Cloud Build configuration for nella MCP server (full GCP stack)
 # Builds Docker image and deploys to Cloud Run
 #
 # Required substitutions (set in trigger or via --substitutions):
@@ -6,7 +6,10 @@
 #   _SERVICE_NAME: Cloud Run service name (default: nella-mcp)
 #
 # Required secrets in Secret Manager:
-#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REDIS_URL,
+#   GCP_CLOUD_SQL_INSTANCE, GCP_DB_USER, GCP_DB_PASSWORD, GCP_DB_NAME,
+#   VOYAGE_API_KEY, OPENAI_API_KEY, COHERE_API_KEY,
+#   NELLA_AUTH_ENCRYPTION_KEY, NELLA_JWT_SECRET
 
 steps:
   # Build the Docker image
@@ -50,13 +53,22 @@ steps:
       - "--max-instances"
       - "3"
       - "--timeout"
-      - "300"
+      - "3600"
       - "--concurrency"
       - "80"
+      - "--session-affinity"
+      - "--network"
+      - "default"
+      - "--subnet"
+      - "default"
+      - "--vpc-egress"
+      - "private-ranges-only"
+      - "--add-cloudsql-instances"
+      - "$PROJECT_ID:${_REGION}:nella-db"
       - "--set-env-vars"
-      - "NODE_ENV=production"
+      - "NODE_ENV=production,GCP_STORAGE_BUCKET=nella-sync-indexes"
       - "--update-secrets"
-      - "SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest"
+      - "SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,REDIS_URL=REDIS_URL:latest,GCP_CLOUD_SQL_INSTANCE=GCP_CLOUD_SQL_INSTANCE:latest,GCP_DB_USER=GCP_DB_USER:latest,GCP_DB_PASSWORD=GCP_DB_PASSWORD:latest,GCP_DB_NAME=GCP_DB_NAME:latest,NELLA_AUTH_ENCRYPTION_KEY=NELLA_AUTH_ENCRYPTION_KEY:latest,NELLA_JWT_SECRET=NELLA_JWT_SECRET:latest,VOYAGE_API_KEY=VOYAGE_API_KEY:latest"
       - "--allow-unauthenticated"
 
 substitutions:
