@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "echo \"No tests yet\"",
+    "test": "tsx --test src/**/__tests__/*.test.ts",
     "dev": "tsc --watch",
     "benchmark": "node dist/cli.js",
     "prepublishOnly": "npm run build"
