@@ -16,6 +16,11 @@
     "sync-docs:dry": "tsx scripts/sync-docs.ts --dry-run",
     "sync-docs:watch": "tsx scripts/sync-docs.ts --watch"
   },
+  "pnpm": {
+    "overrides": {
+      "fast-xml-parser": ">=5.3.4"
+    }
+  },
   "devDependencies": {
     "tsx": "^4.21.0",
     "typescript": "^5.3.0"
