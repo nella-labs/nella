@@ -12,12 +12,19 @@
     "api": "workspace:api",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:ci": "pnpm -r test:ci",
+    "test:coverage": "pnpm -r test && echo Coverage reports generated in each package's coverage/ directory",
     "dev": "pnpm -r dev",
     "dev:api": "pnpm --filter @usenella/api dev",
     "build:api": "pnpm --filter @usenella/api build",
     "sync-docs": "tsx scripts/sync-docs.ts",
     "sync-docs:dry": "tsx scripts/sync-docs.ts --dry-run",
-    "sync-docs:watch": "tsx scripts/sync-docs.ts --watch"
+    "sync-docs:watch": "tsx scripts/sync-docs.ts --watch",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "pnpm": {
     "overrides": {
@@ -25,7 +32,11 @@
     }
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
+    "c8": "^10.1.3",
     "tsx": "^4.21.0",
+    "typedoc": "^0.28.17",
     "typescript": "^5.3.0"
   }
 }
