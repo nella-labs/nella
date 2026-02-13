@@ -1,0 +1,69 @@
+# Nella API — Local Development Stack
+#
+# docker-compose up             — Start API + Redis
+# docker-compose up --build     — Rebuild and start
+# docker-compose down           — Stop all
+
+version: "3.8"
+
+services:
+  # Nella REST API
+  nella-api:
+    build:
+      context: ../..
+      dockerfile: packages/api/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000"
+      LOG_LEVEL: debug
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Nella MCP Server (existing)
+  nella-mcp:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Redis for rate limiting + job queues
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

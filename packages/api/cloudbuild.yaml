@@ -1,0 +1,82 @@
+# Cloud Build configuration for Nella REST API server
+# Deploys as a SEPARATE Cloud Run service alongside the MCP server
+#
+# Required substitutions:
+#   _REGION: GCP region (default: us-central1)
+#   _SERVICE_NAME: Cloud Run service name (default: nella-api)
+#
+# Same secrets as MCP server — both services share the same backing infrastructure
+
+steps:
+  # Build the Docker image using the API-specific Dockerfile
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "packages/api/Dockerfile"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}:latest"
+      - "."
+
+  # Push the Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}"
+
+  # Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--port"
+      - "8080"
+      - "--memory"
+      - "512Mi"
+      - "--cpu"
+      - "1"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "5"
+      - "--timeout"
+      - "300"
+      - "--concurrency"
+      - "100"
+      - "--session-affinity"
+      - "--network"
+      - "default"
+      - "--subnet"
+      - "default"
+      - "--vpc-egress"
+      - "private-ranges-only"
+      - "--add-cloudsql-instances"
+      - "$PROJECT_ID:${_REGION}:nella-db"
+      - "--set-env-vars"
+      - "NODE_ENV=production,GCP_STORAGE_BUCKET=nella-sync-indexes,ALLOWED_ORIGINS=https://app.getnella.dev\\,https://docs.getnella.dev"
+      - "--update-secrets"
+      - "SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,REDIS_URL=REDIS_URL:latest,GCP_CLOUD_SQL_INSTANCE=GCP_CLOUD_SQL_INSTANCE:latest,GCP_DB_USER=GCP_DB_USER:latest,GCP_DB_PASSWORD=GCP_DB_PASSWORD:latest,GCP_DB_NAME=GCP_DB_NAME:latest,NELLA_AUTH_ENCRYPTION_KEY=NELLA_AUTH_ENCRYPTION_KEY:latest,NELLA_JWT_SECRET=NELLA_JWT_SECRET:latest,VOYAGE_API_KEY=VOYAGE_API_KEY:latest"
+      - "--service-account"
+      - "nella-deploy@nella-sync.iam.gserviceaccount.com"
+      - "--allow-unauthenticated"
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: nella-api
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}"
