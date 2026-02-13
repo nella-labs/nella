@@ -1,0 +1,58 @@
+# Dependabot configuration
+# Keeps npm dependencies and GitHub Actions up to date automatically.
+
+version: 2
+
+updates:
+  # npm / pnpm dependencies
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - automated
+    groups:
+      # Group minor + patch updates together to reduce PR noise
+      production-deps:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "typescript"
+          - "@changesets/*"
+        update-types:
+          - minor
+          - patch
+      dev-tooling:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier*"
+          - "typescript"
+          - "@changesets/*"
+        update-types:
+          - minor
+          - patch
+    # Ignore major bumps by default — handle manually
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+      - automated
