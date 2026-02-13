@@ -545,3 +545,32 @@ export type {
   AgentRunnerEventHandler,
   LLMCallOptions,
 } from "./agents";
+
+// =============================================================================
+// Services (Shared Service Layer)
+// =============================================================================
+
+export {
+  ValidationService,
+  SafetyService,
+  ContextService,
+  SearchService,
+  WorkspaceService,
+  AuthService,
+} from "./services";
+
+export type {
+  ValidateConstraintsParams,
+  RunFullTaskParams,
+  DetectRisksResult,
+  RefusalCheckParams,
+  AddAssumptionParams,
+  RecordChangesParams,
+  RecordChangesResult,
+  SearchParams,
+  SearchServiceConfig,
+  CreateWorkspaceParams as ServiceCreateWorkspaceParams,
+  WorkspaceInfo,
+  AuthenticateResult,
+  CreateApiKeyParams,
+} from "./services";
