@@ -14,7 +14,8 @@
     "dev": "tsc --watch",
     "start": "node dist/server.js",
     "start:dev": "tsx src/server.ts",
-    "test": "tsx --test src/**/__tests__/*.test.ts",
+    "test": "c8 --reporter=text --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
+    "test:ci": "c8 --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

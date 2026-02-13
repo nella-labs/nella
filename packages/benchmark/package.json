@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "tsx --test src/**/__tests__/*.test.ts",
+    "test": "c8 --reporter=text --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
+    "test:ci": "c8 --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
     "dev": "tsc --watch",
     "benchmark": "node dist/cli.js",
     "prepublishOnly": "npm run build"

@@ -39,8 +39,26 @@ jobs:
       - name: Build packages
         run: pnpm -r build
 
-      - name: Run tests
-        run: pnpm -r test
+      - name: Run tests with coverage
+        run: pnpm -r test:ci
+
+      - name: Check coverage thresholds
+        run: |
+          npx c8 check-coverage --lines 70 --branches 70 --functions 70 \
+            --temp-directory packages/core/coverage \
+            || echo "::warning::Core coverage below 70% threshold"
+          npx c8 check-coverage --lines 70 --branches 70 --functions 70 \
+            --temp-directory packages/api/coverage \
+            || echo "::warning::API coverage below 70% threshold"
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            packages/*/coverage/lcov.info
+          retention-days: 30
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
