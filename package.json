@@ -9,9 +9,12 @@
   "scripts": {
     "benchmark": "workspace:benchmark",
     "nella": "workspace:nella",
+    "api": "workspace:api",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "dev": "pnpm -r dev",
+    "dev:api": "pnpm --filter @usenella/api dev",
+    "build:api": "pnpm --filter @usenella/api build",
     "sync-docs": "tsx scripts/sync-docs.ts",
     "sync-docs:dry": "tsx scripts/sync-docs.ts --dry-run",
     "sync-docs:watch": "tsx scripts/sync-docs.ts --watch"
