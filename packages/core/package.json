@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js"
+    },
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "require": "./dist/*.js"
     }
   },
   "files": [
@@ -16,7 +20,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "tsx --test src/**/__tests__/*.test.ts",
+    "test": "c8 --reporter=text --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
+    "test:ci": "c8 --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
