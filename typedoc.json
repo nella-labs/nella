@@ -1,0 +1,30 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "packages/core/src/index.ts",
+    "packages/api/src/app.ts",
+    "packages/benchmark/src/index.ts"
+  ],
+  "out": "docs/api-reference",
+  "name": "Nella API Reference",
+  "readme": "README.md",
+  "tsconfig": "tsconfig.json",
+  "exclude": [
+    "**/__tests__/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/fixtures/**"
+  ],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "includeVersion": true,
+  "githubPages": false,
+  "plugin": [],
+  "categorizeByGroup": true,
+  "sort": ["source-order"],
+  "validation": {
+    "notExported": false,
+    "invalidLink": false,
+    "notDocumented": false
+  }
+}
