@@ -1,0 +1,68 @@
+{
+  "name": "@usenella/api",
+  "version": "0.0.0",
+  "description": "REST API server for Nella — exposes workspace, search, validation, context, and auth endpoints",
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "start:dev": "tsx src/server.ts",
+    "test": "tsx --test src/**/__tests__/*.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nella",
+    "api",
+    "rest",
+    "coding-agents",
+    "validation",
+    "safety"
+  ],
+  "author": "Nella Labs",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/usenella/nella.git",
+    "directory": "packages/api"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@usenella/core": "workspace:*",
+    "@supabase/supabase-js": "^2.39.0",
+    "express": "^4.18.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "compression": "^1.7.4",
+    "zod": "^3.22.0",
+    "ioredis": "^5.3.0",
+    "ws": "^8.16.0",
+    "pino": "^8.17.0",
+    "pino-http": "^9.0.0",
+    "bullmq": "^5.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "dotenv": "^16.3.1",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/express": "^4.17.0",
+    "@types/cors": "^2.8.0",
+    "@types/compression": "^1.7.0",
+    "@types/ws": "^8.5.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/swagger-ui-express": "^4.1.0",
+    "supertest": "^6.3.0",
+    "@types/supertest": "^6.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.0"
+  }
+}
