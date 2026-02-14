@@ -1,7 +1,7 @@
 /**
  * Embedder Module
  *
- * Handles embedding generation via Voyage Code 2 (primary), OpenAI (fallback),
+ * Handles embedding generation via OpenAI (primary), Voyage Code 2 (fallback),
  * or local ONNX models for fully offline operation.
  * Includes SQLite caching to avoid redundant API calls.
  */
@@ -16,8 +16,8 @@ import type { EmbedderConfig, EmbeddingRequest, EmbeddingResponse } from "./type
 // =============================================================================
 
 const DEFAULT_CONFIG: EmbedderConfig = {
-  provider: "voyage",
-  model: "voyage-code-2",
+  provider: "openai",
+  model: "text-embedding-3-small",
   dimensions: 1536,
   batchSize: 128,
   maxRetries: 3,
@@ -561,11 +561,11 @@ export class Embedder {
         } else if (provider === "openai") {
           return await this.callOpenAIAPI(texts, model);
         } else {
-          // Try local first if available, fallback to voyage
+          // Try local first if available, fallback to openai
           if (this.localEmbedder?.isAvailable()) {
             return await this.callLocalEmbedder(texts);
           }
-          return await this.callVoyageAPI(texts, model);
+          return await this.callOpenAIAPI(texts, model);
         }
       } catch (error) {
         if (attempt === this.config.maxRetries - 1) {
