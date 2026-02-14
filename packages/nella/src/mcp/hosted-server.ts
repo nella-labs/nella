@@ -364,14 +364,11 @@ async function logUsageEvent(params: {
 }): Promise<void> {
   try {
     const supabase = getSupabase();
+    // Only insert columns that exist in the usage_events table.
+    // Extra fields (duration, success, tokens, etc.) are not in the schema yet.
     const { error } = await supabase.from("usage_events").insert({
       api_key_id: params.apiKeyId,
       tool_name: params.toolName,
-      duration_ms: params.durationMs,
-      success: params.success,
-      error: params.error || null,
-      workspace: params.workspace || null,
-      tokens_used: params.tokensUsed || 0,
     });
     if (error) {
       log("error", "Failed to log usage event to Supabase", {
@@ -559,7 +556,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
           // Also publish to Redis for cross-instance bridging
           if (redisClient) {
-            redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(startPayload)).catch(() => {});
+            redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(startPayload)).catch((err) => {
+              log("error", "Redis publish tool:start failed", { error: err instanceof Error ? err.message : String(err) });
+            });
           }
         }
 
