@@ -531,6 +531,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         const callId = `mcp-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 
         // Broadcast tool:start to playground if user is connected
+        log("info", "MCP tool call started", { toolName: name, callId, ownerUserId: ownerUserId || "none" });
         if (ownerUserId) {
           broadcastToUserPlayground(ownerUserId, {
             type: "tool:start",
@@ -999,13 +1000,28 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
   // Helper: find all playground sessions belonging to a user and broadcast
   function broadcastToUserPlayground(userId: string, message: unknown): void {
+    log("info", "broadcastToUserPlayground called", {
+      userId,
+      totalSessions: playgroundSessions.size,
+      totalClients: playgroundClients.size,
+      sessionKeys: Array.from(playgroundSessions.keys()),
+      sessionUserIds: Array.from(playgroundSessions.values()).map(s => s.userId),
+    });
+    let matched = 0;
     for (const [_key, session] of playgroundSessions) {
       if (session.userId === userId) {
+        matched++;
         for (const cid of session.clients) {
           const c = playgroundClients.get(cid);
-          if (c) sendToClient(c.ws, message);
+          if (c) {
+            log("info", "Sending to playground client", { clientId: cid });
+            sendToClient(c.ws, message);
+          }
         }
       }
+    }
+    if (matched === 0) {
+      log("info", "No playground sessions found for user", { userId });
     }
   }
 
