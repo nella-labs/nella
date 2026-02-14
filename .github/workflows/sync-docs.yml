@@ -113,7 +113,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v8
         with:
           path: nella-website
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
