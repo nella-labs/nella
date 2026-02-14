@@ -505,7 +505,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
   // Create a new MCP server + transport for a session
-  async function createSession(): Promise<{ server: Server; transport: StreamableHTTPServerTransport }> {
+  async function createSession(ownerUserId?: string, ownerApiKeyId?: string): Promise<{ server: Server; transport: StreamableHTTPServerTransport }> {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
     });
@@ -528,12 +528,26 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       }): Promise<CallToolResult> => {
         const { name, arguments: toolArgs } = request.params;
         const callStart = Date.now();
+        const callId = `mcp-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+
+        // Broadcast tool:start to playground if user is connected
+        if (ownerUserId) {
+          broadcastToUserPlayground(ownerUserId, {
+            type: "tool:start",
+            callId,
+            toolName: name,
+          });
+        }
 
         // Create a temporary workspace context for this call
         const tmpDir = path.join(
           os.tmpdir(),
           `nella-hosted-${crypto.randomBytes(4).toString("hex")}`
         );
+
+        let success = false;
+        let resultContent: CallToolResult | null = null;
+        let errorMessage: string | undefined;
 
         try {
           // Ensure temp dir exists
@@ -553,42 +567,66 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             toolArgs || {},
             serverContext
           );
-          if (validationResult !== null) return validationResult as CallToolResult;
+          if (validationResult !== null) {
+            resultContent = validationResult as CallToolResult;
+            success = !resultContent.isError;
+          }
 
-          const safetyResult = await handleSafetyTool(
-            name,
-            toolArgs || {},
-            serverContext
-          );
-          if (safetyResult !== null) return safetyResult as CallToolResult;
+          if (resultContent === null) {
+            const safetyResult = await handleSafetyTool(
+              name,
+              toolArgs || {},
+              serverContext
+            );
+            if (safetyResult !== null) {
+              resultContent = safetyResult as CallToolResult;
+              success = !resultContent.isError;
+            }
+          }
 
-          const contextResult = await handleContextTool(
-            name,
-            toolArgs || {},
-            serverContext
-          );
-          if (contextResult !== null) return contextResult as CallToolResult;
+          if (resultContent === null) {
+            const contextResult = await handleContextTool(
+              name,
+              toolArgs || {},
+              serverContext
+            );
+            if (contextResult !== null) {
+              resultContent = contextResult as CallToolResult;
+              success = !resultContent.isError;
+            }
+          }
 
-          const codeResult = await handleCodeTool(
-            name,
-            toolArgs || {},
-            serverContext
-          );
-          if (codeResult !== null) return codeResult as CallToolResult;
+          if (resultContent === null) {
+            const codeResult = await handleCodeTool(
+              name,
+              toolArgs || {},
+              serverContext
+            );
+            if (codeResult !== null) {
+              resultContent = codeResult as CallToolResult;
+              success = !resultContent.isError;
+            }
+          }
 
-          return {
-            content: [{ type: "text", text: `Unknown tool: ${name}` }],
-            isError: true,
-          } as CallToolResult;
+          if (resultContent === null) {
+            errorMessage = `Unknown tool: ${name}`;
+            resultContent = {
+              content: [{ type: "text", text: errorMessage }],
+              isError: true,
+            } as CallToolResult;
+          }
+
+          return resultContent;
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          return {
+          errorMessage = error instanceof Error ? error.message : String(error);
+          success = false;
+          resultContent = {
             content: [
-              { type: "text", text: `Error executing ${name}: ${message}` },
+              { type: "text", text: `Error executing ${name}: ${errorMessage}` },
             ],
             isError: true,
           } as CallToolResult;
+          return resultContent;
         } finally {
           // Clean up temp dir
           try {
@@ -597,6 +635,54 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             }
           } catch {
             // Best effort cleanup
+          }
+
+          const duration = Date.now() - callStart;
+
+          // Extract result text for token estimation
+          const resultText = resultContent
+            ? resultContent.content.map((c: any) => c.text || "").join("")
+            : "";
+          const argsText = JSON.stringify(toolArgs || {});
+          const inputTokens = Math.ceil(argsText.length / 4);
+          const outputTokens = Math.ceil(resultText.length / 4);
+          const cost = (inputTokens / 1000) * DEFAULT_COST_CONFIG.inputCostPer1k +
+                       (outputTokens / 1000) * DEFAULT_COST_CONFIG.outputCostPer1k;
+
+          // Build tool call entry for playground
+          const toolCallEntry: PlaygroundToolCall = {
+            id: callId,
+            toolName: name,
+            arguments: toolArgs || {},
+            result: resultContent,
+            success,
+            error: errorMessage,
+            duration,
+            timestamp: new Date().toISOString(),
+            tokens: inputTokens + outputTokens,
+            cost,
+          };
+
+          // Broadcast tool:end and record in playground session state
+          if (ownerUserId) {
+            recordToolCallInPlayground(ownerUserId, toolCallEntry);
+            broadcastToUserPlayground(ownerUserId, {
+              type: "tool:end",
+              callId,
+              entry: toolCallEntry,
+            });
+          }
+
+          // Log usage to Supabase
+          if (ownerApiKeyId) {
+            logUsageEvent({
+              apiKeyId: ownerApiKeyId,
+              toolName: name,
+              durationMs: duration,
+              success,
+              error: errorMessage,
+              tokensUsed: inputTokens + outputTokens,
+            });
           }
         }
       }
@@ -752,37 +838,8 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             : (parsedBody as any)?.method === "initialize";
 
         if (isInit || !sessionId) {
-          // New session
-          const { transport } = await createSession();
-
-          // Wrap the tool call handler to log usage
-          const origOnMessage = transport.onmessage;
-          transport.onmessage = (message, extra) => {
-            // Log tool calls for usage tracking
-            if (
-              message &&
-              typeof message === "object" &&
-              "method" in message &&
-              (message as any).method === "tools/call"
-            ) {
-              const toolName = (message as any).params?.name || "unknown";
-              const callStart = Date.now();
-
-              // We'll log after the response is sent — approximate timing
-              setTimeout(() => {
-                logUsageEvent({
-                  apiKeyId: keyRecord.id,
-                  toolName,
-                  durationMs: Date.now() - callStart,
-                  success: true,
-                });
-              }, 100);
-            }
-
-            if (origOnMessage) {
-              origOnMessage(message, extra);
-            }
-          };
+          // New session — pass user info for playground bridging & usage logging
+          const { transport } = await createSession(keyRecord.user_id, keyRecord.id);
 
           await transport.handleRequest(req, res, parsedBody);
 
@@ -937,6 +994,28 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     for (const cid of session.clients) {
       const c = playgroundClients.get(cid);
       if (c) sendToClient(c.ws, message);
+    }
+  }
+
+  // Helper: find all playground sessions belonging to a user and broadcast
+  function broadcastToUserPlayground(userId: string, message: unknown): void {
+    for (const [_key, session] of playgroundSessions) {
+      if (session.userId === userId) {
+        for (const cid of session.clients) {
+          const c = playgroundClients.get(cid);
+          if (c) sendToClient(c.ws, message);
+        }
+      }
+    }
+  }
+
+  // Helper: update playground session state for a user with a tool call entry
+  function recordToolCallInPlayground(userId: string, entry: PlaygroundToolCall): void {
+    for (const [_key, session] of playgroundSessions) {
+      if (session.userId === userId) {
+        session.state.recentToolCalls = [...session.state.recentToolCalls.slice(-49), entry];
+        session.lastActivity = Date.now();
+      }
     }
   }
 
