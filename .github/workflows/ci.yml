@@ -60,5 +60,12 @@ jobs:
             packages/*/coverage/lcov.info
           retention-days: 30
 
+      - name: Require changeset for PRs
+        if: github.event_name == 'pull_request'
+        run: |
+          npx changeset status --since=origin/main || {
+            echo "::warning::No changeset found. If this PR has user-facing changes, run 'pnpm changeset' and commit the generated file."
+          }
+
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
