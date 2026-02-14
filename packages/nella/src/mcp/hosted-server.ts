@@ -364,7 +364,7 @@ async function logUsageEvent(params: {
 }): Promise<void> {
   try {
     const supabase = getSupabase();
-    await supabase.from("usage_events").insert({
+    const { error } = await supabase.from("usage_events").insert({
       api_key_id: params.apiKeyId,
       tool_name: params.toolName,
       duration_ms: params.durationMs,
@@ -373,8 +373,25 @@ async function logUsageEvent(params: {
       workspace: params.workspace || null,
       tokens_used: params.tokensUsed || 0,
     });
-  } catch {
-    // Usage logging should never crash the server
+    if (error) {
+      log("error", "Failed to log usage event to Supabase", {
+        supabaseError: error.message,
+        code: error.code,
+        toolName: params.toolName,
+        apiKeyId: params.apiKeyId,
+      });
+    } else {
+      log("info", "Usage event logged", {
+        toolName: params.toolName,
+        durationMs: params.durationMs,
+        success: params.success,
+      });
+    }
+  } catch (err) {
+    log("error", "Usage logging threw exception", {
+      error: err instanceof Error ? err.message : String(err),
+      toolName: params.toolName,
+    });
   }
 }
 
@@ -533,11 +550,17 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         // Broadcast tool:start to playground if user is connected
         log("info", "MCP tool call started", { toolName: name, callId, ownerUserId: ownerUserId || "none" });
         if (ownerUserId) {
-          broadcastToUserPlayground(ownerUserId, {
+          const startPayload = {
             type: "tool:start",
             callId,
             toolName: name,
-          });
+          };
+          broadcastToUserPlayground(ownerUserId, startPayload);
+
+          // Also publish to Redis for cross-instance bridging
+          if (redisClient) {
+            redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(startPayload)).catch(() => {});
+          }
         }
 
         // Create a temporary workspace context for this call
@@ -676,7 +699,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
           // Log usage to Supabase
           if (ownerApiKeyId) {
-            logUsageEvent({
+            await logUsageEvent({
               apiKeyId: ownerApiKeyId,
               toolName: name,
               durationMs: duration,
@@ -684,6 +707,19 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
               error: errorMessage,
               tokensUsed: inputTokens + outputTokens,
             });
+          }
+
+          // Publish tool event to Redis for cross-instance playground bridging
+          if (ownerUserId && redisClient) {
+            try {
+              await redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify({
+                type: "tool:end",
+                callId,
+                entry: toolCallEntry,
+              }));
+            } catch {
+              // Best effort — Redis pubsub failure shouldn't block
+            }
           }
         }
       }
@@ -909,6 +945,112 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
   const playgroundSessions = new Map<string, PlaygroundSession>();
   const playgroundClients = new Map<string, PlaygroundClient>();
 
+  // -------------------------------------------------------------------------
+  // Redis pub/sub for cross-instance playground bridging
+  // When a tool call happens on instance A, it publishes to Redis.
+  // Instance B (which has the WebSocket) subscribes and forwards to clients.
+  // -------------------------------------------------------------------------
+  let redisSub: Redis | null = null;
+  // Track which user IDs we're subscribed to
+  const subscribedUsers = new Set<string>();
+
+  function setupRedisSubscriber(): void {
+    const redisUrl =
+      process.env.REDIS_URL ||
+      process.env.REDIS_PRIVATE_URL ||
+      process.env.REDIS_PUBLIC_URL;
+    if (!redisUrl) return;
+
+    try {
+      // Need a separate connection for subscribing (Redis constraint)
+      redisSub = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        retryStrategy(times: number) {
+          if (times > 5) return null;
+          return Math.min(times * 200, 2000);
+        },
+        enableReadyCheck: true,
+        lazyConnect: false,
+      });
+
+      redisSub.on("message", (channel: string, message: string) => {
+        try {
+          // Channel format: nella:tool-events:<userId>
+          const userId = channel.replace("nella:tool-events:", "");
+          const parsed = JSON.parse(message);
+
+          log("info", "Redis sub received tool event", { userId, type: parsed.type });
+
+          // Forward to all playground sessions for this user
+          for (const [_key, session] of playgroundSessions) {
+            if (session.userId === userId) {
+              // Also record in session state if it's a tool:end event
+              if (parsed.type === "tool:end" && parsed.entry) {
+                session.state.recentToolCalls = [
+                  ...session.state.recentToolCalls.slice(-49),
+                  parsed.entry,
+                ];
+                session.lastActivity = Date.now();
+              }
+
+              for (const cid of session.clients) {
+                const c = playgroundClients.get(cid);
+                if (c) sendToClient(c.ws, parsed);
+              }
+            }
+          }
+        } catch (err) {
+          log("error", "Redis sub message handling error", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+
+      redisSub.on("connect", () => {
+        log("info", "Redis subscriber connected for playground bridging");
+      });
+
+      redisSub.on("error", (err: Error) => {
+        log("error", "Redis subscriber error", { error: err.message });
+      });
+    } catch (err) {
+      log("error", "Failed to create Redis subscriber", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Subscribe to a user's tool events channel
+  function subscribeToUserEvents(userId: string): void {
+    if (!redisSub || subscribedUsers.has(userId)) return;
+    const channel = `nella:tool-events:${userId}`;
+    redisSub.subscribe(channel).then(() => {
+      subscribedUsers.add(userId);
+      log("info", "Subscribed to Redis channel", { channel });
+    }).catch((err) => {
+      log("error", "Failed to subscribe to Redis channel", {
+        channel,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
+  // Unsubscribe when no more playground clients for a user
+  function unsubscribeFromUserEvents(userId: string): void {
+    if (!redisSub || !subscribedUsers.has(userId)) return;
+    // Check if any sessions still have clients for this user
+    for (const [_key, session] of playgroundSessions) {
+      if (session.userId === userId && session.clients.size > 0) return;
+    }
+    const channel = `nella:tool-events:${userId}`;
+    redisSub.unsubscribe(channel).then(() => {
+      subscribedUsers.delete(userId);
+      log("info", "Unsubscribed from Redis channel", { channel });
+    }).catch(() => {});
+  }
+
+  setupRedisSubscriber();
+
   // Cleanup stale sessions every 60s
   const playgroundCleanupInterval = setInterval(() => {
     const now = Date.now();
@@ -976,6 +1118,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       }
       playgroundClients.delete(clientId);
       log("info", "Playground client disconnected", { clientId });
+
+      // Unsubscribe from Redis if no more clients for this user
+      unsubscribeFromUserEvents(client.userId);
     });
 
     ws.on("error", (err) => {
@@ -1061,6 +1206,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
         sendToClient(client.ws, { type: "connected", sessionId: sessionKey, clientId: client.id });
         sendToClient(client.ws, { type: "session:state", state: session.state });
+
+        // Subscribe to Redis channel for cross-instance tool event bridging
+        subscribeToUserEvents(client.userId);
         break;
       }
 
