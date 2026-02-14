@@ -84,9 +84,9 @@ export function authRouter(): Router {
           key_prefix: keyPrefix,
           scopes: req.body.scopes || null,
           rate_limits: req.body.rateLimits ? {
-            requests_per_minute: req.body.rateLimits.requestsPerMinute || 60,
-            requests_per_hour: req.body.rateLimits.requestsPerHour || 1000,
-            requests_per_day: req.body.rateLimits.requestsPerDay || 10000,
+            requests_per_minute: req.body.rateLimits.requestsPerMinute || 20,
+            requests_per_hour: req.body.rateLimits.requestsPerHour || 100,
+            requests_per_day: req.body.rateLimits.requestsPerDay || 500,
           } : null,
           expires_at: expiresAt,
         })

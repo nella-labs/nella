@@ -546,7 +546,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         const callStart = Date.now();
         const callId = `mcp-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 
-        // Broadcast tool:start to playground if user is connected
+        // Broadcast tool:start to playground
         log("info", "MCP tool call started", { toolName: name, callId, ownerUserId: ownerUserId || "none" });
         if (ownerUserId) {
           const startPayload = {
@@ -554,13 +554,15 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             callId,
             toolName: name,
           };
-          broadcastToUserPlayground(ownerUserId, startPayload);
 
-          // Also publish to Redis for cross-instance bridging
           if (redisClient) {
+            // Publish to Redis — the subscriber (even on same instance) delivers to clients
             redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(startPayload)).catch((err) => {
               log("error", "Redis publish tool:start failed", { error: err instanceof Error ? err.message : String(err) });
             });
+          } else {
+            // No Redis — fallback to in-memory broadcast
+            broadcastToUserPlayground(ownerUserId, startPayload);
           }
         }
 
@@ -688,14 +690,26 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             cost,
           };
 
-          // Broadcast tool:end and record in playground session state
+          // Broadcast tool:end to playground
           if (ownerUserId) {
-            recordToolCallInPlayground(ownerUserId, toolCallEntry);
-            broadcastToUserPlayground(ownerUserId, {
+            const endPayload = {
               type: "tool:end",
               callId,
               entry: toolCallEntry,
-            });
+            };
+
+            if (redisClient) {
+              // Publish to Redis — subscriber handles delivery + session recording
+              try {
+                await redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(endPayload));
+              } catch {
+                // Best effort — Redis pubsub failure shouldn't block
+              }
+            } else {
+              // No Redis — fallback to in-memory
+              recordToolCallInPlayground(ownerUserId, toolCallEntry);
+              broadcastToUserPlayground(ownerUserId, endPayload);
+            }
           }
 
           // Log usage to Supabase
@@ -708,19 +722,6 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
               error: errorMessage,
               tokensUsed: inputTokens + outputTokens,
             });
-          }
-
-          // Publish tool event to Redis for cross-instance playground bridging
-          if (ownerUserId && redisClient) {
-            try {
-              await redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify({
-                type: "tool:end",
-                callId,
-                entry: toolCallEntry,
-              }));
-            } catch {
-              // Best effort — Redis pubsub failure shouldn't block
-            }
           }
         }
       }
@@ -830,9 +831,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
       const keyRecord = authResult.record;
       const rateLimits = keyRecord.rate_limits || {
-        requests_per_minute: 60,
-        requests_per_hour: 1000,
-        requests_per_day: 10000,
+        requests_per_minute: 20,
+        requests_per_hour: 100,
+        requests_per_day: 500,
       };
 
       // Rate limit check (only for POST = actual tool calls / messages)
@@ -1083,9 +1084,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
     const keyRecord = authResult.record;
     const rateLimits = keyRecord.rate_limits || {
-      requests_per_minute: 60,
-      requests_per_hour: 1000,
-      requests_per_day: 10000,
+      requests_per_minute: 20,
+      requests_per_hour: 100,
+      requests_per_day: 500,
     };
 
     const clientId = crypto.randomUUID();
