@@ -78,7 +78,7 @@ Example:
   const server = new Server(
     {
       name: "nella",
-      version: "0.2.0",
+      version: "0.0.0",
     },
     {
       capabilities: {

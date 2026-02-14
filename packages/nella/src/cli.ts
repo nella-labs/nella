@@ -963,7 +963,7 @@ function showHelp(): void {
   // Footer
   console.log(divider());
   console.log(`  ${theme.muted("Documentation:")} ${theme.secondary("https://github.com/nella-labs/nella")}`);
-  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.2.2")}`);
+  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.0.0")}`);
   console.log("");
 }
 

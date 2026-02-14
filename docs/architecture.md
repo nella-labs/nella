@@ -10,7 +10,7 @@
 graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
-    subgraph nella_pkg["@usenella/nella v0.2.2"]
+    subgraph nella_pkg["@usenella/nella v0.0.0"]
         CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
@@ -34,7 +34,7 @@ graph TB
         Supabase["Supabase Backend"]
     end
 
-    subgraph benchmark_pkg["@usenella/benchmark v0.1.0"]
+    subgraph benchmark_pkg["@usenella/benchmark v0.0.0"]
         BenchRunner["Benchmark Runner"]
         Adapters["Agent Adapters<br/>(Anthropic, OpenAI)"]
         Metrics["Metrics Calculator"]
@@ -128,9 +128,9 @@ graph LR
 ```mermaid
 graph LR
     subgraph packages["Nella Packages"]
-        nella["@usenella/nella<br/>v0.2.2"]
-        core["@usenella/core<br/>v0.2.2"]
-        bench["@usenella/benchmark<br/>v0.1.0"]
+        nella["@usenella/nella<br/>v0.0.0"]
+        core["@usenella/core<br/>v0.0.0"]
+        bench["@usenella/benchmark<br/>v0.0.0"]
     end
 
     subgraph nella_deps["nella deps"]

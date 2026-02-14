@@ -9,7 +9,7 @@
   "linked": [
     ["@usenella/core", "@usenella/api", "@usenella/nella", "@usenella/benchmark"]
   ],
-  "access": "restricted",
+  "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": []
