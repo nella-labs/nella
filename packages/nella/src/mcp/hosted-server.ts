@@ -527,7 +527,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     });
 
     const server = new Server(
-      { name: "nella", version: "0.2.2" },
+      { name: "nella", version: "0.0.0" },
       { capabilities: { tools: {} } }
     );
 
@@ -776,7 +776,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     if (pathname === "/health" && req.method === "GET") {
       const health = {
         status: "ok",
-        version: "0.2.2",
+        version: "0.0.0",
         uptime: Math.floor((Date.now() - startTime) / 1000),
         activeSessions: transports.size,
         redis: redisClient ? redisClient.status : "disabled",
