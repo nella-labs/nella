@@ -505,7 +505,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
   // Create a new MCP server + transport for a session
-  function createSession(): { server: Server; transport: StreamableHTTPServerTransport } {
+  async function createSession(): Promise<{ server: Server; transport: StreamableHTTPServerTransport }> {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
     });
@@ -609,15 +609,15 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       server.close().catch(() => {});
     };
 
-    server.connect(transport).catch((err) => {
+    await server.connect(transport).catch((err) => {
       log("error", "Failed to connect MCP server to transport", {
         error: String(err),
       });
     });
 
-    if (transport.sessionId) {
-      transports.set(transport.sessionId, transport);
-    }
+    // NOTE: transport.sessionId is NOT set until handleRequest processes
+    // the "initialize" message, so we must NOT register it here.
+    // Registration happens in the POST handler after handleRequest().
 
     return { server, transport };
   }
@@ -753,7 +753,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
         if (isInit || !sessionId) {
           // New session
-          const { transport } = createSession();
+          const { transport } = await createSession();
 
           // Wrap the tool call handler to log usage
           const origOnMessage = transport.onmessage;
@@ -785,6 +785,12 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           };
 
           await transport.handleRequest(req, res, parsedBody);
+
+          // Register session AFTER handleRequest assigns the session ID
+          if (transport.sessionId && !transports.has(transport.sessionId)) {
+            transports.set(transport.sessionId, transport);
+            log("info", "New MCP session registered", { sessionId: transport.sessionId });
+          }
         } else {
           // Existing session
           const transport = transports.get(sessionId);
