@@ -13,7 +13,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/nella/package.json packages/nella/
 
 # Hoist all deps so @types/node and tsc resolve correctly
-RUN echo "shamefully-hoist=true" > .npmrc
+RUN printf "shamefully-hoist=true\nignore-scripts=true\n" > .npmrc
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -38,7 +38,7 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/nella/package.json packages/nella/
 
-RUN echo "shamefully-hoist=true" > .npmrc
+RUN printf "shamefully-hoist=true\nignore-scripts=true\n" > .npmrc
 RUN pnpm install --frozen-lockfile --prod
 
 # Copy built output from builder

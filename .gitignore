@@ -6,6 +6,10 @@ dist/
 logs/# Dependencies
 node_modules/
 
+# Lockfiles from other package managers
+package-lock.json
+yarn.lock
+
 # Build outputs
 dist/
 build/
