@@ -9,6 +9,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { CodeChunk } from "./types";
+import { saveBest, loadAny, compressedPath, removePersistedFile } from "./persistence";
 
 // =============================================================================
 // Types
@@ -20,7 +21,7 @@ export interface VectorStoreConfig {
   efConstruction: number;  // Build-time parameter (higher = better recall, slower build)
   efSearch: number;        // Query-time parameter (higher = better recall, slower query)
   M: number;               // Number of connections per element
-  backend: "hnsw" | "brute-force" | "auto";  // Backend selection
+  backend: "hnsw" | "hnswlib" | "brute-force" | "auto";  // Backend selection
   metric: "cosine" | "l2" | "ip";  // Distance metric
 }
 
@@ -30,10 +31,17 @@ interface VectorEntry {
   vector: number[];
 }
 
+/** Slim entry for v2 persistence (vectors stored only in backend file) */
+interface VectorEntrySlim {
+  id: string;
+  chunkId: string;
+}
+
 interface VectorStoreData {
   config: VectorStoreConfig;
-  entries: VectorEntry[];
+  entries: VectorEntry[] | VectorEntrySlim[];
   version: string;
+  formatVersion?: number; // 2 = deduplicated (no vectors in metadata)
 }
 
 // =============================================================================
@@ -127,6 +135,108 @@ class HNSWBackend implements VectorBackend {
     if (fs.existsSync(filepath)) {
       this.index.load(filepath);
       this.count = this.index.size();
+    }
+  }
+
+  clear(): void {
+    this.initIndex();
+    this.count = 0;
+  }
+}
+
+// =============================================================================
+// HNSWLib Backend (using hnswlib-node)
+// =============================================================================
+
+class HNSWLibBackend implements VectorBackend {
+  private index: any; // HierarchicalNSW type
+  private config: VectorStoreConfig;
+  private count: number = 0;
+  private HierarchicalNSW: any;
+
+  constructor(config: VectorStoreConfig) {
+    this.config = config;
+    this.initIndex();
+  }
+
+  private initIndex(): void {
+    try {
+      const hnswlib = require("hnswlib-node");
+      this.HierarchicalNSW = hnswlib.HierarchicalNSW;
+
+      const space = this.config.metric === "cosine" ? "cosine"
+        : this.config.metric === "ip" ? "ip" : "l2";
+
+      this.index = new this.HierarchicalNSW(space, this.config.dimensions);
+      this.index.initIndex(this.config.maxElements, this.config.M, this.config.efConstruction);
+      this.index.setEf(this.config.efSearch);
+    } catch (error) {
+      throw new Error(`Failed to initialize hnswlib-node: ${error}`);
+    }
+  }
+
+  add(id: number, vector: Float32Array): void {
+    this.index.addPoint(Array.from(vector), id);
+    this.count++;
+  }
+
+  addBatch(startId: number, vectors: Float32Array[]): void {
+    for (let i = 0; i < vectors.length; i++) {
+      this.add(startId + i, vectors[i]);
+    }
+  }
+
+  search(query: Float32Array, limit: number): { id: number; distance: number }[] {
+    if (this.count === 0) return [];
+
+    const k = Math.min(limit, this.count);
+    const result = this.index.searchKnn(Array.from(query), k);
+
+    const results: { id: number; distance: number }[] = [];
+    for (let i = 0; i < result.neighbors.length; i++) {
+      const id = result.neighbors[i];
+      let distance = result.distances[i];
+
+      // hnswlib returns distance; convert to similarity for cosine/ip
+      if (this.config.metric === "cosine") {
+        distance = 1 - distance; // hnswlib cosine distance → similarity
+      }
+
+      results.push({ id, distance });
+    }
+
+    // Sort: higher similarity first for cosine/ip, lower distance first for l2
+    if (this.config.metric === "cosine" || this.config.metric === "ip") {
+      results.sort((a, b) => b.distance - a.distance);
+    } else {
+      results.sort((a, b) => a.distance - b.distance);
+    }
+
+    return results;
+  }
+
+  remove(id: number): boolean {
+    try {
+      this.index.markDelete(id);
+      this.count--;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  get size(): number {
+    return this.count;
+  }
+
+  save(filepath: string): void {
+    this.index.writeIndexSync(filepath);
+  }
+
+  load(filepath: string): void {
+    if (fs.existsSync(filepath)) {
+      this.index.readIndexSync(filepath);
+      this.count = this.index.getCurrentCount();
     }
   }
 
@@ -234,16 +344,16 @@ class BruteForceBackend implements VectorBackend {
         vector: Array.from(vec),
       })),
     };
-    fs.writeFileSync(filepath, JSON.stringify(data));
+    saveBest(filepath, data);
   }
 
   load(filepath: string): void {
-    if (!fs.existsSync(filepath)) return;
-    
     try {
-      const data = JSON.parse(fs.readFileSync(filepath, "utf-8"));
+      const result = loadAny<{ vectors: { id: number; vector: number[] }[] }>(filepath);
+      if (!result) return;
+
       this.vectors.clear();
-      for (const entry of data.vectors) {
+      for (const entry of result.data.vectors) {
         this.vectors.set(entry.id, new Float32Array(entry.vector));
       }
     } catch {
@@ -299,20 +409,30 @@ export class VectorStore {
       return new HNSWBackend(this.config);
     }
 
-    // Auto-detect: try HNSW, fallback to brute-force
+    if (this.config.backend === "hnswlib") {
+      return new HNSWLibBackend(this.config);
+    }
+
+    // Auto-detect: try usearch HNSW → hnswlib-node → brute-force
     try {
       return new HNSWBackend(this.config);
     } catch {
-      console.warn("HNSW backend unavailable, using brute-force fallback");
-      return new BruteForceBackend(this.config);
+      try {
+        return new HNSWLibBackend(this.config);
+      } catch {
+        console.warn("HNSW backends unavailable (usearch, hnswlib-node), using brute-force fallback");
+        return new BruteForceBackend(this.config);
+      }
     }
   }
 
   /**
    * Get the current backend type
    */
-  getBackendType(): "hnsw" | "brute-force" {
-    return this.backend instanceof HNSWBackend ? "hnsw" : "brute-force";
+  getBackendType(): "hnsw" | "hnswlib" | "brute-force" {
+    if (this.backend instanceof HNSWBackend) return "hnsw";
+    if (this.backend instanceof HNSWLibBackend) return "hnswlib";
+    return "brute-force";
   }
 
   /**
@@ -468,17 +588,23 @@ export class VectorStore {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // Save HNSW index
+    // Save HNSW index (backend stores the raw vectors)
     this.backend.save(this.persistPath);
 
-    // Save metadata
+    // Save metadata — v2: exclude vector arrays (they live in the backend file)
+    const slimEntries: VectorEntrySlim[] = Array.from(this.entries.values()).map(e => ({
+      id: e.id,
+      chunkId: e.chunkId,
+    }));
+
     const metadata: VectorStoreData = {
       config: this.config,
-      entries: Array.from(this.entries.values()),
+      entries: slimEntries,
       version: "2.0.0",
+      formatVersion: 2,
     };
 
-    fs.writeFileSync(this.metadataPath, JSON.stringify(metadata));
+    saveBest(this.metadataPath, metadata);
   }
 
   /**
@@ -487,11 +613,11 @@ export class VectorStore {
   load(): void {
     if (!this.persistPath || !this.metadataPath) return;
 
-    // Load metadata first
-    if (fs.existsSync(this.metadataPath)) {
+    // Load metadata first (try compressed, then JSON)
+    const metaResult = loadAny<VectorStoreData>(this.metadataPath);
+    if (metaResult) {
       try {
-        const content = fs.readFileSync(this.metadataPath, "utf-8");
-        const data: VectorStoreData = JSON.parse(content);
+        const data = metaResult.data;
 
         this.config = { ...this.config, ...data.config };
         this.entries.clear();
@@ -503,7 +629,13 @@ export class VectorStore {
         let maxNumericId = 0;
         for (let i = 0; i < data.entries.length; i++) {
           const entry = data.entries[i];
-          this.entries.set(entry.id, entry);
+          // v2 format: entries may not have vectors (stored in backend)
+          const fullEntry: VectorEntry = {
+            id: entry.id,
+            chunkId: entry.chunkId,
+            vector: (entry as VectorEntry).vector || [],
+          };
+          this.entries.set(entry.id, fullEntry);
           this.chunkIdToVectorId.set(entry.chunkId, entry.id);
           this.idToNumericId.set(entry.id, i);
           this.numericIdToId.set(i, entry.id);
@@ -516,10 +648,15 @@ export class VectorStore {
       }
     }
 
-    // Load HNSW index
-    if (fs.existsSync(this.persistPath)) {
+    // Load backend index (try compressed path, then raw path)
+    const compPath = compressedPath(this.persistPath);
+    const backendPath = fs.existsSync(compPath) ? compPath
+      : fs.existsSync(this.persistPath) ? this.persistPath
+      : null;
+
+    if (backendPath) {
       try {
-        this.backend.load(this.persistPath);
+        this.backend.load(backendPath);
       } catch (error) {
         console.error("Failed to load vector index:", error);
         // Rebuild index from entries if load fails

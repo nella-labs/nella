@@ -8,6 +8,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { saveBest, loadAny } from "./persistence";
 import * as crypto from "crypto";
 import type { EmbedderConfig, EmbeddingRequest, EmbeddingResponse } from "./types";
 
@@ -216,9 +217,9 @@ class JSONEmbeddingCache {
 
   private loadCache(): JSONCacheData {
     try {
-      if (fs.existsSync(this.cachePath)) {
-        const data = fs.readFileSync(this.cachePath, "utf-8");
-        return JSON.parse(data);
+      const result = loadAny<JSONCacheData>(this.cachePath);
+      if (result) {
+        return result.data;
       }
     } catch {
       // Ignore cache errors
@@ -256,7 +257,7 @@ class JSONEmbeddingCache {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(this.cachePath, JSON.stringify(this.cache, null, 2));
+      saveBest(this.cachePath, this.cache);
       this.dirty = false;
     } catch (error) {
       console.error("Failed to save embedding cache:", error);
