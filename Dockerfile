@@ -16,7 +16,7 @@ COPY packages/nella/package.json packages/nella/
 RUN echo "shamefully-hoist=true" > .npmrc
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY packages/core/ packages/core/
@@ -39,7 +39,7 @@ COPY packages/core/package.json packages/core/
 COPY packages/nella/package.json packages/nella/
 
 RUN echo "shamefully-hoist=true" > .npmrc
-RUN pnpm install --frozen-lockfile --prod || pnpm install --no-frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy built output from builder
 COPY --from=builder /app/packages/core/dist packages/core/dist
@@ -49,6 +49,10 @@ COPY --from=builder /app/packages/nella/dist packages/nella/dist
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
+
+# Run as non-root user
+RUN addgroup --system app && adduser --system --ingroup app app
+USER app
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
