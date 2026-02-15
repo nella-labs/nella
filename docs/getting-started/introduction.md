@@ -1,6 +1,6 @@
 # Introduction
 
-Nella is a **reliability layer for AI coding agents** that solves the three biggest problems with AI-assisted development: hallucinations, prompt injection, and context loss.
+Nella is a **reliability layer for AI coding agents** — an MCP server that validates every change your AI agent makes before it touches your codebase.
 
 ## The Problem
 
@@ -14,73 +14,66 @@ AI coding agents are powerful, but they suffer from fundamental reliability issu
 
 ## How Nella Helps
 
-Nella sits between the AI agent and your codebase, validating every change before it's applied:
+Nella runs as an MCP server alongside your IDE, giving your AI agent access to safety and validation tools in real-time:
 
 - **Constraint checking** — Define files that should never be modified, patterns to avoid, and rules to follow
-- **Validation** — Run tests, lints, and type checks to verify changes work correctly
 - **Risk detection** — Identify dangerous patterns like credential exposure, security bypasses, or destructive operations
-- **Code verification** — Index your codebase and verify that AI-generated imports, symbols, and API calls reference real code
-- **Session context** — Track changes, assumptions, and dependencies across an entire coding session to prevent contradictions
+- **Validation** — Run tests, lints, and type checks to verify changes work correctly
+- **Session context** — Track changes, assumptions, and dependencies across an entire coding session
 - **Scope monitoring** — Detect when the agent modifies files outside the expected scope
+- **Refusal intelligence** — Automatically refuse dangerous requests before they cause damage
 
 ## How It Works
 
-Nella integrates with AI agents in three ways:
+Install Nella, point it at your project, and configure it in your MCP client (Claude Desktop, Cursor, VS Code, etc.). Your AI agent gets direct access to these tools during every conversation:
 
-### MCP Server (Recommended)
+| Tool | What It Does |
+|------|-------------|
+| `nella_check` | Validates constraints against file changes |
+| `nella_validate` | Runs test, lint, and compile commands |
+| `nella_run` | Full validation pipeline (check + validate + metrics) |
+| `nella_detect_risks` | Scans for dangerous patterns in code |
+| `nella_should_refuse` | Decides whether a task should be refused |
+| `nella_check_prerequisites` | Verifies project setup before starting |
+| Context tools | Track assumptions, file history, and dependencies |
 
-The Model Context Protocol (MCP) server runs alongside your IDE and gives the AI agent direct access to Nella's tools. The agent can check constraints, detect risks, track context, and validate changes — all without leaving the conversation.
+### Example
+
+```
+You: Add pagination to the users API
+
+Claude: I'll check constraints first.
+[Uses nella_check — all constraints pass]
+[Makes changes to the codebase]
+[Uses nella_validate — tests pass, lint clean]
+✓ Changes validated successfully
+```
+
+No manual steps. The agent calls Nella automatically during the conversation.
+
+## Quick Setup
 
 ```bash
-# Start MCP server for Claude Desktop or Cursor
-nella mcp
+# Install
+npm install -g @usenella/nella
+
+# Add to Claude Desktop config
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["-y", "@usenella/nella", "mcp"],
+      "env": { "NELLA_REPO_PATH": "/path/to/your/project" }
+    }
+  }
+}
 ```
 
-### CLI
-
-Run validation from the command line or in CI/CD pipelines:
-
-```bash
-# Check if a task can proceed safely
-nella check -t ./tasks/add-endpoint -r ./my-project
-
-# Validate agent output
-nella run -t ./tasks/add-endpoint -r ./my-project -c changes.json
-```
-
-### TypeScript Library
-
-Import Nella's core functions directly into your application:
-
-```typescript
-import { runTask, check, validate } from '@usenella/core';
-
-const result = await runTask('/path/to/repo', task, changes);
-console.log(result.passed); // true or false
-```
-
-## Core Principles
-
-1. **Agent-agnostic** — Works with any AI coding agent (Claude, GPT, Copilot, Cursor, Cline) via CLI, library, or MCP
-2. **Zero config to start** — Install and run immediately. Add task definitions and constraints as needed
-3. **Non-blocking** — Validates and reports without modifying your source code
-4. **Composable** — Use individual functions (`check`, `validate`, `shouldRefuse`) or the full pipeline (`runTask`)
-5. **Offline-capable** — Core validation works without network access. Cloud features (sync, hosted MCP) are optional
-
-## Packages
-
-| Package | Purpose | Install |
-|---------|---------|---------|
-| `@usenella/nella` | CLI + MCP server | `npm install -g @usenella/nella` |
-| `@usenella/core` | Core library (validators, safety, indexing, context) | `npm install @usenella/core` |
-| `@usenella/benchmark` | Agent evaluation framework | `npm install @usenella/benchmark` |
-| `@usenella/api` | REST API server for hosted deployments | Internal |
-
-> **Note:** `@usenella/nella` re-exports everything from `@usenella/core`, so you only need one package unless you want the core library without CLI/MCP overhead.
+That's it. Restart your MCP client and Nella's tools are available.
 
 ## Next Steps
 
-- [Installation](./installation.md) — Set up Nella in your project
-- [Quick Start](./quick-start.md) — Validate your first agent change in under 5 minutes
-- [Task Authoring](../user-guide/task-authoring.md) — Learn to write task definitions
-- [MCP Setup](../user-guide/mcp-setup.md) — Connect Nella to your IDE
+- [Installation](./installation.md) — Detailed install options
+- [Quick Start](./quick-start.md) — Set up and validate your first change in 5 minutes
+- [MCP Tools](../mcp/tools.md) — Full reference for every tool
+- [Claude Desktop](../integrations/claude-desktop.md) — Step-by-step Claude Desktop setup
