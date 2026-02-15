@@ -1,7 +1,7 @@
 {
   "name": "@usenella/nella",
   "version": "0.0.0",
-  "description": "Nella - reliability layer for coding agents (CLI + MCP Server)",
+  "description": "Nella MCP Server — reliability layer for AI coding agents. Validates constraints, detects risks, and tracks context via the Model Context Protocol.",
   "type": "commonjs",
   "bin": {
     "nella": "dist/cli.js"
@@ -42,8 +42,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/usenella/nella.git",
+    "url": "https://github.com/nella-labs/nella.git",
     "directory": "packages/nella"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "publishConfig": {
     "access": "public"
