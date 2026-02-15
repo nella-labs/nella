@@ -1,6 +1,6 @@
 # Quick Start
 
-Validate your first AI agent change in under 5 minutes.
+Get Nella running as an MCP server in under 5 minutes.
 
 ## Step 1: Install Nella
 
@@ -8,11 +8,81 @@ Validate your first AI agent change in under 5 minutes.
 npm install -g @usenella/nella
 ```
 
-## Step 2: Create a task definition
+## Step 2: Configure your MCP client
 
-A task describes what the agent should do, what constraints to enforce, and what files should change.
+Add Nella to your AI coding agent's MCP configuration.
 
-Create `task.yaml`:
+### Claude Desktop
+
+Edit `claude_desktop_config.json`:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["-y", "@usenella/nella", "mcp"],
+      "env": {
+        "NELLA_REPO_PATH": "/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to `.cursor/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["-y", "@usenella/nella", "mcp"],
+      "env": {
+        "NELLA_REPO_PATH": "."
+      }
+    }
+  }
+}
+```
+
+Restart your MCP client after saving.
+
+## Step 3: Verify the connection
+
+Ask your AI agent:
+
+> "What Nella tools are available?"
+
+It should list tools like `nella_check`, `nella_validate`, `nella_run`, etc.
+
+## Step 4: Use Nella in a conversation
+
+Ask the agent to make a code change and use Nella for validation:
+
+```
+You: Add a GET /hello endpoint that returns { message: "Hello, World!" }.
+     Don't modify any auth files or use console.log.
+
+Claude: I'll check constraints first.
+[Uses nella_check with constraints and the planned changes]
+✓ All constraints pass
+
+[Makes changes to src/routes/hello.ts]
+[Uses nella_validate to run tests and lint]
+✓ Tests pass, lint clean
+
+The endpoint has been added and validated.
+```
+
+## Step 5: Write a task definition (optional)
+
+For repeatable validation, create a `task.yaml`:
 
 ```yaml
 id: add-hello-endpoint
@@ -44,104 +114,11 @@ expected:
     - "src/routes/hello.ts"
 ```
 
-## Step 3: Run a pre-flight check
-
-Before the agent makes any changes, verify the task is safe to proceed:
-
-```bash
-nella check -t task.yaml -r ./my-project
-```
-
-Output:
-
-```
-✓ Task: Add GET /hello endpoint
-✓ Prerequisites: package.json found, node_modules present
-✓ Safety: No dangerous patterns detected
-✓ Ready to proceed
-```
-
-## Step 4: Validate agent output
-
-After the agent makes changes, validate them. Create `changes.json` with the agent's output:
-
-```json
-{
-  "files": [
-    {
-      "path": "src/routes/hello.ts",
-      "operation": "create",
-      "content": "import { Router } from 'express';\n\nconst router = Router();\n\nrouter.get('/hello', (req, res) => {\n  res.json({ message: 'Hello, World!' });\n});\n\nexport default router;"
-    }
-  ]
-}
-```
-
-Run full validation:
-
-```bash
-nella run -t task.yaml -r ./my-project -c changes.json
-```
-
-Output:
-
-```
-✓ Constraints: 2/2 passed
-✓ Scope: No unexpected file modifications
-✓ Validation: Tests passed, lint clean
-✓ Result: PASSED
-
-Metrics:
-  Build/Test Pass: 1
-  Constraint Violations: 0
-  Scope Creep: 0.00
-```
-
-## Step 5: Get JSON output (optional)
-
-For CI/CD integration, use `--json` to get machine-readable output:
-
-```bash
-nella run -t task.yaml -r ./my-project -c changes.json --json > result.json
-```
-
-## Using the MCP Server Instead
-
-For interactive use with Claude Desktop or Cursor, start the MCP server:
-
-```bash
-nella mcp
-```
-
-The AI agent can then call Nella tools directly during the conversation. See [MCP Setup](../user-guide/mcp-setup.md) for integration guides.
-
-## Using the TypeScript Library
-
-```typescript
-import { runTask, check } from '@usenella/core';
-import { readFileSync } from 'fs';
-import * as yaml from 'js-yaml';
-
-// Load task
-const task = yaml.load(readFileSync('task.yaml', 'utf-8'));
-
-// Pre-flight check
-const refusal = check(task, './my-project');
-if (refusal.shouldRefuse) {
-  console.error('Refused:', refusal.reason);
-  process.exit(1);
-}
-
-// Validate changes
-const changes = { files: [{ path: 'src/routes/hello.ts', operation: 'create', content: '...' }] };
-const result = await runTask('./my-project', task, changes);
-
-console.log('Passed:', result.passed);
-console.log('Metrics:', result.metrics);
-```
+The agent can reference this task file when calling Nella tools.
 
 ## Next Steps
 
-- [Task Authoring](../user-guide/task-authoring.md) — Write effective task definitions with constraints
-- [CI/CD Integration](../user-guide/ci-cd-integration.md) — Run Nella in GitHub Actions or GitLab CI
-- [CLI Commands](../cli/commands.md) — Full command reference
+- [MCP Tools](../mcp/tools.md) — Full reference for every tool
+- [Task Authoring](../user-guide/task-authoring.md) — Write effective task definitions
+- [Claude Desktop](../integrations/claude-desktop.md) — Detailed Claude Desktop setup
+- [Cursor](../integrations/cursor.md) — Detailed Cursor setup
