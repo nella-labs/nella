@@ -463,6 +463,30 @@ export class Chunker {
       ));
     }
 
+    // Annotate each member chunk with the class-level symbol so the
+    // verifier and symbol index can resolve the class name.
+    for (const chunk of chunks) {
+      chunk.symbols.push({
+        name: className,
+        kind: "class",
+        exported: false,
+      });
+    }
+
+    // Prepend the class declaration line to the first member chunk
+    // so that extractExports() regex can detect the export.
+    if (chunks.length > 0 && node.loc) {
+      const classLine = lines[node.loc.start.line - 1];
+      if (classLine && classLine.match(/\bclass\b/)) {
+        const first = chunks[0];
+        // Use the actual declaration line (e.g. "export class Foo {")
+        // so regex-based export detection picks it up
+        first.content = classLine.trimEnd() + "\n" + first.content;
+        // Re-extract exports from the updated content
+        first.exports = this.extractExports(first.content);
+      }
+    }
+
     // If no members extracted, return class as single chunk
     if (chunks.length === 0 && node.loc) {
       const content = lines.slice(node.loc.start.line - 1, node.loc.end.line).join("\n");
