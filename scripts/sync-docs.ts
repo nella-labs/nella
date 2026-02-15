@@ -27,7 +27,7 @@ interface SyncMapping {
   transform?: (content: string, filename: string, target: string) => string;
 }
 
-// Define how source docs map to target locations
+// Define how source docs map to target locations — MCP-focused only
 const SYNC_MAPPINGS: SyncMapping[] = [
   // =========================================================================
   // Getting Started
@@ -47,18 +47,57 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     target: "getting-started/quick-start.mdx",
     transform: transformGeneric,
   },
+
+  // =========================================================================
+  // MCP Tools
+  // =========================================================================
   {
-    source: "how-to-use.md",
-    target: "getting-started/usage-guide.mdx",
-    transform: transformUsageGuide,
+    source: "mcp/tools.md",
+    target: "mcp-tools/overview.mdx",
+    transform: transformToolsReference,
+  },
+  {
+    source: "api-reference/tools/nella-check.md",
+    target: "mcp-tools/nella-check.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-validate.md",
+    target: "mcp-tools/nella-validate.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-run.md",
+    target: "mcp-tools/nella-run.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-detect-risks.md",
+    target: "mcp-tools/nella-detect-risks.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-should-refuse.md",
+    target: "mcp-tools/nella-should-refuse.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-check-prerequisites.md",
+    target: "mcp-tools/nella-check-prerequisites.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/context-tools.md",
+    target: "mcp-tools/context-tools.mdx",
+    transform: transformGeneric,
   },
 
   // =========================================================================
   // Configuration
   // =========================================================================
   {
-    source: "configuration/overview.md",
-    target: "configuration/overview.mdx",
+    source: "user-guide/task-authoring.md",
+    target: "configuration/task-authoring.mdx",
     transform: transformGeneric,
   },
   {
@@ -71,62 +110,28 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     target: "configuration/validation.mdx",
     transform: transformGeneric,
   },
-  {
-    source: "core/configuration.md",
-    target: "configuration/core-config.mdx",
-    transform: transformConfiguration,
-  },
 
   // =========================================================================
-  // User Guide
+  // Integrations
   // =========================================================================
   {
-    source: "user-guide/task-authoring.md",
-    target: "user-guide/task-authoring.mdx",
+    source: "integrations/claude-desktop.md",
+    target: "integrations/claude-desktop.mdx",
     transform: transformGeneric,
   },
   {
-    source: "user-guide/mcp-setup.md",
-    target: "user-guide/mcp-setup.mdx",
+    source: "integrations/cursor.md",
+    target: "integrations/cursor.mdx",
     transform: transformGeneric,
   },
   {
-    source: "user-guide/ci-cd-integration.md",
-    target: "user-guide/ci-cd-integration.mdx",
+    source: "integrations/vscode.md",
+    target: "integrations/vscode.mdx",
     transform: transformGeneric,
   },
   {
-    source: "user-guide/cloud-features.md",
-    target: "user-guide/cloud-features.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Architecture
-  // =========================================================================
-  {
-    source: "architecture/overview.md",
-    target: "architecture/overview.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "architecture/core-modules.md",
-    target: "architecture/core-modules.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "architecture/mcp-server.md",
-    target: "architecture/mcp-server.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "architecture/indexing-rag.md",
-    target: "architecture/indexing-rag.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "architecture/security-auth.md",
-    target: "architecture/security-auth.mdx",
+    source: "integrations/custom-client.md",
+    target: "integrations/custom-client.mdx",
     transform: transformGeneric,
   },
 
@@ -137,199 +142,6 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     source: "cli/commands.md",
     target: "cli/commands.mdx",
     transform: transformCliCommands,
-  },
-  {
-    source: "cli/examples.md",
-    target: "cli/cli-examples.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // API Reference
-  // =========================================================================
-  {
-    source: "api-reference/overview.md",
-    target: "api-reference/overview.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/api-reference.md",
-    target: "api-reference/core-api.mdx",
-    transform: transformCoreApi,
-  },
-  {
-    source: "core/types.md",
-    target: "api-reference/types.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "mcp/README.md",
-    target: "api-reference/mcp-overview.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "mcp/tools.md",
-    target: "api-reference/tools-reference.mdx",
-    transform: transformToolsReference,
-  },
-
-  // API Reference — Individual Tool Pages
-  {
-    source: "api-reference/tools/nella-check.md",
-    target: "api-reference/tools/nella-check.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-validate.md",
-    target: "api-reference/tools/nella-validate.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-run.md",
-    target: "api-reference/tools/nella-run.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-detect-risks.md",
-    target: "api-reference/tools/nella-detect-risks.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-should-refuse.md",
-    target: "api-reference/tools/nella-should-refuse.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-check-prerequisites.md",
-    target: "api-reference/tools/nella-check-prerequisites.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/context-tools.md",
-    target: "api-reference/tools/context-tools.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Guides
-  // =========================================================================
-  {
-    source: "guides/claude-desktop.md",
-    target: "guides/claude-desktop.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "guides/cursor-integration.md",
-    target: "guides/cursor-integration.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "guides/typescript-library.md",
-    target: "guides/typescript-library.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "mcp/integration.md",
-    target: "guides/mcp-integration.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/auth.md",
-    target: "guides/authentication.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "mcp/context.md",
-    target: "guides/context-management.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/context-sharing.md",
-    target: "guides/context-sharing.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/indexing.md",
-    target: "guides/indexing.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/workspace.md",
-    target: "guides/workspace.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/agents.md",
-    target: "guides/agents.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/playground.md",
-    target: "guides/playground.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/sync.md",
-    target: "guides/cloud-sync.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/rate-limiting.md",
-    target: "guides/rate-limiting.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "spec.md",
-    target: "guides/specification.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Examples
-  // =========================================================================
-  {
-    source: "examples/basic-validation.md",
-    target: "examples/basic-validation.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "examples/context-tracking.md",
-    target: "examples/context-tracking.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "core/examples.md",
-    target: "examples/core-examples.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "mcp/examples.md",
-    target: "examples/mcp-examples.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Benchmark
-  // =========================================================================
-  {
-    source: "benchmark/api-reference.md",
-    target: "benchmark/api-reference.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "benchmark/configuration.md",
-    target: "benchmark/configuration.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "benchmark/metrics.md",
-    target: "benchmark/metrics.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "benchmark/tasks.md",
-    target: "benchmark/tasks.mdx",
-    transform: transformGeneric,
   },
 
   // =========================================================================
@@ -464,61 +276,6 @@ function transformToolsReference(content: string, filename: string, target: stri
   transformed = fixRelativeLinks(transformed);
 
   return generateFrontmatter(title, description, 10) + imports + transformed;
-}
-
-function transformCoreApi(content: string, filename: string, target: string): string {
-  const title = "Core API Reference";
-  const description = "Complete API documentation for @usenella/core TypeScript library.";
-  const prefix = getImportPrefix(target);
-
-  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
-
-  const imports = [
-    `import Callout from '${prefix}components/mdx/Callout.astro';`,
-    `import APITable from '${prefix}components/mdx/APITable.astro';`,
-    "",
-  ].join("\n");
-
-  transformed = convertCallouts(transformed);
-  transformed = fixRelativeLinks(transformed);
-
-  return generateFrontmatter(title, description, 11) + imports + transformed;
-}
-
-function transformConfiguration(content: string, filename: string, target: string): string {
-  const title = "Configuration Reference";
-  const description = "Configuration options and task definition schema for @usenella/core.";
-  const prefix = getImportPrefix(target);
-
-  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
-
-  const imports = [
-    `import Callout from '${prefix}components/mdx/Callout.astro';`,
-    "",
-  ].join("\n");
-
-  transformed = convertCallouts(transformed);
-  transformed = fixRelativeLinks(transformed);
-
-  return generateFrontmatter(title, description, 4) + imports + transformed;
-}
-
-function transformUsageGuide(content: string, filename: string, target: string): string {
-  const title = "How to Use Nella";
-  const description = "End-to-end guide for using Nella to validate agent changes.";
-  const prefix = getImportPrefix(target);
-
-  let transformed = content.replace(/^#\s+.+\r?\n+/, "");
-
-  const imports = [
-    `import Callout from '${prefix}components/mdx/Callout.astro';`,
-    "",
-  ].join("\n");
-
-  transformed = convertCallouts(transformed);
-  transformed = fixRelativeLinks(transformed);
-
-  return generateFrontmatter(title, description, 4) + imports + transformed;
 }
 
 function transformCliCommands(content: string, filename: string, target: string): string {
