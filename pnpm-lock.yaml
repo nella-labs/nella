@@ -192,6 +192,9 @@ importers:
       express:
         specifier: ^4.18.0
         version: 4.22.1
+      hnswlib-node:
+        specifier: ^3.0.0
+        version: 3.0.0
       ioredis:
         specifier: ^5.9.3
         version: 5.9.3
@@ -2156,6 +2159,9 @@ packages:
   helmet@7.2.0:
     resolution: {integrity: sha512-ZRiwvN089JfMXokizgqEPXsl2Guk094yExfoDXR0cBYWxtBbaSww/w+vT4WEJsBW2iTUi1GgZ6swmoug3Oy4Xw==}
     engines: {node: '>=16.0.0'}
+
+  hnswlib-node@3.0.0:
+    resolution: {integrity: sha512-fypn21qvVORassppC8/qNfZ5KAOspZpm/IbUkAtlqvbtDNnF5VVk5RWF7O5V6qwr7z+T3s1ePej6wQt5wRQ4Cg==}
 
   hono@4.11.4:
     resolution: {integrity: sha512-U7tt8JsyrxSRKspfhtLET79pU8K+tInj5QZXs1jSugO1Vq5dFj3kmZsRldo29mTBfcjDRVRXrEZ6LS63Cog9ZA==}
@@ -6050,6 +6056,12 @@ snapshots:
       function-bind: 1.1.2
 
   helmet@7.2.0: {}
+
+  hnswlib-node@3.0.0:
+    dependencies:
+      bindings: 1.5.0
+      node-addon-api: 8.5.0
+    optional: true
 
   hono@4.11.4: {}
 
