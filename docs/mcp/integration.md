@@ -9,6 +9,7 @@ How to set up and configure the Nella MCP Server with various clients.
 - [Self-Hosted Server (nella serve)](#self-hosted-server-nella-serve)
 - [Claude Desktop](#claude-desktop)
 - [Claude Code (CLI)](#claude-code-cli)
+- [Cursor](#cursor)
 - [Custom MCP Clients](#custom-mcp-clients)
 - [Authentication (nella auth)](#authentication-nella-auth)
 - [Configuration Options](#configuration-options)
@@ -29,6 +30,9 @@ nella connect --client claude-desktop
 
 # Or for Claude Code:
 nella connect --client claude-code
+
+# Or for Cursor:
+nella connect --client cursor
 ```
 
 The `nella connect` command automatically:
@@ -83,6 +87,23 @@ All requests require an `Authorization: Bearer nella_...` header.
 claude mcp add nella --transport streamable-http \
   --url https://mcp.getnella.dev/mcp \
   --header "Authorization: Bearer nella_YOUR_API_KEY"
+```
+
+### Cursor (Remote)
+
+Add to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in your project):
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "url": "https://mcp.getnella.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer nella_YOUR_API_KEY"
+      }
+    }
+  }
+}
 ```
 
 ### Rate Limits
@@ -178,6 +199,9 @@ nella connect --client claude-desktop --server-url http://localhost:3001
 
 # Connect Claude Code
 nella connect --client claude-code --server-url http://localhost:3001
+
+# Connect Cursor
+nella connect --client cursor --server-url http://localhost:3001
 
 # Connect with a specific API key
 nella connect --client claude-desktop --api-key nella_my_key
@@ -329,6 +353,80 @@ After configuring, restart Claude Desktop and ask Claude:
 > "What Nella tools do you have available?"
 
 Claude should list all 18 tools (12 standard + 6 core) if configured correctly.
+
+---
+
+## Cursor
+
+### Configuration File Location
+
+| Platform | Path |
+|----------|------|
+| macOS | `~/.cursor/mcp.json` |
+| Windows | `%USERPROFILE%\.cursor\mcp.json` |
+| Linux | `~/.cursor/mcp.json` |
+
+You can also use a project-level config at `.cursor/mcp.json` in your project root.
+
+### Basic Configuration (Local / Stdio)
+
+**macOS / Linux:**
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx",
+      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+**Windows:**
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "command": "npx.cmd",
+      "args": ["@usenella/nella", "mcp", "--workspace", "C:\\path\\to\\your\\project"]
+    }
+  }
+}
+```
+
+### Remote Configuration (Hosted / Self-Hosted)
+
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "url": "https://mcp.getnella.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer nella_YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Auto-Configure with CLI
+
+```bash
+# Configure Cursor automatically
+nella connect --client cursor
+
+# With a specific API key
+nella connect --client cursor --api-key nella_your_key
+
+# Point to a self-hosted server
+nella connect --client cursor --server-url http://localhost:3001
+```
+
+### Verifying Installation
+
+After configuring, reload Cursor (**Developer: Reload Window** from the command palette) and ask the AI:
+
+> "What Nella tools do you have available?"
 
 ---
 
