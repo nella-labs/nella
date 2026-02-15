@@ -2,10 +2,11 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
     "packages/core/src/index.ts",
+    "packages/nella/src/index.ts",
     "packages/api/src/app.ts",
     "packages/benchmark/src/index.ts"
   ],
-  "out": "docs/api-reference",
+  "out": "docs/generated-api",
   "name": "Nella API Reference",
   "readme": "README.md",
   "tsconfig": "tsconfig.json",
