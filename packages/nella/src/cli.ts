@@ -125,7 +125,7 @@ interface CliArgs {
   // Connect-specific args
   apiKey?: string;
   serverUrl?: string;
-  client?: "claude" | "vscode" | "all";
+  client?: "claude" | "vscode" | "cursor" | "all";
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
   // Help flag (per-command)
@@ -201,9 +201,9 @@ function parseArgs(args: string[]): CliArgs {
     } else if (arg.startsWith("--server-url=")) {
       result.serverUrl = arg.slice("--server-url=".length);
     } else if (arg === "--client") {
-      result.client = args[++i] as "claude" | "vscode" | "all";
+      result.client = args[++i] as "claude" | "vscode" | "cursor" | "all";
     } else if (arg.startsWith("--client=")) {
-      result.client = arg.slice("--client=".length) as "claude" | "vscode" | "all";
+      result.client = arg.slice("--client=".length) as "claude" | "vscode" | "cursor" | "all";
     }
 
     i++;
@@ -640,6 +640,12 @@ function getVsCodeMcpConfigPath(): string {
   return path.join(process.cwd(), ".vscode", "mcp.json");
 }
 
+function getCursorMcpConfigPath(): string {
+  // Write to ~/.cursor/mcp.json (global Cursor MCP config)
+  const home = process.platform === "win32" ? process.env.USERPROFILE || "" : process.env.HOME || "";
+  return path.join(home, ".cursor", "mcp.json");
+}
+
 function configureClaudeDesktop(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
   const configPath = getClaudeDesktopConfigPath();
 
@@ -692,6 +698,36 @@ function configureVsCode(serverUrl: string, apiKey: string): { success: boolean;
       headers: { Authorization: `Bearer ${apiKey}` },
     } as McpClientConfig;
     config.servers = servers;
+
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    return { success: true, path: configPath };
+  } catch (err) {
+    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function configureCursor(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
+  const configPath = getCursorMcpConfigPath();
+
+  try {
+    let config: Record<string, unknown> = {};
+
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    } else {
+      const dir = path.dirname(configPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+
+    // Cursor uses "mcpServers" (same as Claude Desktop)
+    const mcpServers = (config.mcpServers as Record<string, unknown>) || {};
+    mcpServers.nella = {
+      url: serverUrl,
+      headers: { Authorization: `Bearer ${apiKey}` },
+    } as McpClientConfig;
+    config.mcpServers = mcpServers;
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
     return { success: true, path: configPath };
@@ -772,7 +808,7 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
     console.log(`  ${theme.secondary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--api-key, -k")} ${theme.muted("<key>")}       API key (auto-created if logged in)`);
     console.log(`    ${theme.accent("--server-url, -u")} ${theme.muted("<url>")}    Server URL (default: production)`);
-    console.log(`    ${theme.accent("--client")} ${theme.muted("<name>")}            Target client: claude, vscode, or all (default: all)`);
+    console.log(`    ${theme.accent("--client")} ${theme.muted("<name>")}            Target client: claude, vscode, cursor, or all (default: all)`);
     console.log("");
     return;
   }
@@ -875,6 +911,11 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
     results.push({ name: "VS Code (Copilot)", ...r });
   }
 
+  if (client === "cursor" || client === "all") {
+    const r = configureCursor(serverUrl, apiKey);
+    results.push({ name: "Cursor", ...r });
+  }
+
   for (const r of results) {
     if (r.success) {
       console.log(`  ${theme.icons.success}  ${theme.success(r.name)} configured`);
@@ -921,7 +962,7 @@ function showHelp(): void {
     [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration (stdio)")],
     [theme.primary("serve"), theme.muted("Start hosted MCP server (HTTP, for production)")],
     [theme.primary("auth"), theme.muted("Login, logout, or check auth status (login|logout|status)")],
-    [theme.primary("connect"), theme.muted("Configure Claude Desktop & VS Code to use Nella MCP")],
+    [theme.primary("connect"), theme.muted("Configure Claude Desktop, VS Code & Cursor to use Nella MCP")],
     [theme.primary("playground"), theme.muted("Start playground server with real-time dashboard")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
@@ -951,7 +992,7 @@ function showHelp(): void {
     [theme.accent("--host"), theme.muted("<host>"), "Host for playground server (default: localhost)"],
     [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect command"],
     [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect (default: production)"],
-    [theme.accent("--client"), theme.muted("<name>"), "Target client: claude, vscode, or all (default: all)"],
+    [theme.accent("--client"), theme.muted("<name>"), "Target client: claude, vscode, cursor, or all (default: all)"],
     [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
