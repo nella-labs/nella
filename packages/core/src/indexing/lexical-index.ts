@@ -8,6 +8,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { CodeChunk } from "./types";
+import { saveBest, loadAny } from "./persistence";
 
 // =============================================================================
 // Types
@@ -420,18 +421,20 @@ export class LexicalIndex {
       version: "2.0.0",
     };
 
-    fs.writeFileSync(this.persistPath, JSON.stringify(data));
+    saveBest(this.persistPath, data);
   }
 
   /**
    * Load from disk
    */
   load(): void {
-    if (!this.persistPath || !fs.existsSync(this.persistPath)) return;
+    if (!this.persistPath) return;
+
+    const result = loadAny<LexicalIndexData>(this.persistPath);
+    if (!result) return;
 
     try {
-      const content = fs.readFileSync(this.persistPath, "utf-8");
-      const data: LexicalIndexData = JSON.parse(content);
+      const data = result.data;
 
       this.config = { ...this.config, ...data.config };
       this.clear();

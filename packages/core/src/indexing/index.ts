@@ -25,6 +25,7 @@ import { VectorStore, createVectorStore } from "./vector-store";
 import { LexicalIndex, createLexicalIndex } from "./lexical-index";
 import { HybridSearcher, createHybridSearcher } from "./hybrid-search";
 import { CodeVerifier, createCodeVerifier } from "./verifier";
+import { saveBest, loadAny, removePersistedFile } from "./persistence";
 
 // =============================================================================
 // Types
@@ -373,7 +374,7 @@ export class IndexManager {
     this.lexicalIndex.clear();
     this.metadata = null;
 
-    // Clear persisted files
+    // Clear persisted files (both legacy JSON and compressed)
     const files = [
       "chunks.json",
       "vectors.json",
@@ -382,11 +383,10 @@ export class IndexManager {
       "file-hashes.json",
     ];
     for (const file of files) {
-      const filePath = path.join(this.config.storagePath, file);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      removePersistedFile(path.join(this.config.storagePath, file));
     }
+    // Also remove the vector store metadata file
+    removePersistedFile(path.join(this.config.storagePath, "vectors.json.meta.json"));
   }
 
   // =============================================================================
@@ -469,34 +469,55 @@ export class IndexManager {
 
   private loadChunks(): void {
     const chunksPath = path.join(this.config.storagePath, "chunks.json");
-    if (fs.existsSync(chunksPath)) {
+    const result = loadAny<CodeChunk[]>(chunksPath);
+    if (result) {
       try {
-        const content = fs.readFileSync(chunksPath, "utf-8");
-        const chunks: CodeChunk[] = JSON.parse(content);
-        for (const chunk of chunks) {
+        for (const chunk of result.data) {
           this.chunks.set(chunk.id, chunk);
           this.hybridSearcher.registerChunk(chunk);
           this.verifier.registerChunk(chunk);
         }
+
+        // Rehydrate embeddings from vector store (stripped in v2 saves)
+        this.rehydrateEmbeddings();
       } catch {
         // Ignore errors
       }
     }
   }
 
+  /**
+   * Rehydrate chunk.embedding from the vector store.
+   * In v2 format, embeddings are stripped from chunks.json to avoid duplication.
+   * The sync adapter reads chunk.embedding directly, so we restore them here.
+   */
+  private rehydrateEmbeddings(): void {
+    for (const chunk of this.chunks.values()) {
+      if (!chunk.embedding && this.vectorStore.has(chunk.id)) {
+        const vector = this.vectorStore.getVector(chunk.id);
+        if (vector) {
+          chunk.embedding = vector;
+        }
+      }
+    }
+  }
+
   private saveChunks(): void {
     const chunksPath = path.join(this.config.storagePath, "chunks.json");
-    const chunks = Array.from(this.chunks.values());
-    fs.writeFileSync(chunksPath, JSON.stringify(chunks, null, 2));
+    // Strip embedding arrays — they're stored in the vector store
+    const chunks = Array.from(this.chunks.values()).map(chunk => {
+      const { embedding, ...rest } = chunk;
+      return rest;
+    });
+    saveBest(chunksPath, chunks);
   }
 
   private loadFileHashes(): void {
     const hashesPath = path.join(this.config.storagePath, "file-hashes.json");
-    if (fs.existsSync(hashesPath)) {
+    const result = loadAny<Record<string, string>>(hashesPath);
+    if (result) {
       try {
-        const content = fs.readFileSync(hashesPath, "utf-8");
-        const hashes: Record<string, string> = JSON.parse(content);
-        for (const [file, hash] of Object.entries(hashes)) {
+        for (const [file, hash] of Object.entries(result.data)) {
           this.fileHashes.set(file, hash);
         }
       } catch {
@@ -511,7 +532,8 @@ export class IndexManager {
     for (const [file, hash] of this.fileHashes) {
       hashes[file] = hash;
     }
-    fs.writeFileSync(hashesPath, JSON.stringify(hashes, null, 2));
+    // Small file — keep as JSON for human readability
+    saveBest(hashesPath, hashes, { forceJson: true, prettyJson: true });
   }
 }
 
