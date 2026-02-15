@@ -557,11 +557,17 @@ export class HybridSearcher {
   /**
    * Calculate confidence score based on results
    */
+  /**
+   * Calculate confidence score based on results.
+   *
+   * RRF scores are inherently small (max ≈ 1/(k+1) ≈ 0.016 with k=60),
+   * so we normalize them to [0,1] before computing confidence factors.
+   */
   private calculateConfidence(results: SearchResult[]): number {
     if (results.length === 0) return 0;
 
     // Factors:
-    // 1. Top result score
+    // 1. Top result score (normalized to RRF scale)
     // 2. Score gap between top results
     // 3. Number of high-quality matches
     // 4. Reranking confidence (if available)
@@ -570,13 +576,20 @@ export class HybridSearcher {
     const secondScore = results[1]?.score ?? 0;
     const scoreGap = topScore - secondScore;
 
+    // Normalize RRF scores to [0,1] range.
+    // Max possible RRF score = (vectorWeight + lexicalWeight) / (rrfK + 1)
+    // when a result is ranked #0 in both lists.
+    const maxRRF = (this.config.vectorWeight + this.config.lexicalWeight) / (this.config.rrfK + 1);
+    const normalizedTopScore = maxRRF > 0 ? Math.min(topScore / maxRRF, 1) : 0;
+    const normalizedGap = maxRRF > 0 ? Math.min(scoreGap / maxRRF, 1) : 0;
+
     // High-quality matches (score > 0.5 of top score)
     const threshold = topScore * 0.5;
     const highQualityCount = results.filter((r) => r.score >= threshold).length;
 
-    // Normalize factors
-    const topScoreFactor = Math.min(topScore * 2, 1);
-    const gapFactor = Math.min(scoreGap * 5, 1);
+    // Normalize factors (now using normalized scores)
+    const topScoreFactor = Math.min(normalizedTopScore * 2, 1);
+    const gapFactor = Math.min(normalizedGap * 5, 1);
     const countFactor = Math.min(highQualityCount / 5, 1);
 
     // Check if we have reranking scores
