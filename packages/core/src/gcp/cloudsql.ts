@@ -48,7 +48,7 @@ class CloudSQLManager {
       database: config.database,
       user: config.user,
       password: config.password,
-      ssl: config.ssl !== false ? { rejectUnauthorized: false } : undefined,
+      ssl: config.ssl !== false ? { rejectUnauthorized: config.rejectUnauthorized !== false } : undefined,
       max: config.poolSize || 10,
       connectionTimeoutMillis: config.connectionTimeout || 30000,
       idleTimeoutMillis: config.idleTimeout || 10000,
