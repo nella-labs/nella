@@ -65,7 +65,7 @@ function resolveRepo(repo: string): string {
 
   console.log(`[Playground] Cloning ${repo}...`);
   fs.mkdirSync(path.dirname(cloneDir), { recursive: true });
-  execSync(`git clone --depth 1 ${repo} ${cloneDir}`, { stdio: "inherit" });
+  execSync("git clone --depth 1 -- " + JSON.stringify(repo) + " " + JSON.stringify(cloneDir), { stdio: "inherit" });
   return cloneDir;
 }
 

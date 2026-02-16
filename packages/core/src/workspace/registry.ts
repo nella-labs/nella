@@ -714,7 +714,7 @@ export class WorkspaceRegistry {
   }
 
   private generateWorkspaceId(workspacePath: string): string {
-    const hash = crypto.createHash("md5").update(workspacePath).digest("hex").slice(0, 8);
+    const hash = crypto.createHash("sha256").update(workspacePath).digest("hex").slice(0, 8);
     const timestamp = Date.now().toString(36).slice(-4);
     return `ws_${hash}_${timestamp}`;
   }

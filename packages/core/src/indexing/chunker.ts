@@ -743,7 +743,7 @@ export class Chunker {
     language: string
   ): CodeChunk {
     const content = data.content.join("\n");
-    const id = `chunk_${this.chunkCounter++}_${crypto.createHash("md5").update(content).digest("hex").slice(0, 8)}`;
+    const id = `chunk_${this.chunkCounter++}_${crypto.createHash("sha256").update(content).digest("hex").slice(0, 8)}`;
 
     return {
       id,
@@ -774,7 +774,7 @@ export class Chunker {
     type?: ChunkType,
     symbols?: CodeSymbol[]
   ): CodeChunk {
-    const id = `chunk_${this.chunkCounter++}_${crypto.createHash("md5").update(content).digest("hex").slice(0, 8)}`;
+    const id = `chunk_${this.chunkCounter++}_${crypto.createHash("sha256").update(content).digest("hex").slice(0, 8)}`;
 
     return {
       id,

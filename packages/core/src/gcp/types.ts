@@ -35,6 +35,9 @@ export interface CloudSQLConfig {
   /** Use SSL (default: true for Cloud SQL) */
   ssl?: boolean;
 
+  /** Reject unauthorized SSL certificates (default: true) */
+  rejectUnauthorized?: boolean;
+
   /** Connection pool size (default: 10) */
   poolSize?: number;
 
