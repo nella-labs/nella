@@ -1,0 +1,384 @@
+name: "Health Check \u2014 Infrastructure"
+
+on:
+  schedule:
+    # Run every hour
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+concurrency:
+  group: health-check
+  cancel-in-progress: true
+
+env:
+  GCP_REGION: us-central1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # GCP Cloud Run — nella-mcp + nella-api liveness & readiness
+  # ---------------------------------------------------------------------------
+  check-gcp-services:
+    name: GCP Cloud Run Services
+    runs-on: ubuntu-latest
+    outputs:
+      mcp_health: ${{ steps.mcp.outcome }}
+      api_health: ${{ steps.api-health.outcome }}
+      api_ready: ${{ steps.api-ready.outcome }}
+      api_ready_body: ${{ steps.api-ready.outputs.body }}
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Get nella-mcp URL
+        id: mcp-url
+        run: |
+          URL=$(gcloud run services describe nella-mcp \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)' 2>/dev/null || echo "")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Get nella-api URL
+        id: api-url
+        run: |
+          URL=$(gcloud run services describe nella-api \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)' 2>/dev/null || echo "")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Check nella-mcp /health
+        id: mcp
+        continue-on-error: true
+        run: |
+          URL="${{ steps.mcp-url.outputs.url }}"
+          if [ -z "$URL" ]; then
+            echo "::error::nella-mcp service URL not found"
+            exit 1
+          fi
+          for i in 1 2 3; do
+            if curl -sf --max-time 15 "$URL/health" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'ok', f'Unexpected status: {d.get(\"status\")}'
+          print(f'nella-mcp: status={d[\"status\"]} version={d.get(\"version\",\"?\")} uptime={d.get(\"uptime\",\"?\")}s')
+            "; then
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::nella-mcp /health failed after 3 attempts"
+          exit 1
+
+      - name: Check nella-api /health
+        id: api-health
+        continue-on-error: true
+        run: |
+          URL="${{ steps.api-url.outputs.url }}"
+          if [ -z "$URL" ]; then
+            echo "::error::nella-api service URL not found"
+            exit 1
+          fi
+          for i in 1 2 3; do
+            if curl -sf --max-time 15 "$URL/health" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d.get('status') == 'ok', f'Unexpected status: {d.get(\"status\")}'
+          print(f'nella-api: status={d[\"status\"]} version={d.get(\"version\",\"?\")} uptime={d.get(\"uptime\",\"?\")}s')
+            "; then
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::nella-api /health failed after 3 attempts"
+          exit 1
+
+      - name: Check nella-api /ready (Supabase + Redis)
+        id: api-ready
+        continue-on-error: true
+        run: |
+          URL="${{ steps.api-url.outputs.url }}"
+          if [ -z "$URL" ]; then
+            echo "::error::nella-api service URL not found"
+            echo "body={}" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          BODY=$(curl -sf --max-time 15 "$URL/ready" || echo '{"status":"unreachable","checks":{}}')
+          echo "body=$BODY" >> "$GITHUB_OUTPUT"
+          echo "$BODY" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print(f'nella-api /ready: status={d.get(\"status\")} checks={d.get(\"checks\",{})}')
+          if d.get('status') == 'degraded' or any(v == 'error' for v in d.get('checks',{}).values()):
+              sys.exit(1)
+          "
+
+  # ---------------------------------------------------------------------------
+  # AI / ML API keys — lightweight validation (no credit-consuming calls)
+  # ---------------------------------------------------------------------------
+  check-ai-apis:
+    name: AI API Keys
+    runs-on: ubuntu-latest
+    outputs:
+      openai: ${{ steps.openai.outcome }}
+      voyage: ${{ steps.voyage.outcome }}
+      cohere: ${{ steps.cohere.outcome }}
+    steps:
+      - name: Check OpenAI API
+        id: openai
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::warning::OPENAI_API_KEY secret not configured"
+            exit 1
+          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            "https://api.openai.com/v1/models")
+          echo "OpenAI API response: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::OpenAI API returned HTTP $STATUS"; exit 1; }
+
+      - name: Check Voyage AI API
+        id: voyage
+        continue-on-error: true
+        env:
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          if [ -z "$VOYAGE_API_KEY" ]; then
+            echo "::warning::VOYAGE_API_KEY secret not configured"
+            exit 1
+          fi
+          # Voyage doesn't have a lightweight /models endpoint, so we check with a minimal embedding call
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer $VOYAGE_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"input":["test"],"model":"voyage-code-2"}' \
+            "https://api.voyageai.com/v1/embeddings")
+          echo "Voyage AI API response: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::Voyage AI API returned HTTP $STATUS"; exit 1; }
+
+      - name: Check Cohere API
+        id: cohere
+        continue-on-error: true
+        env:
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        run: |
+          if [ -z "$COHERE_API_KEY" ]; then
+            echo "::warning::COHERE_API_KEY secret not configured"
+            exit 1
+          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer $COHERE_API_KEY" \
+            "https://api.cohere.com/v2/models")
+          echo "Cohere API response: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::Cohere API returned HTTP $STATUS"; exit 1; }
+
+  # ---------------------------------------------------------------------------
+  # npm Registry — verify published packages are accessible
+  # ---------------------------------------------------------------------------
+  check-npm-packages:
+    name: npm Packages
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.core.outcome }}
+      nella: ${{ steps.nella.outcome }}
+      api: ${{ steps.api.outcome }}
+      benchmark: ${{ steps.benchmark.outcome }}
+    steps:
+      - name: Check @usenella/core
+        id: core
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            "https://registry.npmjs.org/@usenella/core")
+          echo "@usenella/core: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::@usenella/core not accessible (HTTP $STATUS)"; exit 1; }
+
+      - name: Check @usenella/nella
+        id: nella
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            "https://registry.npmjs.org/@usenella/nella")
+          echo "@usenella/nella: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::@usenella/nella not accessible (HTTP $STATUS)"; exit 1; }
+
+      - name: Check @usenella/api
+        id: api
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            "https://registry.npmjs.org/@usenella/api")
+          echo "@usenella/api: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::@usenella/api not accessible (HTTP $STATUS)"; exit 1; }
+
+      - name: Check @usenella/benchmark
+        id: benchmark
+        continue-on-error: true
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            "https://registry.npmjs.org/@usenella/benchmark")
+          echo "@usenella/benchmark: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::@usenella/benchmark not accessible (HTTP $STATUS)"; exit 1; }
+
+  # ---------------------------------------------------------------------------
+  # Report — Create / update a GitHub Issue with a checklist
+  # ---------------------------------------------------------------------------
+  report:
+    name: Update Health Report
+    runs-on: ubuntu-latest
+    needs: [check-gcp-services, check-ai-apis, check-npm-packages]
+    if: always()
+    steps:
+      - name: Generate report and update issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date().toISOString();
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Collect results from all jobs
+            const checks = {
+              // GCP Cloud Run
+              mcp_health:   "${{ needs.check-gcp-services.outputs.mcp_health }}",
+              api_health:   "${{ needs.check-gcp-services.outputs.api_health }}",
+              api_ready:    "${{ needs.check-gcp-services.outputs.api_ready }}",
+              // AI APIs
+              openai:       "${{ needs.check-ai-apis.outputs.openai }}",
+              voyage:       "${{ needs.check-ai-apis.outputs.voyage }}",
+              cohere:       "${{ needs.check-ai-apis.outputs.cohere }}",
+              // npm packages
+              npm_core:     "${{ needs.check-npm-packages.outputs.core }}",
+              npm_nella:    "${{ needs.check-npm-packages.outputs.nella }}",
+              npm_api:      "${{ needs.check-npm-packages.outputs.api }}",
+              npm_benchmark:"${{ needs.check-npm-packages.outputs.benchmark }}",
+            };
+
+            const ok = (v) => v === "success";
+            const icon = (v) => ok(v) ? "x" : " ";
+            const status = (v) => ok(v) ? "operational" : "**DOWN / ERROR**";
+
+            const anyFailed = Object.values(checks).some(v => !ok(v));
+
+            // Parse /ready response for sub-dependency details
+            let supabaseStatus = "unknown";
+            let redisStatus = "unknown";
+            try {
+              const readyBody = JSON.parse('${{ needs.check-gcp-services.outputs.api_ready_body }}' || '{}');
+              supabaseStatus = readyBody?.checks?.supabase || "unknown";
+              redisStatus = readyBody?.checks?.redis || "unknown";
+            } catch {}
+
+            const body = [
+              `## 🏥 Infrastructure Health Report`,
+              ``,
+              `**Last checked:** ${now}`,
+              `**Workflow run:** [#${context.runNumber}](${runUrl})`,
+              `**Overall status:** ${anyFailed ? "🔴 Issues detected" : "🟢 All systems operational"}`,
+              ``,
+              `---`,
+              ``,
+              `### GCP Cloud Run`,
+              `- [${icon(checks.mcp_health)}] **nella-mcp** (/health) — ${status(checks.mcp_health)}`,
+              `- [${icon(checks.api_health)}] **nella-api** (/health) — ${status(checks.api_health)}`,
+              `- [${icon(checks.api_ready)}] **nella-api** (/ready) — ${status(checks.api_ready)}`,
+              ``,
+              `### Backend Dependencies (via /ready)`,
+              `- [${supabaseStatus === "ok" ? "x" : " "}] **Supabase** (PostgreSQL + Auth) — ${supabaseStatus}`,
+              `- [${redisStatus === "configured" || redisStatus === "ok" ? "x" : " "}] **Redis** (Rate limiting + Queues) — ${redisStatus}`,
+              ``,
+              `### AI / ML APIs`,
+              `- [${icon(checks.openai)}] **OpenAI** (Embeddings) — ${status(checks.openai)}`,
+              `- [${icon(checks.voyage)}] **Voyage AI** (Code Embeddings) — ${status(checks.voyage)}`,
+              `- [${icon(checks.cohere)}] **Cohere** (Reranking) — ${status(checks.cohere)}`,
+              ``,
+              `### npm Packages`,
+              `- [${icon(checks.npm_core)}] **@usenella/core** — ${status(checks.npm_core)}`,
+              `- [${icon(checks.npm_nella)}] **@usenella/nella** — ${status(checks.npm_nella)}`,
+              `- [${icon(checks.npm_api)}] **@usenella/api** — ${status(checks.npm_api)}`,
+              `- [${icon(checks.npm_benchmark)}] **@usenella/benchmark** — ${status(checks.npm_benchmark)}`,
+              ``,
+              `---`,
+              ``,
+              `> 🤖 This issue is automatically maintained by the [Health Check workflow](${runUrl}).`,
+              `> Checks run every hour. If any check fails, this issue reopens and triggers a GitHub notification.`,
+            ].join("\n");
+
+            // Find existing health-check issue
+            const label = "health-check";
+            const title = "🏥 Infrastructure Health Report";
+
+            // Ensure label exists
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+                color: "0E8A16",
+                description: "Automated health check monitoring",
+              });
+            }
+
+            // Search for existing issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: label,
+              state: "all",
+              per_page: 1,
+              sort: "created",
+              direction: "desc",
+            });
+
+            if (issues.length > 0) {
+              const issue = issues[0];
+              // Update the existing issue body
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body,
+                state: anyFailed ? "open" : "closed",
+              });
+              console.log(`Updated issue #${issue.number} — state: ${anyFailed ? "open" : "closed"}`);
+            } else {
+              // Create new issue
+              const { data: newIssue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+              // Pin it
+              console.log(`Created issue #${newIssue.number}`);
+              if (anyFailed) {
+                console.log("Issue created in open state due to failures");
+              } else {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: newIssue.number,
+                  state: "closed",
+                });
+              }
+            }
