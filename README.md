@@ -1,6 +1,7 @@
 # Nella
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Health Check](https://github.com/nella-labs/nella/actions/workflows/health-check.yml/badge.svg)](https://github.com/nella-labs/nella/actions/workflows/health-check.yml)
 
 **Reliability layer for coding agents.** Nella makes agent-made code changes safer, verifiable, and auditable.
 
