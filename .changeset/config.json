@@ -2,12 +2,12 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.2/schema.json",
   "changelog": [
     "@changesets/changelog-github",
-    { "repo": "usenella/nella" }
+    { "repo": "nella-labs/nella" }
   ],
   "commit": false,
   "fixed": [],
   "linked": [
-    ["@usenella/core", "@usenella/api", "@usenella/nella", "@usenella/benchmark"]
+    ["@usenella/nella"]
   ],
   "access": "public",
   "baseBranch": "main",
