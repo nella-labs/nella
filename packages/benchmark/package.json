@@ -29,13 +29,11 @@
   ],
   "author": "Nella Labs",
   "license": "Apache-2.0",
+  "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/usenella/nella.git",
+    "url": "https://github.com/nella-labs/nella.git",
     "directory": "packages/benchmark"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "dependencies": {
     "dotenv": "^16.3.1",

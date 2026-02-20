@@ -1,6 +1,6 @@
 {
   "name": "@usenella/nella",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Nella MCP Server — reliability layer for AI coding agents. Validates constraints, detects risks, and tracks context via the Model Context Protocol.",
   "type": "commonjs",
   "bin": {
@@ -22,10 +22,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
+    "build:tsc": "tsc",
     "test": "c8 --reporter=text --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
     "test:ci": "c8 --reporter=lcov --report-dir=coverage tsx --test src/**/__tests__/*.test.ts",
-    "dev": "tsc --watch",
+    "dev": "tsup --watch",
     "start:mcp": "node dist/mcp/server.js",
     "prepublishOnly": "npm run build"
   },
@@ -53,14 +54,31 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "@usenella/core": "workspace:*",
+    "@typescript-eslint/typescript-estree": "^7.0.0",
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.5",
     "dotenv": "^16.6.1",
     "figures": "^3.2.0",
-    "ioredis": "^5.9.3",
     "js-yaml": "^4.1.0",
+    "minimatch": "^9.0.0",
+    "natural": "^6.10.0"
+  },
+  "optionalDependencies": {
+    "@google-cloud/storage": "^7.7.0",
+    "@msgpack/msgpack": "^3.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
+    "@opentelemetry/resources": "^1.30.0",
+    "@opentelemetry/sdk-node": "^0.212.0",
+    "@opentelemetry/sdk-trace-base": "^1.30.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.18.0",
+    "hnswlib-node": "^3.0.0",
+    "ioredis": "^5.9.3",
+    "onnxruntime-node": "^1.17.0",
+    "pg": "^8.11.0",
+    "usearch": "^2.12.0",
     "ws": "^8.16.0"
   },
   "devDependencies": {
@@ -68,6 +86,8 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
+    "@usenella/core": "workspace:*",
+    "tsup": "^8.5.1",
     "typescript": "^5.3.0"
   }
 }
