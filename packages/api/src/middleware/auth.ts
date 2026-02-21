@@ -57,6 +57,7 @@ export interface PlanLimits {
   storageMb: number;
   logRetentionDays: number;
   workspaces: number;
+  organizations: number;
 }
 
 /** Plan feature/limit definitions — must stay in sync with nella-website */
@@ -92,10 +93,10 @@ const PLAN_FEATURES: Record<PlanSlug, PlanFeatures> = {
 };
 
 const PLAN_LIMITS: Record<PlanSlug, PlanLimits> = {
-  free:    { requestsPerMonth: 5_000,   projects: 1,  members: 1,  storageMb: 50,    logRetentionDays: 3,  workspaces: 0 },
-  starter: { requestsPerMonth: 25_000,  projects: 3,  members: 1,  storageMb: 250,   logRetentionDays: 7,  workspaces: 1 },
-  pro:     { requestsPerMonth: 100_000, projects: 10, members: 5,  storageMb: 2_048, logRetentionDays: 30, workspaces: 5 },
-  team:    { requestsPerMonth: 500_000, projects: -1, members: 50, storageMb: 10_240, logRetentionDays: 90, workspaces: -1 },
+  free:    { requestsPerMonth: 5_000,   projects: 1,  members: 1,  storageMb: 50,    logRetentionDays: 3,  workspaces: 0,  organizations: 1 },
+  starter: { requestsPerMonth: 25_000,  projects: 3,  members: 1,  storageMb: 250,   logRetentionDays: 7,  workspaces: 1,  organizations: 2 },
+  pro:     { requestsPerMonth: 100_000, projects: 10, members: 5,  storageMb: 2_048, logRetentionDays: 30, workspaces: 5,  organizations: 5 },
+  team:    { requestsPerMonth: 500_000, projects: -1, members: 50, storageMb: 10_240, logRetentionDays: 90, workspaces: -1, organizations: -1 },
 };
 
 // ── TTL cache for org plan lookups (avoids per-request DB hit) ───────────────
@@ -131,6 +132,31 @@ async function resolveOrgPlan(orgId: string): Promise<CachedPlan> {
   };
 
   planCache.set(orgId, entry);
+  return entry;
+}
+
+async function resolveUserPlan(userId: string): Promise<CachedPlan> {
+  const cacheKey = `user:${userId}`;
+  const now = Date.now();
+  const cached = planCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached;
+
+  const supabase = getSupabase();
+  const { data: user } = await supabase
+    .from("users")
+    .select("plan")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const planSlug: PlanSlug = (user?.plan as PlanSlug) || "free";
+  const entry: CachedPlan = {
+    plan: planSlug,
+    features: PLAN_FEATURES[planSlug] || PLAN_FEATURES.free,
+    limits: PLAN_LIMITS[planSlug] || PLAN_LIMITS.free,
+    expiresAt: now + PLAN_CACHE_TTL_MS,
+  };
+
+  planCache.set(cacheKey, entry);
   return entry;
 }
 
@@ -242,21 +268,28 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
       rateLimits: keyRecord.rate_limits || defaultLimits,
     };
 
-    // Resolve plan features/limits from org (if key is org-scoped)
-    if (keyRecord.org_id) {
-      try {
+    // Resolve plan features/limits from org or user
+    try {
+      if (keyRecord.org_id) {
         const orgPlan = await resolveOrgPlan(keyRecord.org_id);
         req.user.planSlug = orgPlan.plan;
         req.user.planFeatures = orgPlan.features;
         req.user.planLimits = orgPlan.limits;
-      } catch (planErr) {
-        // Non-fatal — log and continue without plan enforcement
-        log("warn", "Failed to resolve org plan", {
-          requestId: req.requestId,
-          orgId: keyRecord.org_id,
-          error: (planErr as Error).message,
-        });
+      } else {
+        // No org — resolve from user's plan directly (prevents plan bypass)
+        const userPlan = await resolveUserPlan(keyRecord.user_id);
+        req.user.planSlug = userPlan.plan;
+        req.user.planFeatures = userPlan.features;
+        req.user.planLimits = userPlan.limits;
       }
+    } catch (planErr) {
+      // Non-fatal — log and continue without plan enforcement
+      log("warn", "Failed to resolve plan", {
+        requestId: req.requestId,
+        orgId: keyRecord.org_id,
+        userId: keyRecord.user_id,
+        error: (planErr as Error).message,
+      });
     }
 
     next();
