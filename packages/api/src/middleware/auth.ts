@@ -30,15 +30,128 @@ function getSupabase() {
   return supabaseClient;
 }
 
+// ── Plan types (duplicated from nella-website to avoid cross-dependency) ──────
+
+export type PlanSlug = "free" | "starter" | "pro" | "team";
+export type SearchTier = "basic" | "advanced" | "premium";
+
+export interface PlanFeatures {
+  searchTier: SearchTier;
+  ragIndexing: boolean;
+  ragIndexingFull: boolean;
+  codeVerification: boolean;
+  customConstraints: boolean;
+  contextTracking: boolean;
+  contextTrackingFull: boolean;
+  sso: boolean;
+  auditLogs: boolean;
+  slackAlerts: boolean;
+  prioritySupport: boolean;
+  dedicatedSupport: boolean;
+}
+
+export interface PlanLimits {
+  requestsPerMonth: number;
+  projects: number;
+  members: number;
+  storageMb: number;
+  logRetentionDays: number;
+  workspaces: number;
+}
+
+/** Plan feature/limit definitions — must stay in sync with nella-website */
+const PLAN_FEATURES: Record<PlanSlug, PlanFeatures> = {
+  free: {
+    searchTier: "basic", ragIndexing: false, ragIndexingFull: false,
+    codeVerification: false, customConstraints: false,
+    contextTracking: false, contextTrackingFull: false,
+    sso: false, auditLogs: false, slackAlerts: false,
+    prioritySupport: false, dedicatedSupport: false,
+  },
+  starter: {
+    searchTier: "advanced", ragIndexing: true, ragIndexingFull: false,
+    codeVerification: false, customConstraints: true,
+    contextTracking: true, contextTrackingFull: false,
+    sso: false, auditLogs: false, slackAlerts: false,
+    prioritySupport: false, dedicatedSupport: false,
+  },
+  pro: {
+    searchTier: "premium", ragIndexing: true, ragIndexingFull: true,
+    codeVerification: true, customConstraints: true,
+    contextTracking: true, contextTrackingFull: true,
+    sso: false, auditLogs: false, slackAlerts: false,
+    prioritySupport: true, dedicatedSupport: false,
+  },
+  team: {
+    searchTier: "premium", ragIndexing: true, ragIndexingFull: true,
+    codeVerification: true, customConstraints: true,
+    contextTracking: true, contextTrackingFull: true,
+    sso: true, auditLogs: true, slackAlerts: true,
+    prioritySupport: true, dedicatedSupport: true,
+  },
+};
+
+const PLAN_LIMITS: Record<PlanSlug, PlanLimits> = {
+  free:    { requestsPerMonth: 5_000,   projects: 1,  members: 1,  storageMb: 50,    logRetentionDays: 3,  workspaces: 0 },
+  starter: { requestsPerMonth: 25_000,  projects: 3,  members: 1,  storageMb: 250,   logRetentionDays: 7,  workspaces: 1 },
+  pro:     { requestsPerMonth: 100_000, projects: 10, members: 5,  storageMb: 2_048, logRetentionDays: 30, workspaces: 5 },
+  team:    { requestsPerMonth: 500_000, projects: -1, members: 50, storageMb: 10_240, logRetentionDays: 90, workspaces: -1 },
+};
+
+// ── TTL cache for org plan lookups (avoids per-request DB hit) ───────────────
+
+interface CachedPlan {
+  plan: PlanSlug;
+  features: PlanFeatures;
+  limits: PlanLimits;
+  expiresAt: number;
+}
+
+const planCache = new Map<string, CachedPlan>();
+const PLAN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function resolveOrgPlan(orgId: string): Promise<CachedPlan> {
+  const now = Date.now();
+  const cached = planCache.get(orgId);
+  if (cached && cached.expiresAt > now) return cached;
+
+  const supabase = getSupabase();
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("plan")
+    .eq("id", orgId)
+    .maybeSingle();
+
+  const planSlug: PlanSlug = (org?.plan as PlanSlug) || "free";
+  const entry: CachedPlan = {
+    plan: planSlug,
+    features: PLAN_FEATURES[planSlug] || PLAN_FEATURES.free,
+    limits: PLAN_LIMITS[planSlug] || PLAN_LIMITS.free,
+    expiresAt: now + PLAN_CACHE_TTL_MS,
+  };
+
+  planCache.set(orgId, entry);
+  return entry;
+}
+
+// ── User type ────────────────────────────────────────────────────────────────
+
 export interface AuthenticatedUser {
   apiKeyId: string;
   userId: string;
+  orgId: string | null;
   scopes: string[];
   rateLimits: {
     requests_per_minute: number;
     requests_per_hour: number;
     requests_per_day: number;
   };
+  /** Plan features — undefined when no org (self-hosted / unlinked key) */
+  planFeatures?: PlanFeatures;
+  /** Plan limits — undefined when no org */
+  planLimits?: PlanLimits;
+  /** Plan slug — undefined when no org */
+  planSlug?: PlanSlug;
 }
 
 // Extend Express Request
@@ -89,7 +202,7 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
 
     const { data: keyRecord, error } = await supabase
       .from("api_keys")
-      .select("id, user_id, name, key_prefix, rate_limits, expires_at, revoked_at, scopes")
+      .select("id, user_id, name, key_prefix, rate_limits, expires_at, revoked_at, scopes, org_id")
       .eq("key_hash", keyHash)
       .single();
 
@@ -124,9 +237,27 @@ export async function apiKeyAuth(req: Request, res: Response, next: NextFunction
     req.user = {
       apiKeyId: keyRecord.id,
       userId: keyRecord.user_id,
+      orgId: keyRecord.org_id || null,
       scopes: keyRecord.scopes || ["workspaces:read", "search:read", "validate:run", "context:read"],
       rateLimits: keyRecord.rate_limits || defaultLimits,
     };
+
+    // Resolve plan features/limits from org (if key is org-scoped)
+    if (keyRecord.org_id) {
+      try {
+        const orgPlan = await resolveOrgPlan(keyRecord.org_id);
+        req.user.planSlug = orgPlan.plan;
+        req.user.planFeatures = orgPlan.features;
+        req.user.planLimits = orgPlan.limits;
+      } catch (planErr) {
+        // Non-fatal — log and continue without plan enforcement
+        log("warn", "Failed to resolve org plan", {
+          requestId: req.requestId,
+          orgId: keyRecord.org_id,
+          error: (planErr as Error).message,
+        });
+      }
+    }
 
     next();
   } catch (err) {
