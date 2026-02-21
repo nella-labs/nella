@@ -13,6 +13,7 @@ import { SafetyService } from "@usenella/core/dist/services/safety-service";
 import { sendSuccess, sendError } from "../utils/responses";
 import { validateBody } from "../middleware/validation";
 import { requireScope } from "../middleware/auth";
+import { requirePlanFeature } from "../middleware/plan-gate";
 
 // =============================================================================
 // Schemas
@@ -101,8 +102,8 @@ export function validateRouter(): Router {
     }
   });
 
-  // POST /api/v1/validate/validate — Check constraints
-  router.post("/validate", requireScope("validate:run"), validateBody(validateSchema), async (req: Request, res: Response, next: NextFunction) => {
+  // POST /api/v1/validate/validate — Check constraints (requires Starter+ for custom constraints)
+  router.post("/validate", requireScope("validate:run"), requirePlanFeature("customConstraints"), validateBody(validateSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { modifiedFiles, diff, constraints } = req.body;
 
@@ -118,8 +119,8 @@ export function validateRouter(): Router {
     }
   });
 
-  // POST /api/v1/validate/run — Full validation run
-  router.post("/run", requireScope("validate:run"), validateBody(runSchema), async (req: Request, res: Response, next: NextFunction) => {
+  // POST /api/v1/validate/run — Full validation run (requires Starter+ for custom constraints)
+  router.post("/run", requireScope("validate:run"), requirePlanFeature("customConstraints"), validateBody(runSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await validationService.runFullTask({
         workspacePath: req.body.workspaceId, // Will be resolved from workspace registry
