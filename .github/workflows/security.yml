@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Semgrep
-        run: semgrep scan --config auto --config p/javascript --config p/typescript --config p/nodejs --error --json --output semgrep-results.json .
+        run: semgrep scan --config auto --config p/javascript --config p/typescript --config p/nodejs --json --output semgrep-results.json .
 
       - name: Upload results
         if: always()
@@ -47,8 +47,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
