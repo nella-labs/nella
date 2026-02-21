@@ -12,6 +12,7 @@ import { sendSuccess, sendCreated, sendNoContent, sendError } from "../utils/res
 import { parsePagination, decodeCursor, buildPaginationMeta } from "../utils/pagination";
 import { validateBody } from "../middleware/validation";
 import { requireScope } from "../middleware/auth";
+import { checkWorkspacePlanLimit } from "../middleware/plan-gate";
 import { log } from "../utils/logger";
 
 // =============================================================================
@@ -50,8 +51,8 @@ export function workspacesRouter(): Router {
     }
   });
 
-  // POST /api/v1/workspaces
-  router.post("/", requireScope("workspaces:write"), validateBody(createWorkspaceSchema), async (req: Request, res: Response, next: NextFunction) => {
+  // POST /api/v1/workspaces — workspace creation gated by plan limit
+  router.post("/", requireScope("workspaces:write"), checkWorkspacePlanLimit, validateBody(createWorkspaceSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const ws = await service.create(req.body);
       log("info", "Workspace created", { workspaceId: ws.id, userId: req.user?.userId });

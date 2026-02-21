@@ -12,6 +12,7 @@ import { SearchService } from "@usenella/core/dist/services/search-service";
 import { sendSuccess, sendError } from "../utils/responses";
 import { validateBody } from "../middleware/validation";
 import { requireScope } from "../middleware/auth";
+import { requirePlanFeature, requireSearchTier } from "../middleware/plan-gate";
 
 // =============================================================================
 // Schemas
@@ -53,9 +54,17 @@ export function searchRouter(): Router {
   const service = new SearchService();
 
   // POST /api/v1/search
+  // Search tier gating: "hybrid" mode requires advanced+ plan, "semantic"/"lexical" always allowed
   router.post("/", requireScope("search:read"), validateBody(searchSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { workspaceId, query, mode, topK, filters } = req.body;
+
+      // Gate hybrid search to advanced+ tier plans
+      if (mode === "hybrid" && req.user?.planFeatures && req.user.planFeatures.searchTier === "basic") {
+        sendError(res, req, 403, "FEATURE_NOT_AVAILABLE",
+          "Hybrid search requires the Starter plan or higher. Your plan only includes basic (vector) search.");
+        return;
+      }
 
       const config = {
         workspacePath: "", // Will be resolved from workspace registry
@@ -98,10 +107,11 @@ export function searchRouter(): Router {
     }
   });
 
-  // POST /api/v1/verify
+  // POST /api/v1/verify — requires Pro plan (codeVerification feature)
   router.post(
     "/verify",
     requireScope("search:read"),
+    requirePlanFeature("codeVerification"),
     validateBody(verifySchema),
     async (req: Request, res: Response, next: NextFunction) => {
       try {

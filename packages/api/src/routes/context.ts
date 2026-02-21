@@ -11,6 +11,7 @@ import { ContextService } from "@usenella/core/dist/services/context-service";
 import { sendSuccess, sendCreated, sendNoContent, sendError } from "../utils/responses";
 import { validateBody } from "../middleware/validation";
 import { requireScope } from "../middleware/auth";
+import { requirePlanFeature } from "../middleware/plan-gate";
 
 // =============================================================================
 // Schemas
@@ -59,8 +60,10 @@ function getContextService(workspacePath: string): ContextService {
 export function contextRouter(): Router {
   const router = Router();
 
+  // All context routes require Starter+ plan (contextTracking feature)
+
   // GET /api/v1/context?workspaceId=xxx
-  router.get("/", requireScope("context:read"), async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/", requireScope("context:read"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId) {
@@ -77,7 +80,7 @@ export function contextRouter(): Router {
   });
 
   // POST /api/v1/context/assumptions
-  router.post("/assumptions", requireScope("context:write"), validateBody(addAssumptionSchema), async (req: Request, res: Response, next: NextFunction) => {
+  router.post("/assumptions", requireScope("context:write"), requirePlanFeature("contextTracking"), validateBody(addAssumptionSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string || req.body.workspaceId;
       if (!workspaceId) {
@@ -93,7 +96,7 @@ export function contextRouter(): Router {
   });
 
   // GET /api/v1/context/assumptions
-  router.get("/assumptions", requireScope("context:read"), async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/assumptions", requireScope("context:read"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId) {
@@ -109,7 +112,7 @@ export function contextRouter(): Router {
   });
 
   // GET /api/v1/context/files/:filePath — file history
-  router.get("/files/*", requireScope("context:read"), async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/files/*", requireScope("context:read"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId) {
@@ -126,7 +129,7 @@ export function contextRouter(): Router {
   });
 
   // GET /api/v1/context/dependencies
-  router.get("/dependencies", requireScope("context:read"), async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/dependencies", requireScope("context:read"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string;
       if (!workspaceId) {
@@ -142,7 +145,7 @@ export function contextRouter(): Router {
   });
 
   // POST /api/v1/context/changes — record file changes
-  router.post("/changes", requireScope("context:write"), validateBody(recordChangeSchema), async (req: Request, res: Response, next: NextFunction) => {
+  router.post("/changes", requireScope("context:write"), requirePlanFeature("contextTracking"), validateBody(recordChangeSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.query.workspaceId as string || req.body.workspaceId;
       if (!workspaceId) {
@@ -158,7 +161,7 @@ export function contextRouter(): Router {
   });
 
   // GET /api/v1/context/sessions
-  router.get("/sessions", requireScope("context:read"), async (req: Request, res: Response, next: NextFunction) => {
+  router.get("/sessions", requireScope("context:read"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Return list of active context sessions
       const sessions = Array.from(contextManagers.keys()).map((wsPath) => ({
@@ -172,7 +175,7 @@ export function contextRouter(): Router {
   });
 
   // DELETE /api/v1/context/sessions/:workspaceId
-  router.delete("/sessions/:workspaceId", requireScope("context:write"), async (req: Request, res: Response, next: NextFunction) => {
+  router.delete("/sessions/:workspaceId", requireScope("context:write"), requirePlanFeature("contextTracking"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = req.params.workspaceId;
       if (contextManagers.has(workspaceId)) {
