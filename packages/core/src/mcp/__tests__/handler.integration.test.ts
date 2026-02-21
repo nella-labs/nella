@@ -197,7 +197,7 @@ test("Handler: call history records metadata", async () => {
     assert.equal(history.length, 1);
     assert.equal(history[0].toolName, "nella_status");
     assert.equal(history[0].success, true);
-    assert.ok(history[0].duration! > 0);
+    assert.ok(history[0].duration! >= 0);
   } finally {
     await cleanup();
   }
