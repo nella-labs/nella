@@ -33,6 +33,9 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
 
+# Remove npm (and its bundled vulnerable deps) — we only use pnpm
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # Copy workspace config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/core/package.json packages/core/
