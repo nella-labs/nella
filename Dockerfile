@@ -44,6 +44,9 @@ COPY packages/nella/package.json packages/nella/
 RUN printf "shamefully-hoist=true\nignore-scripts=true\n" > .npmrc
 RUN pnpm install --frozen-lockfile --prod
 
+# Remove corepack cache (contains pnpm's bundled deps that trigger Trivy findings)
+RUN rm -rf /root/.cache/node/corepack
+
 # Copy built output from builder
 COPY --from=builder /app/packages/core/dist packages/core/dist
 COPY --from=builder /app/packages/nella/dist packages/nella/dist
