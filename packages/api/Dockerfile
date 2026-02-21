@@ -3,7 +3,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@10
+RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
 
 # Copy workspace config files first (for layer caching)
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.json ./
@@ -31,7 +31,7 @@ FROM node:20-slim AS production
 
 WORKDIR /app
 
-RUN npm install -g pnpm@10
+RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
 
 # Copy workspace config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
@@ -52,6 +52,10 @@ COPY --from=builder /app/packages/api/package.json packages/api/package.json
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
+
+# Run as non-root user
+RUN addgroup --system app && adduser --system --ingroup app app
+USER app
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:8080/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"

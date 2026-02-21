@@ -82,8 +82,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install dependencies
         working-directory: nella
@@ -91,8 +89,10 @@ jobs:
 
       - name: Run docs sync
         working-directory: nella
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             pnpm sync-docs --dry-run
           else
             pnpm sync-docs
