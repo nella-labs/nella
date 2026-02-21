@@ -20,6 +20,7 @@ build/
 
 # Benchmark results (generated, not tracked)
 benchmark-results/
+.claude/
 
 # IDE
 .vscode/
@@ -28,7 +29,6 @@ benchmark-results/
 # OS files
 .DS_Store
 Thumbs.db
-
 # Logs
 *.log
 npm-debug.log*
@@ -40,3 +40,4 @@ coverage/
 # Private docs
 .private/
 .nella/
+.claude/
