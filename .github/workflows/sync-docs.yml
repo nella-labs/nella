@@ -61,14 +61,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      HAS_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN != '' }}
 
     steps:
+      - name: Check for DOCS_SYNC_TOKEN
+        if: env.HAS_TOKEN != 'true'
+        run: |
+          echo "::warning::DOCS_SYNC_TOKEN secret not configured — skipping docs sync."
+          echo "See workflow comments above for setup instructions."
+
       - name: Checkout nella repo
+        if: env.HAS_TOKEN == 'true'
         uses: actions/checkout@v4
         with:
           path: nella
 
       - name: Checkout nella-website repo
+        if: env.HAS_TOKEN == 'true'
         uses: actions/checkout@v4
         with:
           repository: nella-labs/nella-website
@@ -76,18 +86,22 @@ jobs:
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
 
       - name: Setup Node.js
+        if: env.HAS_TOKEN == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Setup pnpm
+        if: env.HAS_TOKEN == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Install dependencies
+        if: env.HAS_TOKEN == 'true'
         working-directory: nella
         run: pnpm install --frozen-lockfile
 
       - name: Run docs sync
+        if: env.HAS_TOKEN == 'true'
         working-directory: nella
         env:
           DRY_RUN: ${{ inputs.dry_run }}
@@ -99,6 +113,7 @@ jobs:
           fi
 
       - name: Check for changes
+        if: env.HAS_TOKEN == 'true'
         id: changes
         working-directory: nella-website
         run: |
@@ -112,7 +127,7 @@ jobs:
           fi
 
       - name: Create Pull Request
-        if: steps.changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
+        if: env.HAS_TOKEN == 'true' && steps.changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           path: nella-website
