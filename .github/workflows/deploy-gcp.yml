@@ -103,3 +103,10 @@ jobs:
             --format='value(status.url)')
           echo "Service URL: $URL"
           curl -sf "$URL/health" | python3 -m json.tool
+
+  post-deploy-health:
+    name: Post-Deploy Health Check
+    needs: deploy
+    if: success()
+    uses: ./.github/workflows/health-check.yml
+    secrets: inherit
