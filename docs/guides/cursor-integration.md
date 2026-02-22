@@ -28,7 +28,7 @@ Add Nella to your MCP servers configuration:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -94,7 +94,7 @@ You can create a project-specific MCP configuration by adding a `.cursor/mcp.jso
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "-w", "${workspaceFolder}"]
+      "args": ["@getnella/latest", "mcp", "-w", "${workspaceFolder}"]
     }
   }
 }
@@ -157,7 +157,7 @@ You can create a project-specific MCP configuration by adding a `.cursor/mcp.jso
 3. Try running the MCP server manually:
 
    ```bash
-   npx @usenella/nella mcp -w /path/to/project
+   npx @getnella/latest mcp -w /path/to/project
    ```
 
 ### Slow responses

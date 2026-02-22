@@ -8,7 +8,7 @@ Nella is a reliability layer for AI coding agents, structured as a TypeScript mo
 graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
-    subgraph nella_pkg["@usenella/nella v0.0.0"]
+    subgraph nella_pkg["@getnella/latest v0.0.0"]
         CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
@@ -129,7 +129,7 @@ graph LR
     Root --> Scripts["scripts/<br/>sync-docs.ts"]
 
     Packages --> Core["core/<br/>@usenella/core"]
-    Packages --> Nella["nella/<br/>@usenella/nella"]
+    Packages --> Nella["nella/<br/>@getnella/latest"]
     Packages --> Benchmark["benchmark/<br/>@usenella/benchmark"]
     Packages --> API["api/<br/>@usenella/api"]
 
@@ -143,7 +143,7 @@ graph LR
 | Package | Description | Key Exports |
 |---------|-------------|-------------|
 | `@usenella/core` | Core engine — validators, safety, indexing, context, workspace, auth, sync | `runTask()`, `check()`, `validate()`, `shouldRefuse()`, `ContextManager`, `IndexManager` |
-| `@usenella/nella` | CLI + MCP server. Re-exports all of core | `startMcpServer()`, CLI commands, MCP tool handlers |
+| `@getnella/latest` | CLI + MCP server. Re-exports all of core | `startMcpServer()`, CLI commands, MCP tool handlers |
 | `@usenella/benchmark` | Benchmark runner for evaluating agent performance | `BenchmarkRunner`, agent adapters, metrics calculator |
 | `@usenella/api` | REST API server (Express) for hosted deployments | Health, workspace, search, validate, context, auth endpoints |
 
@@ -152,7 +152,7 @@ graph LR
 ```mermaid
 graph LR
     subgraph packages["Nella Packages"]
-        nella["@usenella/nella<br/>v0.0.0"]
+        nella["@getnella/latest<br/>v0.0.0"]
         core["@usenella/core<br/>v0.0.0"]
         bench["@usenella/benchmark<br/>v0.0.0"]
     end
@@ -165,7 +165,7 @@ graph LR
     style bench fill:#fbbf24,color:#000
 ```
 
-`@usenella/nella` depends on and re-exports everything from `@usenella/core`, adding the CLI interface and MCP server on top. `@usenella/benchmark` replicates core types but does not directly depend on the core package at runtime.
+`@getnella/latest` depends on and re-exports everything from `@usenella/core`, adding the CLI interface and MCP server on top. `@usenella/benchmark` replicates core types but does not directly depend on the core package at runtime.
 
 ## Related Architecture Pages
 

@@ -4,7 +4,7 @@ The Nella MCP Server exposes Nella's reliability layer to AI agents like Claude 
 
 ## Overview
 
-The `@usenella/nella` package provides a CLI and MCP server that allows AI agents to:
+The `@getnella/latest` package provides a CLI and MCP server that allows AI agents to:
 
 - **Validate changes** against constraints before/after making them
 - **Detect risks** in proposed code modifications
@@ -31,9 +31,9 @@ The `@usenella/nella` package provides a CLI and MCP server that allows AI agent
 ### 1. Install
 
 ```bash
-npm install -g @usenella/nella
+npm install -g @getnella/latest
 # or use npx without installing
-npx @usenella/nella mcp --help
+npx @getnella/latest mcp --help
 ```
 
 ### 2. Configure Claude Desktop
@@ -45,7 +45,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -144,7 +144,7 @@ Each tool includes category, tags, examples, timeout, and retry configuration in
               MCP Protocol (stdio OR Streamable HTTP)
                               │
 ┌─────────────────────────────────────────────────────────────┐
-│                     @usenella/nella                          │
+│                     @getnella/latest                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  ┌──────┐  │
 │  │ Validation  │  │   Safety    │  │  Context   │  │ Code │  │
 │  │  (3 tools)  │  │  (3 tools)  │  │ (6 tools)  │  │(2)   │  │
@@ -183,5 +183,5 @@ This allows context to survive across multiple conversations with Claude.
 ## Related Packages
 
 - [@usenella/core](../core/) — Core reliability engine
-- [@usenella/nella](../../packages/nella/README.md) — CLI + MCP server
+- [@getnella/latest](../../packages/nella/README.md) — CLI + MCP server
 - [@usenella/benchmark](../benchmark/) — Benchmarking tools

@@ -34,7 +34,7 @@ Open the config file and add:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@usenella/nella", "mcp"],
+      "args": ["-y", "@getnella/latest", "mcp"],
       "env": {
         "NELLA_REPO_PATH": "/path/to/your/project"
       }
@@ -80,12 +80,12 @@ Configure multiple Nella instances for different projects:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["-y", "@usenella/nella", "mcp"],
+      "args": ["-y", "@getnella/latest", "mcp"],
       "env": { "NELLA_REPO_PATH": "/projects/frontend" }
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["-y", "@usenella/nella", "mcp"],
+      "args": ["-y", "@getnella/latest", "mcp"],
       "env": { "NELLA_REPO_PATH": "/projects/backend" }
     }
   }
@@ -121,7 +121,7 @@ Use nella_detect_risks to scan the diff for security issues.
 
 | Issue | Solution |
 |-------|----------|
-| Tools not appearing | Restart Claude Desktop. Check that `npx @usenella/nella mcp` runs without errors in your terminal |
+| Tools not appearing | Restart Claude Desktop. Check that `npx @getnella/latest mcp` runs without errors in your terminal |
 | "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from the default shell |
 | Permission errors | Ensure `NELLA_REPO_PATH` points to a directory you have read access to |
 | Slow startup | First run downloads the package via npx. Subsequent starts are faster |

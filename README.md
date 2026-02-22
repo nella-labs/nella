@@ -59,7 +59,7 @@ graph LR
 
 | Package | Description | npm |
 |---------|-------------|-----|
-| [@usenella/nella](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@usenella/nella)](https://www.npmjs.com/package/@usenella/nella) |
+| [@getnella/latest](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@getnella/latest)](https://www.npmjs.com/package/@getnella/latest) |
 | [@usenella/core](./packages/core) | Core validation library | [![npm](https://img.shields.io/npm/v/@usenella/core)](https://www.npmjs.com/package/@usenella/core) |
 | [@usenella/benchmark](./packages/benchmark) | Agent evaluation suite | [![npm](https://img.shields.io/npm/v/@usenella/benchmark)](https://www.npmjs.com/package/@usenella/benchmark) |
 
@@ -69,7 +69,7 @@ graph LR
 
 ```bash
 # Install globally
-npm install -g @usenella/nella
+npm install -g @getnella/latest
 
 # Check if a task can proceed (pre-flight)
 nella check --task tasks/get-user-by-id --repo ./my-project

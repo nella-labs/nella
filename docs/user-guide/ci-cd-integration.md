@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Install Nella
-        run: npm install -g @usenella/nella
+        run: npm install -g @getnella/latest
 
       - name: Validate changes
         run: nella run -t ./tasks/my-task.yaml -r . -c changes.json --json > result.json
@@ -59,7 +59,7 @@ Add a safety check before the agent even starts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm install -g @usenella/nella
+      - run: npm install -g @getnella/latest
       - name: Pre-flight safety check
         run: nella check -t ./tasks/my-task.yaml -r . --json > safety.json
       - name: Verify safe to proceed
@@ -81,7 +81,7 @@ Add a safety check before the agent even starts:
         task: [add-endpoint, fix-pagination, refactor-auth]
     steps:
       - uses: actions/checkout@v4
-      - run: npm install -g @usenella/nella
+      - run: npm install -g @getnella/latest
       - name: Validate ${{ matrix.task }}
         run: nella run -t ./tasks/${{ matrix.task }}.yaml -r . -c changes/${{ matrix.task }}.json --json
 ```
@@ -94,7 +94,7 @@ validate-agent:
   stage: test
   script:
     - npm ci
-    - npm install -g @usenella/nella
+    - npm install -g @getnella/latest
     - nella run -t ./tasks/$TASK_ID -r . -c changes.json --json > result.json
     - |
       PASSED=$(cat result.json | jq '.passed')
@@ -114,7 +114,7 @@ Run Nella in a container for consistent environments:
 
 ```dockerfile
 FROM node:20-alpine
-RUN npm install -g @usenella/nella
+RUN npm install -g @getnella/latest
 WORKDIR /workspace
 ENTRYPOINT ["nella"]
 ```

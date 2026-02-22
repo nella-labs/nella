@@ -40,7 +40,7 @@ Open the configuration file and add the Nella MCP server:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -71,11 +71,11 @@ You can configure multiple Nella instances for different projects:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "-w", "/projects/frontend"]
+      "args": ["@getnella/latest", "mcp", "-w", "/projects/frontend"]
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "-w", "/projects/backend"]
+      "args": ["@getnella/latest", "mcp", "-w", "/projects/backend"]
     }
   }
 }
@@ -159,7 +159,7 @@ All validations passed! Here's a summary of what I changed:
 ### Connection errors
 
 1. Ensure Node.js is installed and in your PATH
-2. Try running `npx @usenella/nella mcp -w /path/to/project` manually to check for errors
+2. Try running `npx @getnella/latest mcp -w /path/to/project` manually to check for errors
 3. Verify the workspace path exists
 
 ### Path issues on Windows
@@ -171,7 +171,7 @@ Use forward slashes or escaped backslashes in paths:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "-w", "C:/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "-w", "C:/path/to/project"]
     }
   }
 }
