@@ -3,7 +3,7 @@
 > Unified CLI and MCP Server for AI agent validation
 
 [![npm version](https://img.shields.io/npm/v/@getnella/latest.svg)](https://www.npmjs.com/package/@getnella/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Proprietary-blue.svg)](https://getnella.dev)
 
 Nella is a complete validation toolkit for AI coding agents. It provides both a CLI for direct use and an MCP (Model Context Protocol) server for integration with AI assistants like Claude.
 

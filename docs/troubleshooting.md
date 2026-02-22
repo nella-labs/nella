@@ -253,9 +253,9 @@ No. Nella works in a temporary cloned workspace. Your source code is never modif
 
 Nella's validators (constraints, scope checking, forbidden patterns) work with any language — they operate on file paths and text diffs. The indexing/RAG features use TypeScript's compiler API for AST-based chunking, so they work best with TypeScript/JavaScript. Other languages are indexed as plain text chunks.
 
-### Is Nella open source?
+### What is Nella's licensing model?
 
-Yes. Nella is open source under the MIT license. See the [GitHub repository](https://github.com/nella-labs/nella).
+Nella is a commercial product. Visit [getnella.dev](https://getnella.dev) for pricing and plan details.
 
 ### How does Nella compare to writing tests?
 
