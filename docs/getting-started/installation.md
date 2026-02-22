@@ -11,13 +11,13 @@ Install Nella to use as an MCP server with your AI coding agent.
 
 ```bash
 # npm
-npm install -g @usenella/nella
+npm install -g @getnella/latest
 
 # pnpm
-pnpm add -g @usenella/nella
+pnpm add -g @getnella/latest
 
 # yarn
-yarn global add @usenella/nella
+yarn global add @getnella/latest
 ```
 
 Verify the installation:
@@ -26,7 +26,7 @@ Verify the installation:
 nella --version
 ```
 
-> **Tip:** You can also use `npx` without a global install — most MCP clients support running `npx @usenella/nella mcp` directly.
+> **Tip:** You can also use `npx` without a global install — most MCP clients support running `npx @getnella/latest mcp` directly.
 
 ## Docker
 
@@ -34,7 +34,7 @@ Run Nella in a container:
 
 ```dockerfile
 FROM node:20-alpine
-RUN npm install -g @usenella/nella
+RUN npm install -g @getnella/latest
 WORKDIR /workspace
 ENTRYPOINT ["nella"]
 ```

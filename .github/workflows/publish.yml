@@ -30,7 +30,7 @@ jobs:
         run: pnpm --filter @usenella/core run build
 
       - name: Build nella
-        run: pnpm --filter @usenella/nella run build
+        run: pnpm --filter @getnella/latest run build
 
       - name: Publish
         run: cd packages/nella && npm publish --access public --provenance

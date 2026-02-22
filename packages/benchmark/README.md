@@ -82,7 +82,7 @@ npm run benchmark -- -a claude-sonnet -a gpt-4o
 ## Related Packages
 
 - [`@usenella/core`](../core) — Core reliability primitives
-- [`@usenella/nella`](../nella) — CLI + MCP server
+- [`@getnella/latest`](../nella) — CLI + MCP server
 
 ## License
 

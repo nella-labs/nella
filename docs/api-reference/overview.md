@@ -55,7 +55,7 @@ Nella MCP server supports API key authentication with optional features:
 
 ```bash
 # Start with auth enabled
-npx @usenella/nella mcp --workspace /path/to/project --auth
+npx @getnella/latest mcp --workspace /path/to/project --auth
 ```
 
 See [Authentication](../core/auth.md) for complete setup.
@@ -65,7 +65,7 @@ See [Authentication](../core/auth.md) for complete setup.
 Start the MCP server with:
 
 ```bash
-npx @usenella/nella mcp --workspace /path/to/project
+npx @getnella/latest mcp --workspace /path/to/project
 ```
 
 **Claude Desktop Config:**
@@ -75,7 +75,7 @@ npx @usenella/nella mcp --workspace /path/to/project
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "-w", "/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "-w", "/path/to/project"]
     }
   }
 }

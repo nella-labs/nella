@@ -1,8 +1,8 @@
-# @usenella/nella
+# @getnella/latest
 
 > Unified CLI and MCP Server for AI agent validation
 
-[![npm version](https://img.shields.io/npm/v/@usenella/nella.svg)](https://www.npmjs.com/package/@usenella/nella)
+[![npm version](https://img.shields.io/npm/v/@getnella/latest.svg)](https://www.npmjs.com/package/@getnella/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Nella is a complete validation toolkit for AI coding agents. It provides both a CLI for direct use and an MCP (Model Context Protocol) server for integration with AI assistants like Claude.
@@ -11,13 +11,13 @@ Nella is a complete validation toolkit for AI coding agents. It provides both a 
 
 ```bash
 # Global installation
-npm install -g @usenella/nella
+npm install -g @getnella/latest
 
 # Or use with npx
-npx @usenella/nella --help
+npx @getnella/latest --help
 
 # As a dev dependency
-npm install -D @usenella/nella
+npm install -D @getnella/latest
 ```
 
 ## Quick Start
@@ -133,7 +133,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "--workspace", "C:/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "--workspace", "C:/path/to/project"]
     }
   }
 }
@@ -146,7 +146,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@usenella/nella", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -194,10 +194,10 @@ import {
   validate,
   checkConstraints,
   detectRiskPatterns,
-} from '@usenella/nella';
+} from '@getnella/latest';
 
 // MCP server
-import { startMcpServer } from '@usenella/nella/mcp';
+import { startMcpServer } from '@getnella/latest/mcp';
 
 // Example: Run validation programmatically
 const result = await runTask(repoPath, task, changes);
@@ -206,7 +206,7 @@ console.log(result.passed ? 'Validation passed!' : 'Validation failed');
 
 ## Core Modules (Re-exported)
 
-`@usenella/nella` re-exports everything from `@usenella/core`, including advanced modules:
+`@getnella/latest` re-exports everything from `@usenella/core`, including advanced modules:
 
 - Indexing & search (RAG)
 - Workspace management

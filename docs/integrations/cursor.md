@@ -18,7 +18,7 @@ Create `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@usenella/nella", "mcp"],
+      "args": ["-y", "@getnella/latest", "mcp"],
       "env": {
         "NELLA_REPO_PATH": "."
       }
@@ -37,7 +37,7 @@ Open Cursor: **Settings** (Cmd/Ctrl + ,) → **Features** → **MCP** → **Add 
 {
   "nella": {
     "command": "npx",
-    "args": ["-y", "@usenella/nella", "mcp"],
+    "args": ["-y", "@getnella/latest", "mcp"],
     "env": {
       "NELLA_REPO_PATH": "${workspaceFolder}"
     }
@@ -93,4 +93,4 @@ I want to add pagination to the users endpoint. Please:
 | Server not starting | Check Cursor's MCP panel for error messages |
 | "Command not found" | Ensure `npx` is in your PATH. Try using the full path to `npx` |
 | Workspace path issues | Use absolute paths instead of `${workspaceFolder}` if variables aren't resolving |
-| Tools not loading | Restart Cursor. Check that `npx @usenella/nella mcp` works in your terminal |
+| Tools not loading | Restart Cursor. Check that `npx @getnella/latest mcp` works in your terminal |

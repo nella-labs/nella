@@ -48,7 +48,7 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         Integration Points                                  │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│  @usenella/nella        CLI + MCP server (stdio & HTTP)                    │
+│  @getnella/latest        CLI + MCP server (stdio & HTTP)                    │
 │  @usenella/core         TypeScript library (runTask, check, validate)      │
 │  @usenella/benchmark    Agent evaluation & benchmarking suite              │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -59,7 +59,7 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 | Package | Purpose | Binary |
 |---------|---------|--------|
 | `@usenella/core` | Core validation & reliability engine | — |
-| `@usenella/nella` | CLI + MCP server (local & hosted) | `nella` |
+| `@getnella/latest` | CLI + MCP server (local & hosted) | `nella` |
 | `@usenella/benchmark` | Agent benchmarking & evaluation suite | `nella-benchmark` |
 
 ### Data Flow
