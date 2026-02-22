@@ -5,6 +5,7 @@ on:
     # Run every hour
     - cron: "0 * * * *"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -133,7 +134,9 @@ jobs:
     outputs:
       openai: ${{ steps.openai.outcome }}
       voyage: ${{ steps.voyage.outcome }}
+      voyage_skipped: ${{ steps.voyage.outputs.skipped }}
       cohere: ${{ steps.cohere.outcome }}
+      cohere_skipped: ${{ steps.cohere.outputs.skipped }}
     steps:
       - name: Check OpenAI API
         id: openai
@@ -158,8 +161,9 @@ jobs:
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
           if [ -z "$VOYAGE_API_KEY" ]; then
-            echo "::warning::VOYAGE_API_KEY secret not configured"
-            exit 1
+            echo "::notice::VOYAGE_API_KEY not configured (optional provider)"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           # Voyage doesn't have a lightweight /models endpoint, so we check with a minimal embedding call
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
@@ -177,8 +181,9 @@ jobs:
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
         run: |
           if [ -z "$COHERE_API_KEY" ]; then
-            echo "::warning::COHERE_API_KEY secret not configured"
-            exit 1
+            echo "::notice::COHERE_API_KEY not configured (optional provider)"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -H "Authorization: Bearer $COHERE_API_KEY" \
@@ -267,11 +272,31 @@ jobs:
               npm_benchmark:"${{ needs.check-npm-packages.outputs.benchmark }}",
             };
 
+            // Optional provider skip flags
+            const voyageSkipped = "${{ needs.check-ai-apis.outputs.voyage_skipped }}";
+            const cohereSkipped = "${{ needs.check-ai-apis.outputs.cohere_skipped }}";
+
             const ok = (v) => v === "success";
             const icon = (v) => ok(v) ? "x" : " ";
             const status = (v) => ok(v) ? "operational" : "**DOWN / ERROR**";
 
-            const anyFailed = Object.values(checks).some(v => !ok(v));
+            // Severity-aware helpers for optional checks
+            const optIcon = (v, skipped) => skipped === "true" ? "-" : icon(v);
+            const optStatus = (v, skipped) => {
+              if (skipped === "true") return "_skipped (optional)_";
+              return status(v);
+            };
+
+            // Only required failures should trigger issue reopening
+            const requiredFailed = [
+              checks.mcp_health, checks.api_health, checks.api_ready,
+              checks.openai,
+              checks.npm_core, checks.npm_nella, checks.npm_api, checks.npm_benchmark,
+            ].some(v => !ok(v));
+            const optionalFailed =
+              (!ok(checks.voyage) && voyageSkipped !== "true") ||
+              (!ok(checks.cohere) && cohereSkipped !== "true");
+            const anyFailed = requiredFailed || optionalFailed;
 
             // Parse /ready response for sub-dependency details
             let supabaseStatus = "unknown";
@@ -302,8 +327,8 @@ jobs:
               ``,
               `### AI / ML APIs`,
               `- [${icon(checks.openai)}] **OpenAI** (Embeddings) — ${status(checks.openai)}`,
-              `- [${icon(checks.voyage)}] **Voyage AI** (Code Embeddings) — ${status(checks.voyage)}`,
-              `- [${icon(checks.cohere)}] **Cohere** (Reranking) — ${status(checks.cohere)}`,
+              `- [${optIcon(checks.voyage, voyageSkipped)}] **Voyage AI** (Code Embeddings, optional) — ${optStatus(checks.voyage, voyageSkipped)}`,
+              `- [${optIcon(checks.cohere, cohereSkipped)}] **Cohere** (Reranking, optional) — ${optStatus(checks.cohere, cohereSkipped)}`,
               ``,
               `### npm Packages`,
               `- [${icon(checks.npm_core)}] **@usenella/core** — ${status(checks.npm_core)}`,
