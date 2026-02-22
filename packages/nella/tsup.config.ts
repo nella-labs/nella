@@ -5,6 +5,8 @@ export default defineConfig({
     index: "src/index.ts",
     cli: "src/cli.ts",
     "mcp/index": "src/mcp/index.ts",
+    "mcp/server": "src/mcp/server.ts",
+    "mcp/hosted-server": "src/mcp/hosted-server.ts",
   },
   format: ["cjs"],
   target: "node18",

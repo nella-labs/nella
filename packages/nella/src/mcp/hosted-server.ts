@@ -1447,7 +1447,12 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 // Direct execution (for Docker CMD)
 // =============================================================================
 
-if (require.main === module) {
+// Only auto-start when this file is the direct entry point, not when bundled
+// into cli.js by tsup. Check process.argv[1] to distinguish.
+if (
+  require.main === module &&
+  /hosted-server\.(js|ts)$/.test(process.argv[1] ?? "")
+) {
   startHostedServer().catch((err) => {
     console.error("Fatal error:", err);
     process.exit(1);

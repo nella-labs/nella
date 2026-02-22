@@ -160,8 +160,12 @@ Example:
   console.error(`Nella MCP server started for workspace: ${workspacePath}`);
 }
 
-// If run directly (for backward compatibility or standalone usage)
-if (require.main === module) {
+// If run directly (standalone or Docker), not when bundled into cli.js by tsup.
+// Check process.argv[1] to distinguish standalone execution from CLI bundled execution.
+if (
+  require.main === module &&
+  /[/\\](?:mcp[/\\])?server\.(js|ts)$/.test(process.argv[1] ?? "")
+) {
   const args = parseWorkspaceArg(process.argv.slice(2));
   startMcpServer(args).catch((error) => {
     console.error("Fatal error:", error);
