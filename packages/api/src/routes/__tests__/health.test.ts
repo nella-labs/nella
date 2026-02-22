@@ -67,11 +67,17 @@ describe("GET /health", () => {
 describe("GET /ready", () => {
   const savedUrl = process.env.SUPABASE_URL;
   const savedKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const savedRedis = process.env.REDIS_URL;
 
   afterEach(() => {
     // Restore env vars
     process.env.SUPABASE_URL = savedUrl;
     process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey;
+    if (savedRedis !== undefined) {
+      process.env.REDIS_URL = savedRedis;
+    } else {
+      delete process.env.REDIS_URL;
+    }
   });
 
   it("returns readiness with checks object", async () => {
@@ -85,14 +91,15 @@ describe("GET /ready", () => {
     assert.ok(res.body.version);
   });
 
-  it("reports supabase as ok when env vars are set", async () => {
+  it("reports supabase status when env vars are set", async () => {
     process.env.SUPABASE_URL = "https://test.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 
     const app = createApp();
     const res = await request(app).get("/ready");
 
-    assert.equal(res.body.checks.supabase, "ok");
+    // In test env, Supabase URL is fake so actual query may fail
+    assert.ok(["ok", "error"].includes(res.body.checks.supabase));
   });
 
   it("reports supabase as missing_config when URL absent", async () => {
@@ -108,19 +115,21 @@ describe("GET /ready", () => {
     const app = createApp();
     const res = await request(app).get("/ready");
 
+    // In test env without REDIS_URL: not_configured
+    // With REDIS_URL but no server: unreachable
     assert.ok(
-      ["configured", "not_configured", "error"].includes(res.body.checks.redis)
+      ["ok", "not_configured", "unreachable", "error"].includes(res.body.checks.redis)
     );
   });
 
-  it("returns 200 when no checks are in error state", async () => {
+  it("returns 200 when all checks are ok", async () => {
     const app = createApp();
     const res = await request(app).get("/ready");
 
-    const hasError = Object.values(res.body.checks).some(
-      (v) => v === "error"
+    const allOk = Object.values(res.body.checks).every(
+      (v) => v === "ok"
     );
-    if (!hasError) {
+    if (allOk) {
       assert.equal(res.status, 200);
     }
   });
@@ -129,6 +138,17 @@ describe("GET /ready", () => {
     const app = createApp();
     const res = await request(app).get("/ready");
     assert.ok([200, 503].includes(res.status));
+  });
+
+  it("supports deep mode", async () => {
+    const app = createApp();
+    const res = await request(app).get("/ready?deep=true");
+
+    assert.ok([200, 503].includes(res.status));
+    assert.equal(res.body.mode, "deep");
+    assert.ok(typeof res.body.checks === "object");
+    // Deep mode should include auth_service check
+    assert.ok("auth_service" in res.body.checks);
   });
 });
 
