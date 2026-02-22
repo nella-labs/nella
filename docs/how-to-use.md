@@ -160,6 +160,8 @@ Key fields returned in a run:
 - Keep forbidden patterns strict and well-scoped to reduce false positives.
 - Use `skipValidation` only for fast, local checks — keep validations enabled in CI.
 
+For more tips — including always-on Nella setup, prompt engineering, and team workflow patterns — see the [Tips & Best Practices guide](./guides/tips-and-best-practices.md).
+
 ## 9) Explore advanced modules
 
 Nella Core includes advanced modules for larger agent systems:

@@ -24,6 +24,7 @@ The `@usenella/nella` package provides a CLI and MCP server that allows AI agent
 | [Context Management](../core/context.md) | Session persistence, assumptions, and dependency tracking |
 | [CLI Commands](../cli/commands.md) | Full CLI reference (`serve`, `connect`, `auth`, etc.) |
 | [Examples](../core/examples.md) | Practical code examples |
+| [Tips & Best Practices](../guides/tips-and-best-practices.md) | Always-on setup, prompt tips, constraint patterns, workflow guides |
 
 ## Quick Start
 

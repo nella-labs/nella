@@ -118,6 +118,7 @@ The agent can reference this task file when calling Nella tools.
 
 ## Next Steps
 
+- [Tips & Best Practices](../guides/tips-and-best-practices.md) — Always-on Nella, prompt tips, and workflow patterns
 - [MCP Tools](../mcp/tools.md) — Full reference for every tool
 - [Task Authoring](../user-guide/task-authoring.md) — Write effective task definitions
 - [Claude Desktop](../integrations/claude-desktop.md) — Detailed Claude Desktop setup
