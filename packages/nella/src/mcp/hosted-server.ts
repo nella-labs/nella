@@ -42,6 +42,9 @@ import {
 import { ContextManager } from "@usenella/core";
 import { WebSocketServer, WebSocket } from "ws";
 import Redis from "ioredis";
+
+let pkgVersion = "0.0.0";
+try { pkgVersion = require("../../package.json").version; } catch {}
 import { registerValidationTools, handleValidationTool } from "./tools/validation";
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
@@ -776,7 +779,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     if (pathname === "/health" && req.method === "GET") {
       const health = {
         status: "ok",
-        version: "0.0.0",
+        version: pkgVersion,
         uptime: Math.floor((Date.now() - startTime) / 1000),
         activeSessions: transports.size,
         redis: redisClient ? redisClient.status : "disabled",
