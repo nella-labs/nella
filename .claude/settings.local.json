@@ -14,15 +14,20 @@
       "Read(//tmp/**)"
     ]
   },
+  "enabledMcpjsonServers": [
+    "nella"
+  ],
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
+      "args": [
+        "-y",
+        "@getnella/mcp"
+      ],
       "env": {
         "NELLA_REPO_PATH": "./"
       }
     }
-  }
+  },
+  "enableAllProjectMcpServers": true
 }
-
-

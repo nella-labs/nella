@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nella": {
+      "command": "node",
+      "args": ["packages/nella/dist/cli.js", "mcp", "--workspace", "."]
+    }
+  }
+}

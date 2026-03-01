@@ -1,0 +1,8 @@
+{
+  "name": "nella",
+  "description": "Nella — reliability layer for AI coding agents. Adds /nella slash command for validation, constraint checking, risk detection, and session context.",
+  "author": {
+    "name": "Nella Labs",
+    "url": "https://github.com/usenella"
+  }
+}

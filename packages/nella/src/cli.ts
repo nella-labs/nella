@@ -45,68 +45,90 @@ import {
 // Theme & Styling
 // =============================================================================
 
+// Read version from package.json
+const PKG_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"));
+    return pkg.version || "0.0.0";
+  } catch { return "0.0.0"; }
+})();
+
 const theme = {
-  // Brand colors
-  primary: chalk.hex("#7C3AED"),      // Purple
-  secondary: chalk.hex("#06B6D4"),    // Cyan
-  accent: chalk.hex("#F59E0B"),       // Amber
-  
+  // Brand colors — Nella green identity
+  primary: chalk.hex("#2ECC71"),      // Nella green (from logo)
+  secondary: chalk.hex("#27AE60"),    // Darker green
+  accent: chalk.hex("#F1C40F"),       // Gold
+
   // Status colors
-  success: chalk.hex("#10B981"),      // Green
+  success: chalk.hex("#2ECC71"),      // Nella green
   error: chalk.hex("#EF4444"),        // Red
   warning: chalk.hex("#F59E0B"),      // Amber
-  info: chalk.hex("#3B82F6"),         // Blue
-  
+  info: chalk.hex("#3498DB"),         // Soft blue
+
   // Text colors
-  muted: chalk.hex("#6B7280"),        // Gray
+  muted: chalk.hex("#95A5A6"),        // Light gray
   dim: chalk.dim,
   bold: chalk.bold,
-  
+
   // Icons
   icons: {
-    success: chalk.hex("#10B981")(figures.tick),
+    success: chalk.hex("#2ECC71")(figures.tick),
     error: chalk.hex("#EF4444")(figures.cross),
     warning: chalk.hex("#F59E0B")(figures.warning),
-    info: chalk.hex("#3B82F6")(figures.info),
-    arrow: chalk.hex("#7C3AED")(figures.arrowRight),
-    bullet: chalk.hex("#6B7280")(figures.bullet),
-    star: chalk.hex("#F59E0B")(figures.star),
+    info: chalk.hex("#3498DB")(figures.info),
+    arrow: chalk.hex("#2ECC71")(figures.arrowRight),
+    bullet: chalk.hex("#95A5A6")(figures.bullet),
+    star: chalk.hex("#F1C40F")(figures.star),
   },
 };
 
-// ASCII art logo
+// ASCII art logo with green gradient (bright → dark from top to bottom)
+const g1 = chalk.hex("#5BF5A0"); // Lightest
+const g2 = chalk.hex("#3DE87D");
+const g3 = chalk.hex("#2ECC71"); // Brand green
+const g4 = chalk.hex("#27AE60");
+const g5 = chalk.hex("#1F8A4C");
+const g6 = chalk.hex("#176E3A"); // Darkest
+
 const logo = `
-${theme.primary("  ███╗   ██╗███████╗██╗     ██╗      █████╗ ")}
-${theme.primary("  ████╗  ██║██╔════╝██║     ██║     ██╔══██╗")}
-${theme.primary("  ██╔██╗ ██║█████╗  ██║     ██║     ███████║")}
-${theme.primary("  ██║╚██╗██║██╔══╝  ██║     ██║     ██╔══██║")}
-${theme.primary("  ██║ ╚████║███████╗███████╗███████╗██║  ██║")}
-${theme.primary("  ╚═╝  ╚═══╝╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝")}
+${g1("  ███╗   ██╗")}${g1("███████╗")}${g1("██╗     ██╗      █████╗ ")}
+${g2("  ████╗  ██║")}${g2("██╔════╝")}${g2("██║     ██║     ██╔══██╗")}
+${g3("  ██╔██╗ ██║")}${g3("█████╗  ")}${g3("██║     ██║     ███████║")}
+${g4("  ██║╚██╗██║")}${g4("██╔══╝  ")}${g4("██║     ██║     ██╔══██║")}
+${g5("  ██║ ╚████║")}${g5("███████╗")}${g5("███████╗███████╗██║  ██║")}
+${g6("  ╚═╝  ╚═══╝")}${g6("╚══════╝")}${g6("╚══════╝╚══════╝╚═╝  ╚═╝")}
 `;
 
-const tagline = theme.muted("  Reliability layer for coding agents\n");
+const tagline = `  ${theme.muted("Reliability layer for coding agents")}  ${chalk.dim(`v${PKG_VERSION}`)}\n`;
+
+function sectionHeader(title: string): string {
+  const line = theme.muted("─".repeat(Math.max(0, 40 - title.length)));
+  return `  ${theme.primary("┌")} ${theme.primary.bold(title)} ${line}`;
+}
 
 function box(content: string, title?: string): string {
   const lines = content.split("\n");
   const maxLen = Math.max(...lines.map(l => l.replace(/\x1b\[[0-9;]*m/g, "").length), (title?.length ?? 0) + 4);
   const width = Math.min(maxLen + 4, 70);
-  
-  const top = title 
-    ? `${theme.muted("┌─")} ${theme.bold(title)} ${theme.muted("─".repeat(Math.max(0, width - title.length - 5)) + "┐")}`
-    : theme.muted("┌" + "─".repeat(width) + "┐");
-  const bottom = theme.muted("└" + "─".repeat(width) + "┘");
-  
+
+  const borderColor = chalk.hex("#27AE60");
+
+  const top = title
+    ? `${borderColor("╔═")} ${theme.primary.bold(title)} ${borderColor("═".repeat(Math.max(0, width - title.length - 5)) + "╗")}`
+    : borderColor("╔" + "═".repeat(width) + "╗");
+  const bottom = borderColor("╚" + "═".repeat(width) + "╝");
+
   const boxedLines = lines.map(line => {
     const cleanLen = line.replace(/\x1b\[[0-9;]*m/g, "").length;
     const padding = " ".repeat(Math.max(0, width - cleanLen - 2));
-    return `${theme.muted("│")} ${line}${padding} ${theme.muted("│")}`;
+    return `${borderColor("║")} ${line}${padding} ${borderColor("║")}`;
   });
-  
+
   return [top, ...boxedLines, bottom].join("\n");
 }
 
-function divider(char = "─"): string {
-  return theme.muted(char.repeat(50));
+function divider(): string {
+  return `  ${theme.muted("─".repeat(20))} ${theme.primary("✦")} ${theme.muted("─".repeat(20))}`;
 }
 
 // =============================================================================
@@ -114,7 +136,7 @@ function divider(char = "─"): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "check" | "validate" | "run" | "mcp" | "serve" | "connect" | "auth" | "playground" | "help";
+  command: "check" | "validate" | "run" | "mcp" | "serve" | "connect" | "auth" | "playground" | "setup" | "help";
   taskPath?: string;
   repoPath?: string;
   changesPath?: string;
@@ -147,7 +169,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "help") {
+    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "setup" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -309,8 +331,7 @@ function formatPretty(result: Record<string, unknown>): string {
   if (result.constraints) {
     const constraints = result.constraints as Array<{ id: string; passed: boolean; violationDetails?: string }>;
     if (constraints.length > 0) {
-      lines.push(`  ${theme.secondary.bold("Constraints")}`);
-      lines.push("");
+      lines.push(sectionHeader("Constraints"));
       
       const table = new Table({
         chars: {
@@ -342,8 +363,7 @@ function formatPretty(result: Record<string, unknown>): string {
       compile?: { success: boolean };
     };
     
-    lines.push(`  ${theme.secondary.bold("Validation")}`);
-    lines.push("");
+    lines.push(sectionHeader("Validation"));
     
     const items: string[] = [];
     if (val.test) {
@@ -366,8 +386,7 @@ function formatPretty(result: Record<string, unknown>): string {
   // Scope section
   if (result.scope) {
     const scope = result.scope as { scopeCreepRatio: number; extraFiles: string[] };
-    lines.push(`  ${theme.secondary.bold("Scope Analysis")}`);
-    lines.push("");
+    lines.push(sectionHeader("Scope Analysis"));
     
     const ratio = scope.scopeCreepRatio * 100;
     const color = ratio === 0 ? theme.success : ratio < 50 ? theme.warning : theme.error;
@@ -391,8 +410,7 @@ function formatPretty(result: Record<string, unknown>): string {
   // Metrics section
   if (result.metrics) {
     const metrics = result.metrics as Record<string, unknown>;
-    lines.push(`  ${theme.secondary.bold("Metrics")}`);
-    lines.push("");
+    lines.push(sectionHeader("Metrics"));
     
     const table = new Table({
       chars: {
@@ -446,13 +464,13 @@ function formatPretty(result: Record<string, unknown>): string {
 function createProgressBar(percent: number, width: number, success: boolean): string {
   const filled = Math.round((percent / 100) * width);
   const empty = width - filled;
-  
+
   if (success) {
-    return theme.success("█".repeat(width));
+    return theme.success("▓".repeat(width));
   }
-  
+
   const color = percent < 30 ? theme.success : percent < 70 ? theme.warning : theme.error;
-  return color("█".repeat(filled)) + theme.dim("░".repeat(empty));
+  return color("▓".repeat(filled)) + theme.muted("░".repeat(empty));
 }
 
 function formatMetricValue(
@@ -481,10 +499,10 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
   if (args.showHelp || (!args.taskPath || !args.repoPath)) {
     console.log(logo);
     console.log(tagline);
-    console.log(`  ${theme.secondary.bold("nella check")} — Pre-flight check: can the task proceed?\n`);
-    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`  ${theme.primary.bold("nella check")} — Pre-flight check: can the task proceed?\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella check --task <path> --repo <path>")}\n`);
-    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}    Path to task.yaml or task directory`);
     console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}    Path to repository`);
     console.log(`    ${theme.accent("--skip-prerequisites")}    Skip prerequisite checks`);
@@ -498,7 +516,7 @@ async function runCheckCommand(args: CliArgs): Promise<void> {
   const repoPath = path.resolve(args.repoPath!);
 
   console.log("");
-  console.log(`  ${theme.icons.arrow}  ${theme.muted("Checking task")} ${theme.primary.bold(task.id)}`);
+  console.log(`  ${theme.primary("nella")} ${theme.muted("▸")} checking ${theme.primary.bold(task.id)}`);
   console.log("");
 
   const result = check(task, repoPath, {
@@ -534,10 +552,10 @@ async function runValidateCommand(args: CliArgs): Promise<void> {
   if (args.showHelp || (!args.taskPath || !args.repoPath || !args.changesPath)) {
     console.log(logo);
     console.log(tagline);
-    console.log(`  ${theme.secondary.bold("nella validate")} — Validate changes against task constraints\n`);
-    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`  ${theme.primary.bold("nella validate")} — Validate changes against task constraints\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella validate --task <path> --repo <path> --changes <path>")}\n`);
-    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}       Path to task.yaml or task directory`);
     console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}       Path to repository`);
     console.log(`    ${theme.accent("--changes, -c")} ${theme.muted("<path>")}    Path to changes.json file`);
@@ -553,7 +571,7 @@ async function runValidateCommand(args: CliArgs): Promise<void> {
   const changes = loadChanges(args.changesPath!);
 
   console.log("");
-  console.log(`  ${theme.icons.arrow}  ${theme.muted("Validating")} ${theme.primary.bold(task.id)}`);
+  console.log(`  ${theme.primary("nella")} ${theme.muted("▸")} validating ${theme.primary.bold(task.id)}`);
 
   const result = await runTask(repoPath, task, changes, {
     skipRefusalCheck: true,
@@ -574,10 +592,10 @@ async function runRunCommand(args: CliArgs): Promise<void> {
   if (args.showHelp) {
     console.log(logo);
     console.log(tagline);
-    console.log(`  ${theme.secondary.bold("nella run")} — Full run: check + validate + metrics\n`);
-    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`  ${theme.primary.bold("nella run")} — Full run: check + validate + metrics\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella run --task <path> --repo <path> [--changes <path>]")}\n`);
-    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--task, -t")} ${theme.muted("<path>")}       Path to task.yaml or task directory`);
     console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<path>")}       Path to repository`);
     console.log(`    ${theme.accent("--changes, -c")} ${theme.muted("<path>")}    Path to changes.json file (optional)`);
@@ -596,13 +614,13 @@ async function runRunCommand(args: CliArgs): Promise<void> {
   const repoPath = path.resolve(args.repoPath!);
 
   console.log("");
-  console.log(`  ${theme.icons.arrow}  ${theme.muted("Running")} ${theme.primary.bold(task.id)}`);
+  console.log(`  ${theme.primary("nella")} ${theme.muted("▸")} running ${theme.primary.bold(task.id)}`);
 
   // Optionally load changes
   let changes: Changes | undefined;
   if (args.changesPath) {
     changes = loadChanges(args.changesPath);
-    console.log(`  ${theme.muted("   with")} ${changes.files.length} ${theme.muted("file changes")}`);
+    console.log(`  ${theme.muted("       with")} ${changes.files.length} ${theme.muted("file changes")}`);
   }
 
   const result = await runTask(repoPath, task, changes, {
@@ -751,8 +769,8 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
   const sub = args.authSubcommand;
 
   if (!sub || args.showHelp) {
-    console.log(`  ${theme.secondary.bold("nella auth")} — Manage authentication\n`);
-    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`  ${theme.primary.bold("nella auth")} — Manage authentication\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella auth login")}    ${theme.muted("Log in with your Nella account")}`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella auth logout")}   ${theme.muted("Clear stored credentials")}`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella auth status")}   ${theme.muted("Show current login state")}`);
@@ -804,12 +822,12 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
   console.log(tagline);
 
   if (args.showHelp) {
-    console.log(`  ${theme.secondary.bold("nella connect")} — Configure MCP clients to use Nella\n`);
-    console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+    console.log(`  ${theme.primary.bold("nella connect")} — Configure MCP clients to use Nella\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella connect")}`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --api-key nella_your_key")}`);
     console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --client claude")}\n`);
-    console.log(`  ${theme.secondary.bold("Options:")}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--api-key, -k")} ${theme.muted("<key>")}       API key (auto-created if logged in)`);
     console.log(`    ${theme.accent("--server-url, -u")} ${theme.muted("<url>")}    Server URL (default: production)`);
     console.log(`    ${theme.accent("--client")} ${theme.muted("<name>")}            Target client: claude, vscode, cursor, or all (default: all)`);
@@ -941,74 +959,120 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
   }
 }
 
+// =============================================================================
+// Setup Command — install Claude Code plugin
+// =============================================================================
+
+function runSetupCommand(): void {
+  const pluginSrc = path.join(__dirname, "..", "claude-plugin");
+  const pluginDest = path.join(os.homedir(), ".claude", "plugins", "nella");
+
+  if (!fs.existsSync(pluginSrc)) {
+    console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Plugin source not found.")} ${theme.muted("Try reinstalling @getnella/mcp.")}\n`);
+    process.exit(1);
+  }
+
+  function copyDir(src: string, dest: string): void {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) {
+        copyDir(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+
+  const isUpdate = fs.existsSync(pluginDest);
+  copyDir(pluginSrc, pluginDest);
+
+  console.log(logo);
+  console.log(tagline);
+  if (isUpdate) {
+    console.log(`  ${theme.icons.success}  ${theme.success.bold("Plugin updated")} ${theme.muted("→")} ${theme.primary(pluginDest)}`);
+  } else {
+    console.log(`  ${theme.icons.success}  ${theme.success.bold("Plugin installed")} ${theme.muted("→")} ${theme.primary(pluginDest)}`);
+  }
+  console.log(`\n  ${theme.icons.arrow}  Restart Claude Code, then use ${theme.primary.bold("/nella")} to get started.\n`);
+}
+
 function showHelp(): void {
   console.log(logo);
   console.log(tagline);
-  
-  // Commands section
-  console.log(`  ${theme.secondary.bold("Commands")}`);
+
+  // Quick start
+  console.log(`  ${theme.muted("Quick start:")} ${theme.primary("npx @getnella/mcp")} ${theme.muted("--workspace ./my-project")}`);
   console.log("");
-  
-  const cmdTable = new Table({
-    chars: {
-      "top": "", "top-mid": "", "top-left": "", "top-right": "",
-      "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
-      "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
-      "right": "", "right-mid": "", "middle": "  ",
-    },
-    style: { "padding-left": 0, "padding-right": 2 },
-  });
-  
-  cmdTable.push(
+
+  const tableChars = {
+    "top": "", "top-mid": "", "top-left": "", "top-right": "",
+    "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+    "left": "    ", "left-mid": "", "mid": "", "mid-mid": "",
+    "right": "", "right-mid": "", "middle": "  ",
+  };
+  const tableStyle = { "padding-left": 0, "padding-right": 2 };
+
+  // Validation commands
+  console.log(sectionHeader("Validation"));
+  const valTable = new Table({ chars: tableChars, style: tableStyle });
+  valTable.push(
     [theme.primary("check"), theme.muted("Pre-flight safety check — can the task proceed?")],
     [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
-    [theme.primary("run"), theme.muted("Full run: check + validate + compute metrics")],
-    [theme.primary("mcp"), theme.muted("Start MCP server for AI agent integration (stdio)")],
-    [theme.primary("serve"), theme.muted("Start hosted MCP server (HTTP, for production)")],
-    [theme.primary("auth"), theme.muted("Login, logout, or check auth status (login|logout|status)")],
-    [theme.primary("connect"), theme.muted("Configure Claude Desktop, VS Code & Cursor to use Nella MCP")],
-    [theme.primary("playground"), theme.muted("Start playground server with real-time dashboard")],
+    [theme.primary("run"), theme.muted("Full pipeline: check + validate + metrics")],
+  );
+  console.log(valTable.toString());
+  console.log("");
+
+  // Server commands
+  console.log(sectionHeader("Servers"));
+  const srvTable = new Table({ chars: tableChars, style: tableStyle });
+  srvTable.push(
+    [theme.primary("mcp"), theme.muted("Start MCP server for AI agents (stdio)")],
+    [theme.primary("serve"), theme.muted("Start hosted MCP server (HTTP)")],
+    [theme.primary("playground"), theme.muted("Real-time debugging dashboard")],
+  );
+  console.log(srvTable.toString());
+  console.log("");
+
+  // Setup commands
+  console.log(sectionHeader("Setup"));
+  const setupTable = new Table({ chars: tableChars, style: tableStyle });
+  setupTable.push(
+    [theme.primary("setup"), theme.muted("Install /nella slash command in Claude Code")],
+    [theme.primary("auth"), theme.muted("Login, logout, or check status")],
+    [theme.primary("connect"), theme.muted("Configure Claude, VS Code & Cursor")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
-  console.log(cmdTable.toString());
+  console.log(setupTable.toString());
   console.log("");
-  
-  // Options section
-  console.log(`  ${theme.secondary.bold("Options")}`);
-  console.log("");
-  
-  const optTable = new Table({
-    chars: {
-      "top": "", "top-mid": "", "top-left": "", "top-right": "",
-      "bottom": "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
-      "left": "  ", "left-mid": "", "mid": "", "mid-mid": "",
-      "right": "", "right-mid": "", "middle": "  ",
-    },
-    style: { "padding-left": 0, "padding-right": 2 },
-  });
-  
+
+  // Options
+  console.log(sectionHeader("Options"));
+  const optTable = new Table({ chars: tableChars, style: tableStyle });
   optTable.push(
-    [theme.accent("--task, -t"), theme.muted("<path>"), "Path to task.yaml or task directory"],
-    [theme.accent("--repo, -r"), theme.muted("<path>"), "Path to repository"],
-    [theme.accent("--changes, -c"), theme.muted("<path>"), "Path to changes.json file"],
-    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (for mcp/playground)"],
-    [theme.accent("--port, -p"), theme.muted("<number>"), "Port for playground server (default: 3847)"],
-    [theme.accent("--host"), theme.muted("<host>"), "Host for playground server (default: localhost)"],
-    [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect command"],
-    [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect (default: production)"],
-    [theme.accent("--client"), theme.muted("<name>"), "Target client: claude, vscode, cursor, or all (default: all)"],
-    [theme.accent("--skip-validation"), "", "Skip test/lint/compile commands"],
+    [theme.accent("--task, -t"), theme.muted("<path>"), "Task YAML or directory"],
+    [theme.accent("--repo, -r"), theme.muted("<path>"), "Repository path"],
+    [theme.accent("--changes, -c"), theme.muted("<path>"), "Changes JSON file"],
+    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (mcp/playground)"],
+    [theme.accent("--port, -p"), theme.muted("<num>"), "Server port (default: 3847)"],
+    [theme.accent("--host"), theme.muted("<host>"), "Server host (default: localhost)"],
+    [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect"],
+    [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect"],
+    [theme.accent("--client"), theme.muted("<name>"), "claude, vscode, cursor, or all"],
+    [theme.accent("--skip-validation"), "", "Skip test/lint/compile"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
     [theme.accent("--help, -h"), "", "Show help"],
   );
   console.log(optTable.toString());
   console.log("");
-  
+
   // Footer
   console.log(divider());
-  console.log(`  ${theme.muted("Documentation:")} ${theme.secondary("https://github.com/nella-labs/nella")}`);
-  console.log(`  ${theme.muted("Version:")} ${theme.dim("0.0.0")}`);
+  console.log(`\n  ${theme.muted("Docs")}  ${theme.secondary("https://getnella.dev/docs")}`);
+  console.log(`  ${theme.muted("Repo")}  ${theme.secondary("https://github.com/nella-labs/nella")}`);
   console.log("");
 }
 
@@ -1033,10 +1097,10 @@ async function main(): Promise<void> {
       if (args.showHelp) {
         console.log(logo);
         console.log(tagline);
-        console.log(`  ${theme.secondary.bold("nella mcp")} — Start MCP server for AI agent integration (stdio)\n`);
-        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`  ${theme.primary.bold("nella mcp")} — Start MCP server for AI agent integration (stdio)\n`);
+        console.log(`  ${theme.primary.bold("Usage:")}\n`);
         console.log(`    ${theme.muted("$")} ${theme.primary("nella mcp [--workspace <path>]")}\n`);
-        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`  ${theme.primary.bold("Options:")}\n`);
         console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}    Workspace path`);
         console.log("");
         break;
@@ -1047,10 +1111,10 @@ async function main(): Promise<void> {
       if (args.showHelp) {
         console.log(logo);
         console.log(tagline);
-        console.log(`  ${theme.secondary.bold("nella serve")} — Start hosted MCP server (HTTP)\n`);
-        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`  ${theme.primary.bold("nella serve")} — Start hosted MCP server (HTTP)\n`);
+        console.log(`  ${theme.primary.bold("Usage:")}\n`);
         console.log(`    ${theme.muted("$")} ${theme.primary("nella serve [--port <number>] [--host <host>]")}\n`);
-        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`  ${theme.primary.bold("Options:")}\n`);
         console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}    Port (default: 3847)`);
         console.log(`    ${theme.accent("--host")} ${theme.muted("<host>")}           Host (default: localhost)`);
         console.log("");
@@ -1064,14 +1128,17 @@ async function main(): Promise<void> {
     case "connect":
       await runConnectCommand(args);
       break;
+    case "setup":
+      runSetupCommand();
+      break;
     case "playground":
       if (args.showHelp) {
         console.log(logo);
         console.log(tagline);
-        console.log(`  ${theme.secondary.bold("nella playground")} — Start playground server with real-time dashboard\n`);
-        console.log(`  ${theme.secondary.bold("Usage:")}\n`);
+        console.log(`  ${theme.primary.bold("nella playground")} — Start playground server with real-time dashboard\n`);
+        console.log(`  ${theme.primary.bold("Usage:")}\n`);
         console.log(`    ${theme.muted("$")} ${theme.primary("nella playground [--workspace <path>] [--repo <url>] [--port <number>] [--host <host>]")}\n`);
-        console.log(`  ${theme.secondary.bold("Options:")}\n`);
+        console.log(`  ${theme.primary.bold("Options:")}\n`);
         console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}      Workspace path`);
         console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<url|path>")}       Git repo URL or local path to use as workspace`);
         console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}         Port (default: 3847)`);
