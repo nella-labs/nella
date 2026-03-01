@@ -1,6 +1,6 @@
 {
   "name": "@getnella/mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Nella MCP Server — reliability layer for AI coding agents. Validates constraints, detects risks, and tracks context via the Model Context Protocol.",
   "type": "commonjs",
   "bin": {
@@ -20,7 +20,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "claude-plugin"
   ],
   "scripts": {
     "build": "tsup",

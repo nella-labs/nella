@@ -9,7 +9,19 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import { execSync } from "child_process";
+import chalk from "chalk";
+import figures from "figures";
 import { createPlaygroundServer } from "@usenella/core";
+
+// Nella green theme (matches cli.ts)
+const g = {
+  primary: chalk.hex("#2ECC71"),
+  secondary: chalk.hex("#27AE60"),
+  muted: chalk.hex("#95A5A6"),
+  error: chalk.hex("#EF4444"),
+  ok: chalk.hex("#2ECC71")(figures.tick),
+  arrow: chalk.hex("#2ECC71")(figures.arrowRight),
+};
 
 export interface PlaygroundOptions {
   workspace?: string;
@@ -54,16 +66,16 @@ function resolveRepo(repo: string): string {
   const cloneDir = path.join(os.tmpdir(), "nella-playground", repoName);
 
   if (fs.existsSync(path.join(cloneDir, ".git"))) {
-    console.log(`[Playground] Repo already cloned, pulling latest...`);
+    console.log(`  ${g.muted("playground")} ${g.muted("▸")} pulling latest...`);
     try {
       execSync("git pull --ff-only", { cwd: cloneDir, stdio: "pipe" });
     } catch {
-      console.log(`[Playground] Pull failed, using existing clone`);
+      console.log(`  ${g.muted("playground")} ${g.muted("▸")} pull failed, using existing clone`);
     }
     return cloneDir;
   }
 
-  console.log(`[Playground] Cloning ${repo}...`);
+  console.log(`  ${g.muted("playground")} ${g.muted("▸")} cloning ${g.secondary(repo)}`);
   fs.mkdirSync(path.dirname(cloneDir), { recursive: true });
   execSync("git clone --depth 1 -- " + JSON.stringify(repo) + " " + JSON.stringify(cloneDir), { stdio: "inherit" });
   return cloneDir;
@@ -74,7 +86,7 @@ export async function startPlaygroundServer(options: PlaygroundOptions): Promise
 
   if (options.repo) {
     workspacePath = resolveRepo(options.repo);
-    console.log(`[Playground] Using repo workspace: ${workspacePath}`);
+    console.log(`  ${g.muted("playground")} ${g.muted("▸")} workspace ${g.secondary(workspacePath)}`);
   } else {
     workspacePath = options.workspace
       ? path.resolve(options.workspace)
@@ -97,7 +109,7 @@ export async function startPlaygroundServer(options: PlaygroundOptions): Promise
 
   // Handle graceful shutdown
   const shutdown = async () => {
-    console.log("\n[Playground] Shutting down...");
+    console.log(`\n  ${g.muted("playground")} ${g.muted("▸")} shutting down...`);
     await server.stop();
     process.exit(0);
   };
@@ -110,24 +122,26 @@ export async function startPlaygroundServer(options: PlaygroundOptions): Promise
 
   server.on({
     onStart: (port) => {
-      console.log(`\n  ✓ Playground server running`);
-      console.log(`  → Dashboard: ${proto}://localhost:${port}/`);
-      console.log(`  → WebSocket: ${wsproto}://localhost:${port}/ws`);
-      console.log(`  → Metrics:   ${proto}://localhost:${port}/metrics`);
-      console.log(`  → Workspace: ${workspacePath}`);
-      if (options.tls) console.log(`  → TLS: enabled`);
-      if (options.auth) console.log(`  → Auth: enabled`);
-      if (options.maxConnections) console.log(`  → Max connections: ${options.maxConnections}`);
-      console.log(`\n  Press Ctrl+C to stop\n`);
+      console.log("");
+      console.log(`  ${g.ok}  ${g.primary.bold("Playground running")}`);
+      console.log("");
+      console.log(`  ${g.arrow}  ${g.muted("Dashboard")}  ${g.secondary(`${proto}://localhost:${port}/`)}`);
+      console.log(`  ${g.arrow}  ${g.muted("WebSocket")}  ${g.secondary(`${wsproto}://localhost:${port}/ws`)}`);
+      console.log(`  ${g.arrow}  ${g.muted("Metrics")}    ${g.secondary(`${proto}://localhost:${port}/metrics`)}`);
+      console.log(`  ${g.arrow}  ${g.muted("Workspace")}  ${chalk.dim(workspacePath)}`);
+      if (options.tls) console.log(`  ${g.arrow}  ${g.muted("TLS")}        ${g.primary("enabled")}`);
+      if (options.auth) console.log(`  ${g.arrow}  ${g.muted("Auth")}       ${g.primary("enabled")}`);
+      if (options.maxConnections) console.log(`  ${g.arrow}  ${g.muted("Max conn")}   ${g.primary(String(options.maxConnections))}`);
+      console.log(`\n  ${g.muted("Press Ctrl+C to stop")}\n`);
     },
     onClientConnect: (id) => {
-      console.log(`  [connect] Client ${id.slice(0, 12)}...`);
+      console.log(`  ${g.ok}  ${g.muted("connected")}    ${chalk.dim(id.slice(0, 12) + "...")}`);
     },
     onClientDisconnect: (id) => {
-      console.log(`  [disconnect] Client ${id.slice(0, 12)}...`);
+      console.log(`  ${g.muted("○")}  ${g.muted("disconnected")} ${chalk.dim(id.slice(0, 12) + "...")}`);
     },
     onError: (error) => {
-      console.error(`  [error] ${error.message}`);
+      console.error(`  ${chalk.hex("#EF4444")(figures.cross)}  ${g.error(error.message)}`);
     },
   });
 
