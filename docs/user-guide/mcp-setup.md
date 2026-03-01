@@ -39,7 +39,7 @@ Edit Claude Desktop's config file:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "/path/to/your/project"
       }
@@ -62,7 +62,7 @@ It should list tools like `nella_check`, `nella_validate`, `nella_run`, etc.
 
 | Issue | Solution |
 |-------|----------|
-| Tools not appearing | Restart Claude Desktop. Check that `npx @getnella/latest mcp` runs without errors in your terminal |
+| Tools not appearing | Restart Claude Desktop. Check that `npx @getnella/mcp mcp` runs without errors in your terminal |
 | "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from the default shell |
 | Permission errors | Ensure `NELLA_REPO_PATH` points to a directory you have read access to |
 | Slow startup | First run downloads the package. Subsequent starts are faster |
@@ -79,7 +79,7 @@ Add Nella to Cursor's MCP configuration:
 {
   "nella": {
     "command": "npx",
-    "args": ["-y", "@getnella/latest", "mcp"],
+    "args": ["-y", "@getnella/mcp"],
     "env": {
       "NELLA_REPO_PATH": "${workspaceFolder}"
     }
@@ -94,7 +94,7 @@ Or edit `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "."
       }
@@ -120,7 +120,7 @@ For VS Code with GitHub Copilot, add to `.vscode/mcp.json`:
   "servers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "${workspaceFolder}"
       }
@@ -172,7 +172,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 
 const transport = new StdioClientTransport({
   command: 'npx',
-  args: ['-y', '@getnella/latest', 'mcp'],
+  args: ['-y', '@getnella/mcp', 'mcp'],
   env: { NELLA_REPO_PATH: '/path/to/repo' },
 });
 

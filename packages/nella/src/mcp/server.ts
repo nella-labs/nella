@@ -6,8 +6,9 @@
  * to AI agents like Claude.
  *
  * Usage:
- *   nella mcp --workspace /path/to/project
- *   nella mcp -w /path/to/project
+ *   npx @getnella/mcp                              # auto-start via npx
+ *   npx @getnella/mcp --workspace /path/to/project  # with explicit workspace
+ *   nella mcp --workspace /path/to/project           # via CLI subcommand
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";

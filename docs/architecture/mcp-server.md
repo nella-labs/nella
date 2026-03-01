@@ -8,7 +8,7 @@ Nella exposes its capabilities to AI agents through the Model Context Protocol (
 graph LR
     Agent["AI Agent<br/>(Claude)"]
 
-    subgraph server["MCP Server (@getnella/latest)"]
+    subgraph server["MCP Server (@getnella/mcp)"]
         Transport["StdioServerTransport"]
         Router["Tool Router"]
 

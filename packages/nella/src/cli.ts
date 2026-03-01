@@ -9,6 +9,10 @@
  *   nella run        - Full run: check + validate + metrics
  *   nella mcp        - Start MCP server for AI agent integration
  *   nella playground - Start the playground server with real-time dashboard
+ *
+ * MCP Quick Start:
+ *   npx @getnella/mcp                   # starts MCP server directly
+ *   npx @getnella/mcp -w /path/to/repo  # with explicit workspace
  */
 
 import * as fs from "fs";

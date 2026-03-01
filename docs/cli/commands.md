@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete command reference for `@getnella/latest`.
+Complete command reference for `@getnella/mcp`.
 
 ## Table of Contents
 
@@ -178,7 +178,7 @@ Add to `~/.config/Claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -563,16 +563,16 @@ import {
   checkConstraints,
   detectRiskPatterns,
   // ... all core exports
-} from '@getnella/latest';
+} from '@getnella/mcp';
 
 // MCP server (for programmatic use)
-import { startMcpServer } from '@getnella/latest/mcp';
+import { startMcpServer } from '@getnella/mcp/mcp';
 ```
 
 ### Example: Custom CLI wrapper
 
 ```typescript
-import { runTask, check, Task, Changes } from '@getnella/latest';
+import { runTask, check, Task, Changes } from '@getnella/mcp';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 

@@ -315,5 +315,5 @@ const invalidated = assumptions.checkInvalidations(
 
 ## Related Packages
 
-- [`@getnella/latest`](https://www.npmjs.com/package/@getnella/latest) — CLI + MCP server
+- [`@getnella/mcp`](https://www.npmjs.com/package/@getnella/mcp) — CLI + MCP server
 - [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) — Benchmarking tools

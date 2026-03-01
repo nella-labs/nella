@@ -55,14 +55,14 @@ No manual steps. The agent calls Nella automatically during the conversation.
 
 ```bash
 # Install
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Add to Claude Desktop config
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": { "NELLA_REPO_PATH": "/path/to/your/project" }
     }
   }

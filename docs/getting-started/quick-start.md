@@ -5,7 +5,7 @@ Get Nella running as an MCP server in under 5 minutes.
 ## Step 1: Install Nella
 
 ```bash
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 ```
 
 ## Step 2: Configure your MCP client
@@ -24,7 +24,7 @@ Edit `claude_desktop_config.json`:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "/path/to/your/project"
       }
@@ -42,7 +42,7 @@ Add to `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "."
       }

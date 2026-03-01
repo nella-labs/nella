@@ -7,7 +7,7 @@ An end-to-end guide for using Nella to validate agent changes with the CLI or th
 ### CLI
 
 ```bash
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 ```
 
 ### Core library

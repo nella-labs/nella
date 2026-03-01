@@ -10,13 +10,13 @@ The CLI isn't in your PATH. Solutions:
 
 ```bash
 # Check if it's installed
-npx @getnella/latest --version
+npx @getnella/mcp --version
 
 # Reinstall globally
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Or use npx instead of a global install
-npx @getnella/latest check -t task.yaml -r .
+npx @getnella/mcp check -t task.yaml -r .
 ```
 
 On Windows, you may need to restart your terminal or add npm's global bin to your PATH.
@@ -29,7 +29,7 @@ Make sure you've installed the package:
 npm install @usenella/core
 ```
 
-If you installed `@getnella/latest` globally, you need a separate local install of `@usenella/core` to import it in your code.
+If you installed `@getnella/mcp` globally, you need a separate local install of `@usenella/core` to import it in your code.
 
 ### Optional dependency warnings
 
@@ -51,7 +51,7 @@ Messages like `usearch not available, falling back to brute-force` are normal. O
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 3. **Test the server manually:**
    ```bash
-   npx @getnella/latest mcp
+   npx @getnella/mcp mcp
    ```
    If this shows errors, fix them before restarting Claude Desktop
 4. **Check Node.js version:** Nella requires Node.js 18+
@@ -72,7 +72,7 @@ The first run downloads the package via `npx`. To speed this up:
 
 ```bash
 # Pre-install the package
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Then use the direct path in your config
 {

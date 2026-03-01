@@ -1,6 +1,6 @@
 # CLI Examples
 
-Practical examples for using `@getnella/latest`.
+Practical examples for using `@getnella/mcp`.
 
 ## Table of Contents
 
@@ -75,7 +75,7 @@ jobs:
         run: npm ci
       
       - name: Install Nella
-        run: npm install -g @getnella/latest
+        run: npm install -g @getnella/mcp
       
       - name: Validate changes
         run: |
@@ -96,7 +96,7 @@ validate-agent:
   image: node:20
   script:
     - npm ci
-    - npm install -g @getnella/latest
+    - npm install -g @getnella/mcp
     - nella run -t ./tasks/$TASK_ID -r . -c changes.json --json > result.json
   artifacts:
     paths:
@@ -111,7 +111,7 @@ validate-agent:
 
 ```bash
 # Install globally
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Verify installation
 nella --help
@@ -134,7 +134,7 @@ Add to Claude Desktop config:
 
 ```bash
 # Add via CLI
-claude mcp add nella -- npx @getnella/latest mcp --workspace .
+claude mcp add nella -- npx @getnella/mcp mcp --workspace .
 ```
 
 ---

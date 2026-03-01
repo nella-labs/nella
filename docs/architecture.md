@@ -10,7 +10,7 @@
 graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
-    subgraph nella_pkg["@getnella/latest v0.0.0"]
+    subgraph nella_pkg["@getnella/mcp v0.0.0"]
         CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
@@ -85,7 +85,7 @@ graph LR
     Root --> Scripts["scripts/<br/>sync-docs.ts"]
 
     Packages --> Core["core/<br/>@usenella/core"]
-    Packages --> Nella["nella/<br/>@getnella/latest"]
+    Packages --> Nella["nella/<br/>@getnella/mcp"]
     Packages --> Benchmark["benchmark/<br/>@usenella/benchmark"]
 
     Core --> C_Run["run.ts"]
@@ -128,7 +128,7 @@ graph LR
 ```mermaid
 graph LR
     subgraph packages["Nella Packages"]
-        nella["@getnella/latest<br/>v0.0.0"]
+        nella["@getnella/mcp<br/>v0.0.0"]
         core["@usenella/core<br/>v0.0.0"]
         bench["@usenella/benchmark<br/>v0.0.0"]
     end
@@ -392,7 +392,7 @@ sequenceDiagram
 graph LR
     Agent["AI Agent<br/>(Claude)"]
 
-    subgraph server["MCP Server (@getnella/latest)"]
+    subgraph server["MCP Server (@getnella/mcp)"]
         Transport["StdioServerTransport"]
         Router["Tool Router"]
 
