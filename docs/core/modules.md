@@ -1,6 +1,6 @@
 # Core Modules Guide
 
-This guide covers all modules in **@usenella/core**. You can import the same modules from **@getnella/latest** because that package re-exports the Core API.
+This guide covers all modules in **@usenella/core**. You can import the same modules from **@getnella/mcp** because that package re-exports the Core API.
 
 ## Table of Contents
 
@@ -678,7 +678,7 @@ const response = await handler.handleToolCall({
 | `nella_set_context` | Set shared context entries |
 | `nella_status` | Get server/workspace status |
 
-The `@getnella/latest` package adds 12 additional tools for validation, safety, and context tracking. See the [MCP Tools Reference](../mcp/tools.md).
+The `@getnella/mcp` package adds 12 additional tools for validation, safety, and context tracking. See the [MCP Tools Reference](../mcp/tools.md).
 
 ---
 

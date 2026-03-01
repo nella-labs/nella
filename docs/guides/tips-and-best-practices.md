@@ -269,7 +269,7 @@ This is the default loop with always-on Nella:
 ```yaml
 # .github/workflows/nella.yml
 - name: Nella validate
-  run: npx @getnella/latest validate --workspace . --test "npm test" --lint "npm run lint"
+  run: npx @getnella/mcp validate --workspace . --test "npm test" --lint "npm run lint"
 ```
 
 See the [CI/CD Integration guide](../user-guide/ci-cd-integration.md) for full examples.
@@ -283,12 +283,12 @@ If you work across multiple repos, configure Nella with per-project workspaces:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": { "NELLA_REPO_PATH": "/path/to/frontend" }
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": { "NELLA_REPO_PATH": "/path/to/backend" }
     }
   }

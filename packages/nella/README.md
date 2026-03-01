@@ -1,8 +1,8 @@
-# @getnella/latest
+# @getnella/mcp
 
 > Unified CLI and MCP Server for AI agent validation
 
-[![npm version](https://img.shields.io/npm/v/@getnella/latest.svg)](https://www.npmjs.com/package/@getnella/latest)
+[![npm version](https://img.shields.io/npm/v/@getnella/mcp.svg)](https://www.npmjs.com/package/@getnella/mcp)
 [![License](https://img.shields.io/badge/License-Proprietary-blue.svg)](https://getnella.dev)
 
 Nella is a complete validation toolkit for AI coding agents. It provides both a CLI for direct use and an MCP (Model Context Protocol) server for integration with AI assistants like Claude.
@@ -11,13 +11,13 @@ Nella is a complete validation toolkit for AI coding agents. It provides both a 
 
 ```bash
 # Global installation
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Or use with npx
-npx @getnella/latest --help
+npx @getnella/mcp --help
 
 # As a dev dependency
-npm install -D @getnella/latest
+npm install -D @getnella/mcp
 ```
 
 ## Quick Start
@@ -133,7 +133,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "C:/path/to/project"]
+      "args": ["@getnella/mcp", "--workspace", "C:/path/to/project"]
     }
   }
 }
@@ -146,7 +146,7 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/project"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -194,10 +194,10 @@ import {
   validate,
   checkConstraints,
   detectRiskPatterns,
-} from '@getnella/latest';
+} from '@getnella/mcp';
 
 // MCP server
-import { startMcpServer } from '@getnella/latest/mcp';
+import { startMcpServer } from '@getnella/mcp/mcp';
 
 // Example: Run validation programmatically
 const result = await runTask(repoPath, task, changes);
@@ -206,7 +206,7 @@ console.log(result.passed ? 'Validation passed!' : 'Validation failed');
 
 ## Core Modules (Re-exported)
 
-`@getnella/latest` re-exports everything from `@usenella/core`, including advanced modules:
+`@getnella/mcp` re-exports everything from `@usenella/core`, including advanced modules:
 
 - Indexing & search (RAG)
 - Workspace management

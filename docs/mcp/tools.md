@@ -1114,7 +1114,7 @@ Returns recent tool call history. Useful for debugging and understanding what to
 
 ### nella_refactor
 
-> **Category:** Code | **Package:** `@getnella/latest`
+> **Category:** Code | **Package:** `@getnella/mcp`
 
 Analyzes code for refactoring opportunities including deep nesting, long functions, repeated patterns, complex conditionals, magic numbers, TODO comments, and unused imports.
 
@@ -1141,7 +1141,7 @@ Analyzes code for refactoring opportunities including deep nesting, long functio
 
 ### nella_test
 
-> **Category:** Code | **Package:** `@getnella/latest`
+> **Category:** Code | **Package:** `@getnella/mcp`
 
 Generates test skeletons for functions, classes, and methods found in the provided code.
 
@@ -1183,10 +1183,10 @@ Responses are designed to be:
 
 | Category | Tools | Package | Description |
 |----------|-------|---------|-------------|
-| Validation | `nella_check`, `nella_validate`, `nella_run` | `@getnella/latest` | Code quality validation |
-| Safety | `nella_detect_risks`, `nella_should_refuse`, `nella_check_prerequisites` | `@getnella/latest` | Risk detection and safety |
-| Context | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_get_file_history`, `nella_check_dependencies`, `nella_record_change` | `@getnella/latest` | Session context tracking |
-| Code | `nella_refactor`, `nella_test` | `@getnella/latest` | Code analysis and test generation |
+| Validation | `nella_check`, `nella_validate`, `nella_run` | `@getnella/mcp` | Code quality validation |
+| Safety | `nella_detect_risks`, `nella_should_refuse`, `nella_check_prerequisites` | `@getnella/mcp` | Risk detection and safety |
+| Context | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_get_file_history`, `nella_check_dependencies`, `nella_record_change` | `@getnella/mcp` | Session context tracking |
+| Code | `nella_refactor`, `nella_test` | `@getnella/mcp` | Code analysis and test generation |
 | Core | `nella_search`, `nella_verify`, `nella_index`, `nella_get_context`, `nella_set_context`, `nella_status`, `nella_explain`, `nella_docs`, `nella_history` | `@usenella/core` | Indexing, search, shared context, explanation, docs, history, status |
 
 **Total: 23 MCP tools** across 5 categories.

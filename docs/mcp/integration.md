@@ -235,14 +235,14 @@ services:
 
 ### Installation
 
-The Nella MCP Server is included in the main `@getnella/latest` package:
+The Nella MCP Server is included in the main `@getnella/mcp` package:
 
 ```bash
 # Global installation
-npm install -g @getnella/latest
+npm install -g @getnella/mcp
 
 # Or use npx (downloads on first use)
-npx @getnella/latest mcp --help
+npx @getnella/mcp mcp --help
 ```
 
 ### Configuration File Location
@@ -261,7 +261,7 @@ npx @getnella/latest mcp --help
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/your/project"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -273,7 +273,7 @@ npx @getnella/latest mcp --help
   "mcpServers": {
     "nella": {
       "command": "npx.cmd",
-      "args": ["@getnella/latest", "mcp", "--workspace", "C:\\path\\to\\your\\project"]
+      "args": ["@getnella/mcp", "--workspace", "C:\\path\\to\\your\\project"]
     }
   }
 }
@@ -336,11 +336,11 @@ You can configure multiple Nella servers for different projects:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/frontend"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/frontend"]
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/backend"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/backend"]
     }
   }
 }
@@ -376,7 +376,7 @@ You can also use a project-level config at `.cursor/mcp.json` in your project ro
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "/path/to/your/project"]
+      "args": ["@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -388,7 +388,7 @@ You can also use a project-level config at `.cursor/mcp.json` in your project ro
   "mcpServers": {
     "nella": {
       "command": "npx.cmd",
-      "args": ["@getnella/latest", "mcp", "--workspace", "C:\\path\\to\\your\\project"]
+      "args": ["@getnella/mcp", "--workspace", "C:\\path\\to\\your\\project"]
     }
   }
 }
@@ -441,7 +441,7 @@ Claude Code uses the same MCP configuration format. Add to your Claude Code sett
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "."]
+      "args": ["@getnella/mcp", "--workspace", "."]
     }
   }
 }
@@ -458,7 +458,7 @@ For Claude Code, you might want the workspace to follow your current directory:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/latest", "mcp", "--workspace", "${workspaceFolder}"]
+      "args": ["@getnella/mcp", "--workspace", "${workspaceFolder}"]
     }
   }
 }
@@ -475,7 +475,7 @@ The MCP server uses stdio transport:
 ```typescript
 import { spawn } from 'child_process';
 
-const server = spawn('npx', ['@getnella/latest', 'mcp', '--workspace', '/path/to/project'], {
+const server = spawn('npx', ['@getnella/mcp', 'mcp', '--workspace', '/path/to/project'], {
   stdio: ['pipe', 'pipe', 'inherit']
 });
 
@@ -618,7 +618,7 @@ The workspace should have:
 
 **Debug**: Run the server manually to see errors:
 ```bash
-npx @getnella/latest mcp --workspace /path/to/project
+npx @getnella/mcp mcp --workspace /path/to/project
 ```
 
 ### Prerequisites Failing
@@ -685,7 +685,7 @@ To debug MCP messages, you can intercept stdio:
 # Create a debug wrapper script
 cat > debug-nella.sh << 'EOF'
 #!/bin/bash
-tee /tmp/nella-in.log | npx @getnella/latest mcp "$@" | tee /tmp/nella-out.log
+tee /tmp/nella-in.log | npx @getnella/mcp mcp "$@" | tee /tmp/nella-out.log
 EOF
 chmod +x debug-nella.sh
 ```

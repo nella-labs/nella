@@ -7,7 +7,7 @@
   "commit": false,
   "fixed": [],
   "linked": [
-    ["@getnella/latest"]
+    ["@getnella/mcp"]
   ],
   "access": "public",
   "baseBranch": "main",

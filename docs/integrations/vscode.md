@@ -16,7 +16,7 @@ Add a `.vscode/mcp.json` file to your project:
   "servers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/latest", "mcp"],
+      "args": ["-y", "@getnella/mcp"],
       "env": {
         "NELLA_REPO_PATH": "${workspaceFolder}"
       }
@@ -40,5 +40,5 @@ With the MCP server configured, Copilot's agent mode can call Nella tools during
 | Issue | Solution |
 |-------|----------|
 | Tools not available | Ensure you're using Copilot in agent mode, not inline completions |
-| Server not starting | Verify `npx @getnella/latest mcp` runs without errors in your terminal |
+| Server not starting | Verify `npx @getnella/mcp mcp` runs without errors in your terminal |
 | Path issues | Use absolute paths if `${workspaceFolder}` doesn't resolve correctly |

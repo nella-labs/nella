@@ -212,14 +212,14 @@ jobs:
           echo "@usenella/core: HTTP $STATUS"
           [ "$STATUS" = "200" ] || { echo "::error::@usenella/core not accessible (HTTP $STATUS)"; exit 1; }
 
-      - name: Check @getnella/latest
+      - name: Check @getnella/mcp
         id: nella
         continue-on-error: true
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            "https://registry.npmjs.org/@getnella/latest")
-          echo "@getnella/latest: HTTP $STATUS"
-          [ "$STATUS" = "200" ] || { echo "::error::@getnella/latest not accessible (HTTP $STATUS)"; exit 1; }
+            "https://registry.npmjs.org/@getnella/mcp")
+          echo "@getnella/mcp: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::@getnella/mcp not accessible (HTTP $STATUS)"; exit 1; }
 
       - name: Check @usenella/api
         id: api
@@ -332,7 +332,7 @@ jobs:
               ``,
               `### npm Packages`,
               `- [${icon(checks.npm_core)}] **@usenella/core** — ${status(checks.npm_core)}`,
-              `- [${icon(checks.npm_nella)}] **@getnella/latest** — ${status(checks.npm_nella)}`,
+              `- [${icon(checks.npm_nella)}] **@getnella/mcp** — ${status(checks.npm_nella)}`,
               `- [${icon(checks.npm_api)}] **@usenella/api** — ${status(checks.npm_api)}`,
               `- [${icon(checks.npm_benchmark)}] **@usenella/benchmark** — ${status(checks.npm_benchmark)}`,
               ``,

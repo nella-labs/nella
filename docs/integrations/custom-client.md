@@ -7,7 +7,7 @@ Connect Nella to any MCP-compatible client or build your own integration.
 Nella's MCP server uses the stdio transport by default. Any MCP client that supports stdio can connect:
 
 ```bash
-npx @getnella/latest mcp
+npx @getnella/mcp mcp
 ```
 
 The server communicates over stdin/stdout using the MCP protocol.
@@ -22,7 +22,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 
 const transport = new StdioClientTransport({
   command: 'npx',
-  args: ['-y', '@getnella/latest', 'mcp'],
+  args: ['-y', '@getnella/mcp', 'mcp'],
   env: { NELLA_REPO_PATH: '/path/to/repo' },
 });
 

@@ -167,5 +167,5 @@ pnpm test       # Run tests
 ## See Also
 
 - [Nella Specification](../../docs/spec.md) — Architecture and design
-- [@getnella/latest](../nella/README.md) — CLI + MCP server
+- [@getnella/mcp](../nella/README.md) — CLI + MCP server
 - [@usenella/benchmark](../benchmark/README.md) — Benchmarking tools
