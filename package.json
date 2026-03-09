@@ -8,9 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "benchmark": "workspace:benchmark",
-    "nella": "workspace:nella",
-    "api": "workspace:api",
+    "benchmark": "pnpm --filter benchmark",
+    "nella": "node packages/nella/dist/cli.js",
+    "api": "pnpm --filter @usenella/api",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:ci": "pnpm -r test:ci",
