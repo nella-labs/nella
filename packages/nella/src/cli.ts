@@ -29,7 +29,10 @@ import {
   RawTaskYaml,
   Changes,
   FileChange,
+  createIndexManager,
+  DEFAULT_INDEX_CONFIG,
 } from "@usenella/core";
+import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
 import { startHostedServer } from "./mcp/hosted-server";
 import { startPlaygroundServer } from "./playground";
@@ -136,7 +139,8 @@ function divider(): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "check" | "validate" | "run" | "mcp" | "serve" | "connect" | "auth" | "playground" | "setup" | "help";
+  command: "check" | "validate" | "run" | "index" | "mcp" | "serve" | "connect" | "auth" | "playground" | "setup" | "help";
+  force?: boolean;
   taskPath?: string;
   repoPath?: string;
   changesPath?: string;
@@ -169,7 +173,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "check" || arg === "validate" || arg === "run" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "setup" || arg === "help") {
+    if (arg === "check" || arg === "validate" || arg === "run" || arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "setup" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -192,6 +196,8 @@ function parseArgs(args: string[]): CliArgs {
       result.repoPath = args[++i];
     } else if (arg === "--changes" || arg === "-c") {
       result.changesPath = args[++i];
+    } else if (arg === "--force" || arg === "-f") {
+      result.force = true;
     } else if (arg === "--skip-validation") {
       result.skipValidation = true;
     } else if (arg === "--skip-prerequisites") {
@@ -965,7 +971,11 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
 
 function runSetupCommand(): void {
   const pluginSrc = path.join(__dirname, "..", "claude-plugin");
-  const pluginDest = path.join(os.homedir(), ".claude", "plugins", "nella");
+  const claudeDir = path.join(os.homedir(), ".claude");
+  const marketplacesDir = path.join(claudeDir, "plugins", "marketplaces");
+  const nellaMarketplace = path.join(marketplacesDir, "nella");
+  const pluginDest = path.join(nellaMarketplace, "plugins", "nella");
+  const knownMarketplacesPath = path.join(claudeDir, "plugins", "known_marketplaces.json");
 
   if (!fs.existsSync(pluginSrc)) {
     console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Plugin source not found.")} ${theme.muted("Try reinstalling @getnella/mcp.")}\n`);
@@ -988,6 +998,29 @@ function runSetupCommand(): void {
   const isUpdate = fs.existsSync(pluginDest);
   copyDir(pluginSrc, pluginDest);
 
+  // Register nella as a known marketplace so Claude Code discovers the plugin
+  let knownMarketplaces: Record<string, unknown> = {};
+  try {
+    knownMarketplaces = JSON.parse(fs.readFileSync(knownMarketplacesPath, "utf-8"));
+  } catch {}
+  if (!knownMarketplaces["nella"]) {
+    knownMarketplaces["nella"] = {
+      source: { source: "local" },
+      installLocation: nellaMarketplace,
+      lastUpdated: new Date().toISOString(),
+    };
+    fs.writeFileSync(knownMarketplacesPath, JSON.stringify(knownMarketplaces, null, 2) + "\n");
+  }
+
+  // Clean up legacy plugin location (pre-v0.1.4)
+  const legacyDest = path.join(claudeDir, "plugins", "nella");
+  if (fs.existsSync(legacyDest) && fs.statSync(legacyDest).isDirectory()) {
+    const legacyPlugin = path.join(legacyDest, ".claude-plugin");
+    if (fs.existsSync(legacyPlugin)) {
+      fs.rmSync(legacyDest, { recursive: true, force: true });
+    }
+  }
+
   console.log(logo);
   console.log(tagline);
   if (isUpdate) {
@@ -996,6 +1029,114 @@ function runSetupCommand(): void {
     console.log(`  ${theme.icons.success}  ${theme.success.bold("Plugin installed")} ${theme.muted("→")} ${theme.primary(pluginDest)}`);
   }
   console.log(`\n  ${theme.icons.arrow}  Restart Claude Code, then use ${theme.primary.bold("/nella")} to get started.\n`);
+}
+
+// =============================================================================
+// Index Command — index workspace for search & code verification
+// =============================================================================
+
+async function runIndexCommand(args: CliArgs): Promise<void> {
+  if (args.showHelp) {
+    console.log(logo);
+    console.log(tagline);
+    console.log(`  ${theme.primary.bold("nella index")} — Index workspace for search & code verification\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella index [--workspace <path>] [--force]")}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}    Workspace path (default: cwd)`);
+    console.log(`    ${theme.accent("--force, -f")}                    Force full reindex`);
+    console.log("");
+    return;
+  }
+
+  const workspacePath = path.resolve(args.workspace || process.cwd());
+  const workspaceId = path.basename(workspacePath);
+  const storagePath = path.join(workspacePath, ".nella", "index");
+
+  console.log(logo);
+  console.log(tagline);
+  console.log(`  ${theme.icons.arrow}  Indexing ${theme.primary.bold(workspacePath)}\n`);
+
+  if (args.force) {
+    console.log(`  ${theme.muted("Mode: full reindex (--force)")}\n`);
+  }
+
+  const config: IndexManagerConfig = {
+    workspaceId,
+    workspacePath,
+    storagePath,
+    chunking: {
+      maxTokens: 512,
+      overlap: 50,
+      strategy: "ast",
+    },
+    embedder: {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    },
+    search: {
+      vectorWeight: 0.7,
+      lexicalWeight: 0.3,
+      rerankEnabled: false,
+      topK: 10,
+    },
+    include: DEFAULT_INDEX_CONFIG.include,
+    exclude: [...DEFAULT_INDEX_CONFIG.exclude, "**/.nella/**"],
+  };
+
+  const manager = createIndexManager(config);
+
+  let lastProgressLine = "";
+  manager.onEvent((event: IndexEvent) => {
+    switch (event.type) {
+      case "index:start":
+        console.log(`  ${theme.icons.info}  Found ${theme.primary.bold(String(event.totalFiles))} files to process\n`);
+        break;
+      case "index:progress": {
+        const pct = Math.round((event.processed / event.total) * 100);
+        lastProgressLine = `  ${theme.muted(`[${pct}%]`)} ${theme.muted(event.currentFile)}`;
+        process.stderr.write(`\r${lastProgressLine}${"".padEnd(20)}`);
+        break;
+      }
+      case "index:embed":
+        process.stderr.write("\r" + " ".repeat(80) + "\r");
+        console.log(`  ${theme.icons.info}  Embedded batch of ${theme.primary(String(event.batchSize))} chunks ${theme.muted(`(${event.tokensUsed} tokens)`)}`);
+        break;
+      case "index:error":
+        process.stderr.write("\r" + " ".repeat(80) + "\r");
+        console.log(`  ${theme.icons.error}  ${theme.error(event.error)} ${event.filePath ? theme.muted(event.filePath) : ""}`);
+        break;
+      case "index:complete":
+        process.stderr.write("\r" + " ".repeat(80) + "\r");
+        break;
+    }
+  });
+
+  try {
+    const metadata = await manager.index({ force: args.force });
+    const stats = metadata.stats;
+
+    console.log("");
+    console.log(box([
+      `${theme.icons.success}  ${theme.success.bold("Index Complete")}`,
+      "",
+      `   Files indexed:    ${theme.primary.bold(String(stats.filesIndexed))}`,
+      `   Chunks created:   ${theme.primary.bold(String(stats.chunksCount))}`,
+      `   Embeddings:       ${theme.primary.bold(String(stats.embeddingsCount))}`,
+      `   Tokens processed: ${theme.primary.bold(String(stats.totalTokens))}`,
+      "",
+      `   Storage: ${theme.muted(path.relative(workspacePath, storagePath) + "/")}`,
+    ].join("\n"), "Index"));
+    console.log("");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log("");
+    console.log(`  ${theme.icons.error}  ${theme.error.bold("Indexing failed")}`);
+    console.log(`  ${theme.muted(message)}`);
+    console.log("");
+    process.exit(1);
+  }
 }
 
 function showHelp(): void {
@@ -1021,6 +1162,7 @@ function showHelp(): void {
     [theme.primary("check"), theme.muted("Pre-flight safety check — can the task proceed?")],
     [theme.primary("validate"), theme.muted("Validate changes against task constraints")],
     [theme.primary("run"), theme.muted("Full pipeline: check + validate + metrics")],
+    [theme.primary("index"), theme.muted("Index workspace for search & code verification")],
   );
   console.log(valTable.toString());
   console.log("");
@@ -1061,6 +1203,7 @@ function showHelp(): void {
     [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect"],
     [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect"],
     [theme.accent("--client"), theme.muted("<name>"), "claude, vscode, cursor, or all"],
+    [theme.accent("--force, -f"), "", "Force full reindex"],
     [theme.accent("--skip-validation"), "", "Skip test/lint/compile"],
     [theme.accent("--skip-prerequisites"), "", "Skip prerequisite checks"],
     [theme.accent("--json"), "", "Output as JSON"],
@@ -1092,6 +1235,9 @@ async function main(): Promise<void> {
       break;
     case "run":
       await runRunCommand(args);
+      break;
+    case "index":
+      await runIndexCommand(args);
       break;
     case "mcp":
       if (args.showHelp) {

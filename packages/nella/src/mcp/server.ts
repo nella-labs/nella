@@ -25,6 +25,7 @@ import { registerValidationTools, handleValidationTool } from "./tools/validatio
 import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
 import { registerCodeTools, handleCodeTool } from "./tools/code";
+import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
 
 // =============================================================================
 // Types
@@ -94,6 +95,7 @@ Example:
     ...registerSafetyTools(),
     ...registerContextTools(),
     ...registerCodeTools(),
+    ...registerIndexingTools(),
   ];
 
   // Handle tool listing
@@ -126,6 +128,11 @@ Example:
         const codeResult = await handleCodeTool(name, toolArgs || {}, serverContext);
         if (codeResult !== null) {
           return codeResult as CallToolResult;
+        }
+
+        const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);
+        if (indexingResult !== null) {
+          return indexingResult as CallToolResult;
         }
 
         // Unknown tool

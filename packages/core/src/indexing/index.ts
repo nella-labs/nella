@@ -225,11 +225,23 @@ export class IndexManager {
     const chunksToEmbed = Array.from(this.chunks.values()).filter((c) => !c.embedding);
 
     if (chunksToEmbed.length > 0) {
-      const batchSize = 100;
-      for (let i = 0; i < chunksToEmbed.length; i += batchSize) {
-        const batch = chunksToEmbed.slice(i, i + batchSize);
-        const texts = batch.map((c) => c.content);
+      // Token-aware batching to avoid exceeding API limits (e.g. OpenAI 8192 token limit).
+      const maxBatchTokens = 8000;
+      const maxBatchSize = 50;
+      let i = 0;
+      while (i < chunksToEmbed.length) {
+        const batch: CodeChunk[] = [];
+        let batchTokens = 0;
+        while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
+          // Estimate tokens from content length if chunk.tokens is 0
+          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 4);
+          if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
+          batchTokens += chunkTokens;
+          batch.push(chunksToEmbed[i]);
+          i++;
+        }
 
+        const texts = batch.map((c) => c.content);
         const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
         totalCost += cost;
 

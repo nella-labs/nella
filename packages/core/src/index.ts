@@ -120,6 +120,8 @@ export {
   // Main manager
   IndexManager,
   createIndexManager,
+  // Config defaults
+  DEFAULT_INDEX_CONFIG,
   // Components
   Chunker,
   createChunker,
@@ -138,6 +140,7 @@ export {
 
 export type {
   // Types
+  IndexManagerConfig,
   CodeChunk,
   ChunkType,
   CodeSymbol,

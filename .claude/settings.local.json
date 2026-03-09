@@ -11,23 +11,16 @@
       "Bash(gh pr view:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(npm pack:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(node:*)",
+      "Bash(npm run:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "nella"
-  ],
-  "mcpServers": {
-    "nella": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@getnella/mcp"
-      ],
-      "env": {
-        "NELLA_REPO_PATH": "./"
-      }
-    }
-  },
-  "enableAllProjectMcpServers": true
+  ]
 }
