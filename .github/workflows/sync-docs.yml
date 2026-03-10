@@ -73,13 +73,13 @@ jobs:
 
       - name: Checkout nella repo
         if: env.HAS_TOKEN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: nella
 
       - name: Checkout nella-website repo
         if: env.HAS_TOKEN == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: nella-labs/nella-website
           path: nella-website
