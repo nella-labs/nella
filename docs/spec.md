@@ -15,18 +15,17 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 ### Core Principles
 
 1. **Agent-agnostic** — Works with any agent (Claude, GPT, etc.) via CLI, library, or MCP
-2. **Defense in depth** — Multiple layers of validation (refusal, constraints, scope, tests)
+2. **Context persistence** — Tracks assumptions, dependencies, and changes across sessions
 3. **Structured output** — All results are machine-readable JSONL for analysis
-4. **Zero trust** — Validates everything, trusts nothing from the agent
+4. **Codebase-aware** — Indexes and searches your codebase for grounded context
 
 ### Core Objectives
 
 | Objective | Problem | Nella Solution | Key Components |
 |-----------|---------|----------------|----------------|
-| **Reduce Hallucinations** | Agents reference non-existent imports, symbols, APIs | Index the real codebase; verify generated code against it | `CodeVerifier`, `nella_verify`, `nella_search` |
-| **Increase Context** | Agents lose prior decisions and assumptions across turns | Persistent session state with assumptions, change history, dependency snapshots | `ContextManager`, `SessionStore`, `ChangeLedger`, `AssumptionTracker`, `DependencyTracker` |
-| **Prompt Injection Protection** | Malicious prompts trigger dangerous operations | Scan prompts for risk patterns; recommend refusal; enforce constraints | `shouldRefuse`, `detectRiskPatterns`, `RISK_PATTERNS`, `nella_detect_risks` |
-| **Prevent Contradictions** | Agents contradict prior intent or generate code not grounded in codebase | Track assumptions and detect conflicts; verify symbols exist; enforce scope | `AssumptionTracker.getConflicts()`, `CodeVerifier`, `checkScope` |
+| **Reduce Hallucinations** | Agents reference non-existent imports, symbols, APIs | Index the real codebase; verify generated code against it | `CodeVerifier`, `nella_search`, `nella_index` |
+| **Increase Context** | Agents lose prior decisions and assumptions across turns | Persistent session state with assumptions, change history, dependency snapshots | `ContextManager`, `SessionStore`, `AssumptionTracker`, `DependencyTracker` |
+| **Prevent Contradictions** | Agents contradict prior intent or generate code not grounded in codebase | Track assumptions and detect conflicts; verify symbols exist | `AssumptionTracker.getConflicts()`, `CodeVerifier`, `nella_check_assumptions` |
 
 ---
 
@@ -49,7 +48,7 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 │                         Integration Points                                  │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  @getnella/mcp        CLI + MCP server (stdio & HTTP)                    │
-│  @usenella/core         TypeScript library (runTask, check, validate)      │
+│  @usenella/core         TypeScript library (indexing, context, search)     │
 │  @usenella/benchmark    Agent evaluation & benchmarking suite              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -64,12 +63,11 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 
 ### Data Flow
 
-1. **Agent receives task** → Parses prompt, constraints, expected changes
-2. **Pre-flight check** → Nella checks for refusal conditions
-3. **Agent makes changes** → Generates file modifications
-4. **Changes submitted to Nella** → Via CLI, library, or MCP
-5. **Nella validates** → Constraints, scope, validation commands
-6. **Result returned** → Pass/fail with metrics and artifacts
+1. **Agent indexes codebase** → `nella index` builds searchable code index
+2. **Agent searches context** → `nella_search` finds relevant code and symbols
+3. **Agent tracks assumptions** → `nella_add_assumption` records decisions
+4. **Agent checks assumptions** → `nella_check_assumptions` detects conflicts
+5. **Agent checks dependencies** → `nella_check_dependencies` detects drift
 
 ---
 
@@ -77,10 +75,7 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 
 | Module | Purpose | Key Classes |
 |--------|---------|-------------|
-| **Validation** | Task validation pipeline | `runTask`, `check`, `validate` |
-| **Validators** | Constraint & scope checking | `checkConstraints`, `checkScope`, `runValidation` |
-| **Safety** | Refusal detection & risk scanning | `shouldRefuse`, `detectRiskPatterns`, `RISK_PATTERNS` |
-| **Context** | Session persistence & tracking | `ContextManager`, `SessionStore`, `ChangeLedger`, `AssumptionTracker`, `DependencyTracker` |
+| **Context** | Session persistence & tracking | `ContextManager`, `SessionStore`, `AssumptionTracker`, `DependencyTracker` |
 | **Indexing/RAG** | Code indexing & hybrid search | `IndexManager`, `Chunker`, `Embedder`, `VectorStore`, `LexicalIndex`, `HybridSearcher`, `CodeVerifier` |
 | **Workspace** | Multi-workspace management | `WorkspaceRegistry`, `Workspace`, `WorkspaceSwitcher`, `FileLock`, `FileWatcher` |
 | **Auth** | API key management & access control | `KeyManager`, `AgentManager`, `Authenticator`, `TokenManager`, `AuditLogManager`, `IPFilter`, `RequestSigner` |
@@ -97,7 +92,7 @@ Nella is a **reliability layer for coding agents** that makes agent-made code ch
 
 ## Task Definition
 
-Tasks are defined in YAML files with the following schema:
+Tasks are defined in YAML files for the benchmark suite:
 
 ```yaml
 # Required fields
@@ -112,7 +107,7 @@ difficulty: easy | medium | hard
 # Fixture/repo name
 fixture: string
 
-# Constraints (what the agent must NOT do)
+# Constraints (what the agent must NOT do — used by benchmark validators)
 constraints:
   - id: string
     description: string
@@ -122,7 +117,7 @@ constraints:
     forbidden_patterns:
       - string[]
 
-# Expected changes (for scope validation)
+# Expected changes (for benchmark scope validation)
 expected:
   files_to_modify:
     - string[]
@@ -130,13 +125,13 @@ expected:
     - string[]
   expected_line_count: number
 
-# Validation commands
+# Validation commands (for benchmark validation)
 validation:
   test: string
   lint: string
   compile: string
 
-# Refusal configuration
+# Refusal configuration (for benchmark evaluation)
 refusal_expected: boolean
 refusal_patterns: string[]
 timeout_seconds: number
@@ -144,62 +139,9 @@ timeout_seconds: number
 
 ---
 
-## Core API
-
-### `runTask(repoPath, task, changes?, options?) → RunResult`
-
-Main entrypoint. Orchestrates the full validation flow.
-
-```typescript
-interface RunTaskOptions {
-  skipRefusalCheck?: boolean;
-  skipPrerequisites?: boolean;
-  skipValidation?: boolean;
-  validationTimeout?: number;
-  skipArtifacts?: boolean;
-  plan?: Plan;
-  enableContextTracking?: boolean;
-  checkDependencies?: boolean;
-  checkAssumptionConflicts?: boolean;
-}
-```
-
-### `check(task, workspacePath, options?) → RefusalResult`
-
-Pre-flight check. Returns whether the task should be refused.
-
-### `validate(task, workspacePath, changes, options?) → ValidateResult`
-
-Validate changes without the full `runTask` flow.
-
 ---
 
-## Context Tracking
-
-Persistent session across runs to detect dependency drift and assumption conflicts.
-
-```typescript
-const result = await runTask('/path/to/repo', task, changes, {
-  enableContextTracking: true,
-  checkDependencies: true,
-  checkAssumptionConflicts: true
-});
-```
-
----
-
-## Metrics
-
-### Core Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `scopeCreep` | number | Ratio of unexpected file changes (0.0-1.0) |
-| `constraintViolations` | number | Count of violated constraints |
-| `validationIntegrity` | number | Ratio of validation commands that passed (0.0-1.0) |
-| `refusalCorrectness` | boolean \| null | Correctly refused (if applicable) |
-
-### Benchmark Metrics
+## Benchmark Metrics
 
 | Metric | Abbr | Description |
 |--------|------|-------------|
@@ -214,28 +156,13 @@ const result = await runTask('/path/to/repo', task, changes, {
 
 ---
 
-## Refusal Detection
-
-31 risk patterns across categories:
-- **Credential exposure** — logging passwords, tokens, secrets
-- **Security bypass** — disabling auth, skipping validation
-- **Dangerous operations** — DROP TABLE, DELETE all users, rm -rf
-- **Data exposure** — exposing PII, leaking API keys
-- **Backdoor indicators** — hardcoded passwords, admin backdoors
-
-16 agent response refusal patterns detect phrases like "I can't", "security risk", "not safe", etc.
-
----
-
 ## CLI Reference
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| `nella check` | Pre-flight check: can the task proceed? |
-| `nella validate` | Validate changes against constraints |
-| `nella run` | Full run: check + validate + metrics |
+| `nella index` | Index codebase for search and context |
 | `nella mcp` | Start MCP server (stdio transport) |
 | `nella serve` | Start hosted MCP server (Streamable HTTP) |
 | `nella connect` | Configure MCP clients to use Nella |
@@ -247,34 +174,26 @@ const result = await runTask('/path/to/repo', task, changes, {
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--task` | `-t` | Path to task.yaml or task directory |
-| `--repo` | `-r` | Path to repository |
-| `--changes` | `-c` | Path to changes.json file |
 | `--workspace` | `-w` | Workspace path for mcp/playground |
 | `--port` | `-p` | Port for serve/playground (default: 3847) |
 | `--host` | | Host for serve/playground (default: localhost) |
 | `--api-key` | `-k` | API key for connect command |
 | `--server-url` | `-u` | Server URL for connect (default: production) |
 | `--client` | | Target MCP client: claude, vscode, or all |
-| `--skip-validation` | | Skip running test/lint/compile |
-| `--skip-prerequisites` | | Skip prerequisite checks |
 | `--json` | | Output as JSON |
 
 ---
 
-## MCP Tools
+## MCP Tools (6)
 
-### Nella Package MCP Tools (12)
-
-**Validation:** `nella_check`, `nella_validate`, `nella_run`
-
-**Safety:** `nella_detect_risks`, `nella_should_refuse`, `nella_check_prerequisites`
-
-**Context:** `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_get_file_history`, `nella_check_dependencies`, `nella_record_change`
-
-### Core MCP Tools (6)
-
-`nella_search`, `nella_verify`, `nella_index`, `nella_get_context`, `nella_set_context`, `nella_status`
+| Tool | Description |
+|------|-------------|
+| `nella_index` | Index codebase for search and context |
+| `nella_search` | Search indexed codebase |
+| `nella_get_context` | Get session context |
+| `nella_add_assumption` | Record an assumption |
+| `nella_check_assumptions` | Check assumption status and conflicts |
+| `nella_check_dependencies` | Check for dependency drift |
 
 ---
 

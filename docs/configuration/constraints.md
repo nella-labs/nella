@@ -1,8 +1,6 @@
-# Constraints
+# Constraints (Benchmark Only)
 
-Define boundaries and rules for AI-generated changes.
-
-Constraints define what the AI agent cannot do. They help prevent accidental modifications to critical files and ensure code quality standards are maintained.
+Constraints are used by the **benchmark suite** (`@usenella/benchmark`) to evaluate whether AI agents respect boundaries during task execution. They are not part of the MCP tool interface.
 
 ## Constraint Structure
 
@@ -41,8 +39,6 @@ Use glob patterns to protect files from modification:
 | `!src/test/**` | Exclude test directory |
 | `config/**` | All files in config directory |
 
-> **Tip:** Nella uses standard glob patterns. Use `**` for any directory depth and `*` for any file name.
-
 ## forbiddenPatterns
 
 Use regex patterns to detect unwanted code in diffs:
@@ -79,114 +75,24 @@ Use regex patterns to detect unwanted code in diffs:
 
 > **Warning:** Remember to escape special regex characters in your patterns. In JavaScript strings, use double backslashes (`\\`).
 
-## Common Constraint Sets
+## Usage in Benchmark Tasks
 
-### Security Constraints
+Constraints are defined in task YAML files used by the benchmark suite:
 
-```typescript
-const securityConstraints = [
-  {
-    id: 'no-hardcoded-secrets',
-    description: 'No hardcoded secrets',
-    forbiddenPatterns: [
-      'password\\s*[:=]\\s*["\'][^"\']{8,}["\']',
-      'secret\\s*[:=]\\s*["\'][^"\']+["\']',
-      'api[_-]?key\\s*[:=]\\s*["\'][^"\']+["\']',
-    ],
-  },
-  {
-    id: 'no-eval',
-    description: 'No eval() or Function() calls',
-    forbiddenPatterns: [
-      '\\beval\\s*\\(',
-      'new\\s+Function\\s*\\(',
-    ],
-  },
-  {
-    id: 'no-innerhtml',
-    description: 'No innerHTML assignments (XSS risk)',
-    forbiddenPatterns: [
-      '\\.innerHTML\\s*=',
-      '\\.outerHTML\\s*=',
-    ],
-  },
-];
+```yaml
+constraints:
+  - id: no-schema-changes
+    description: Do not modify database schema
+    files_not_to_modify:
+      - prisma/schema.prisma
+      - package.json
+  - id: no-console-log
+    description: No console.log in production code
+    forbidden_patterns:
+      - "console\\.log"
 ```
 
-### Code Quality Constraints
-
-```typescript
-const qualityConstraints = [
-  {
-    id: 'no-console-log',
-    description: 'No console.log in production code',
-    forbiddenPatterns: ['console\\.log\\('],
-  },
-  {
-    id: 'no-debugger',
-    description: 'No debugger statements',
-    forbiddenPatterns: ['\\bdebugger\\b'],
-  },
-  {
-    id: 'no-any-type',
-    description: 'No any type annotations',
-    forbiddenPatterns: [':\\s*any\\b', 'as\\s+any\\b'],
-  },
-];
-```
-
-### File Protection Constraints
-
-```typescript
-const fileConstraints = [
-  {
-    id: 'protect-config',
-    description: 'Do not modify root configuration',
-    filesNotToModify: [
-      'package.json',
-      'package-lock.json',
-      'pnpm-lock.yaml',
-      'tsconfig.json',
-      '.env*',
-    ],
-  },
-  {
-    id: 'protect-migrations',
-    description: 'Do not modify existing migrations',
-    filesNotToModify: [
-      '**/migrations/*.sql',
-      '**/migrations/*.ts',
-    ],
-  },
-  {
-    id: 'protect-ci',
-    description: 'Do not modify CI/CD configuration',
-    filesNotToModify: [
-      '.github/**',
-      '.gitlab-ci.yml',
-      'Dockerfile',
-    ],
-  },
-];
-```
-
-## Constraint Violations
-
-When a constraint is violated, Nella returns detailed information:
-
-```
-## Constraint Check Results
-
-❌ 2 constraint(s) violated
-
-### Violations
-- **no-console-log**: Found console.log( at line 45
-- **protect-config**: Modified protected file: package.json
-
-### Passed Constraints
-- ✅ **no-secrets**: No sensitive patterns detected
-- ✅ **no-eval**: No eval patterns found
-```
+The benchmark validators (`@usenella/benchmark/validators/`) check agent output against these constraints to compute the Constraint Violation Rate (CVR) metric.
 
 ## Next Steps
 

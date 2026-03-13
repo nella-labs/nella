@@ -8,13 +8,10 @@ Reliability layer for coding agents. Enforces behavioral contracts that prevent 
 
 ## Features
 
-- **🛡️ Refusal Detection** — Block execution when prerequisites are missing or risk patterns detected
-- **📋 Constraint Validation** — Ensure agents don't touch forbidden files or introduce forbidden patterns
-- **✅ Validation Execution** — Run test/lint/compile commands and capture proof
-- **🔍 Scope Analysis** — Detect scope creep when agents modify files outside the declared plan
-- **📊 Metrics Calculation** — Compute scope creep ratio, constraint violations, validation integrity
-- **📝 Structured Logging** — Emit JSONL run records for auditing and analysis
-- **🧠 Context Tracking** — Track assumptions, dependency drift, and change history across runs
+- **Indexing & Search** — Hybrid vector + lexical search for RAG workflows
+- **Context Tracking** — Track assumptions, dependency drift, and change history across runs
+- **Structured Logging** — Emit JSONL run records for auditing and analysis
+- **Metrics Calculation** — Compute scope creep ratio and other quality metrics
 
 ## Advanced Modules
 
@@ -38,26 +35,18 @@ npm install @usenella/core
 ## Quick Start
 
 ```typescript
-import { runTask, check, Task, Changes } from '@usenella/core';
+import { createIndex, search } from '@usenella/core';
 
-// 1. Pre-flight check: should this task be refused?
-const refusal = check(task, '/path/to/repo');
-if (refusal.shouldRefuse) {
-  console.error('Task refused:', refusal.reason);
-  process.exit(1);
-}
+// Index a workspace
+await createIndex('/path/to/repo');
 
-// 2. Validate agent changes
-const changes: Changes = {
-  files: [
-    { path: 'src/users.ts', operation: 'modify', content: '...' }
-  ]
-};
+// Search the indexed codebase
+const results = await search('/path/to/repo', {
+  query: 'user authentication',
+  mode: 'hybrid',
+});
 
-const result = await runTask('/path/to/repo', task, changes);
-
-console.log('Passed:', result.passed);
-console.log('Metrics:', result.metrics);
+console.log('Results:', results);
 ```
 
 ## Playground Server
@@ -88,31 +77,6 @@ Features:
 
 ## API Overview
 
-### Main Functions
-
-| Function | Description |
-|----------|-------------|
-| `runTask(repoPath, task, changes?, options?)` | Main entrypoint — full validation flow (optionally with context tracking) |
-| `check(task, workspacePath, options?)` | Pre-flight refusal check |
-| `validate(task, workspacePath, changes, options?)` | Validate without full run |
-
-### Validators
-
-| Function | Description |
-|----------|-------------|
-| `checkConstraints(files, diff, constraints)` | Check all constraints |
-| `checkScope(files, expected)` | Detect scope creep |
-| `runValidation(config, workDir)` | Run test/lint/compile |
-| `runCommand(command, workDir, timeout?)` | Execute single command |
-
-### Safety
-
-| Function | Description |
-|----------|-------------|
-| `shouldRefuse(task, workspacePath, options?)` | Full refusal detection |
-| `detectRiskPatterns(prompt)` | Check for risky patterns |
-| `checkPrerequisites(workspacePath)` | Verify prerequisites |
-
 ### Context Management
 
 | Export | Description |
@@ -131,15 +95,6 @@ Features:
 | `generateRunId()` | Generate unique run ID |
 | `createTempWorkspace(path)` | Create isolated workspace copy |
 | `applyChanges(workspace, changes)` | Apply file changes |
-
-## Metrics
-
-| Metric | Description |
-|--------|-------------|
-| `scopeCreep` | Ratio of files modified outside expected scope |
-| `constraintViolations` | Count of violated constraints |
-| `validationIntegrity` | Ratio of validation commands that passed |
-| `refusalCorrectness` | Whether refusal matched expectation |
 
 ## Documentation
 

@@ -55,7 +55,7 @@ Ask Claude:
 
 > "What Nella tools are available?"
 
-Claude should list tools like `nella_check`, `nella_validate`, `nella_run`, etc.
+Claude should list tools like `nella_search`, `nella_index`, `nella_get_context`, etc.
 
 ## Automatic Setup
 
@@ -96,25 +96,22 @@ Configure multiple Nella instances for different projects:
 
 Once connected, Claude uses Nella tools automatically. You can also request them explicitly:
 
-### Check Constraints
+### Search the Codebase
 
 ```
-Please use nella_check to verify my changes don't violate any constraints.
-The constraints are:
-- Don't modify package.json
-- No console.log statements
+Use nella_search to find how authentication is implemented in this project.
 ```
 
-### Run Full Validation
+### Record Assumptions
 
 ```
-Use nella_run to validate all my changes against the task definition.
+Use nella_add_assumption to record that this project uses Express with TypeScript.
 ```
 
-### Detect Risks
+### Check Dependencies
 
 ```
-Use nella_detect_risks to scan the diff for security issues.
+Use nella_check_dependencies to see if any packages changed since we started.
 ```
 
 ## Troubleshooting

@@ -12,61 +12,40 @@ graph LR
         Transport["StdioServerTransport"]
         Router["Tool Router"]
 
-        subgraph validation_tools["Validation Tools"]
-            nella_check["nella_check<br/>Constraint checking"]
-            nella_validate["nella_validate<br/>Run test/lint/compile"]
-            nella_run["nella_run<br/>Full task validation"]
-        end
-
-        subgraph safety_tools["Safety Tools"]
-            nella_detect_risks["nella_detect_risks<br/>Risk pattern scanning"]
-            nella_should_refuse["nella_should_refuse<br/>Refusal decision"]
-            nella_check_prereqs["nella_check_prerequisites<br/>Prerequisite verification"]
+        subgraph indexing_tools["Indexing Tools"]
+            nella_index["nella_index<br/>Index workspace"]
+            nella_search["nella_search<br/>Hybrid search"]
         end
 
         subgraph context_tools["Context Tools"]
             nella_get_context["nella_get_context<br/>Session context"]
             nella_add_assumption["nella_add_assumption<br/>Record assumption"]
             nella_check_assumptions["nella_check_assumptions<br/>Assumption status"]
-            nella_get_file_history["nella_get_file_history<br/>File change history"]
             nella_check_deps["nella_check_dependencies<br/>Dependency drift"]
-            nella_record_change["nella_record_change<br/>Manual change recording"]
         end
     end
 
     subgraph core["@usenella/core"]
-        checkConstraints["checkConstraints()"]
-        runValidation["runValidation()"]
-        runTask["runTask()"]
-        detectRiskPatterns["detectRiskPatterns()"]
-        shouldRefuse["shouldRefuse()"]
-        checkPrereqs["checkPrerequisites()"]
+        IndexEngine["IndexEngine"]
+        SearchEngine["SearchEngine"]
         ContextMgr["ContextManager"]
     end
 
     Agent -->|"stdio"| Transport
     Transport --> Router
-    Router --> validation_tools
-    Router --> safety_tools
+    Router --> indexing_tools
     Router --> context_tools
 
-    nella_check --> checkConstraints
-    nella_validate --> runValidation
-    nella_run --> runTask
-    nella_detect_risks --> detectRiskPatterns
-    nella_should_refuse --> shouldRefuse
-    nella_check_prereqs --> checkPrereqs
+    nella_index --> IndexEngine
+    nella_search --> SearchEngine
     nella_get_context --> ContextMgr
     nella_add_assumption --> ContextMgr
     nella_check_assumptions --> ContextMgr
-    nella_get_file_history --> ContextMgr
     nella_check_deps --> ContextMgr
-    nella_record_change --> ContextMgr
 
     style Agent fill:#6366f1,color:#fff
     style server fill:#f3e8ff,stroke:#7c3aed
-    style validation_tools fill:#ddd6fe
-    style safety_tools fill:#fecaca
+    style indexing_tools fill:#bfdbfe
     style context_tools fill:#d1fae5
     style core fill:#ede9fe,stroke:#6d28d9
 ```
@@ -75,9 +54,8 @@ graph LR
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Validation** | `nella_check`, `nella_validate`, `nella_run` | Verify code changes against constraints, run tests/lints, or do a full validation pipeline |
-| **Safety** | `nella_detect_risks`, `nella_should_refuse`, `nella_check_prerequisites` | Scan for dangerous patterns, make refusal decisions, verify project prerequisites |
-| **Context** | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_get_file_history`, `nella_check_dependencies`, `nella_record_change` | Track session state, manage assumptions, inspect file history, detect dependency drift |
+| **Indexing** | `nella_index`, `nella_search` | Index workspace codebase and search via hybrid/semantic/lexical modes |
+| **Context** | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_check_dependencies` | Track session state, manage assumptions, detect dependency drift |
 
 ## Tool Call Lifecycle
 
@@ -94,17 +72,15 @@ sequenceDiagram
 
     A->>T: ListToolsRequest
     T->>S: route request
-    S-->>T: 12 tool definitions (JSON Schema)
+    S-->>T: 6 tool definitions (JSON Schema)
     T-->>A: tool list
 
     A->>T: CallToolRequest {name, arguments}
     T->>S: route request
     S->>R: dispatch(name, args, serverContext)
 
-    alt Validation Tool
-        R->>H: handleValidationTool(name, args, ctx)
-    else Safety Tool
-        R->>H: handleSafetyTool(name, args, ctx)
+    alt Indexing Tool
+        R->>H: handleIndexingTool(name, args, ctx)
     else Context Tool
         R->>H: handleContextTool(name, args, ctx)
     end
@@ -119,7 +95,7 @@ sequenceDiagram
 
 Key points:
 - The server registers all tools on startup with JSON Schema definitions for each tool's input parameters
-- The router dispatches by tool name prefix: `nella_check/validate/run` → validation handler, `nella_detect_risks/should_refuse/check_prerequisites` → safety handler, all others → context handler
+- The router dispatches by tool name prefix: `nella_index/search` -> indexing handler, all others -> context handler
 - Tool results are formatted as markdown text for the agent to parse
 - Errors are returned as `{isError: true}` with a human-readable error message
 
@@ -140,8 +116,7 @@ graph TB
         end
 
         subgraph Tools["MCP Tools"]
-            Validation["Validation Tools<br/>check, validate, run"]
-            SafetyTools["Safety Tools<br/>detect_risks, should_refuse"]
+            IndexingTools["Indexing Tools<br/>index, search"]
             ContextTools["Context Tools<br/>get_context, add_assumption, ..."]
         end
     end
@@ -187,7 +162,7 @@ sequenceDiagram
     CLI->>MCP: Health check
     MCP-->>CLI: OK (version)
     CLI->>CLI: Write MCP config (Claude/VSCode)
-    CLI-->>User: ✓ Connected
+    CLI-->>User: Connected
 ```
 
 ### Steps
@@ -202,6 +177,6 @@ sequenceDiagram
 ## Related Architecture Pages
 
 - [Architecture Overview](./overview.md) — System topology and package structure
-- [Core Modules](./core-modules.md) — Run engine, validators, context, and workspace
+- [Core Modules](./core-modules.md) — Context, indexing, and workspace
 - [Indexing & RAG](./indexing-rag.md) — Code chunking, embedding, and hybrid search
-- [Security & Auth](./security-auth.md) — Safety detection, authentication, and rate limiting
+- [Security & Auth](./security-auth.md) — Authentication and rate limiting

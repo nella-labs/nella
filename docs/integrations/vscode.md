@@ -29,10 +29,10 @@ Reload VS Code after saving.
 
 ## Usage
 
-With the MCP server configured, Copilot's agent mode can call Nella tools during conversations. Ask Copilot to check constraints, validate changes, or detect risks — it will use the appropriate Nella tool automatically.
+With the MCP server configured, Copilot's agent mode can call Nella tools during conversations. Ask Copilot to search the codebase, track assumptions, or check dependencies — it will use the appropriate Nella tool automatically.
 
 ```
-@workspace Add a health check endpoint. Use nella_check to verify constraints first.
+@workspace Add a health check endpoint. Use nella_search to find existing endpoint patterns first.
 ```
 
 ## Troubleshooting
