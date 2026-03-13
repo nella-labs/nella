@@ -1061,6 +1061,30 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
     console.log(`  ${theme.muted("Mode: full reindex (--force)")}\n`);
   }
 
+  // Use Nella's server-side embedding proxy when authenticated
+  const session = await getValidSession();
+  let embedderConfig: IndexManagerConfig["embedder"];
+  if (session) {
+    console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
+    embedderConfig = {
+      provider: "nella",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      apiKey: session.access_token,
+      apiBase: "https://app.getnella.dev/api",
+    };
+  } else if (process.env.OPENAI_API_KEY) {
+    console.log(`  ${theme.muted("Using local OpenAI API key")}\n`);
+    embedderConfig = {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
+  } else {
+    console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
+    process.exit(1);
+  }
+
   const config: IndexManagerConfig = {
     workspaceId,
     workspacePath,
@@ -1070,11 +1094,7 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
       overlap: 50,
       strategy: "ast",
     },
-    embedder: {
-      provider: "openai",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    },
+    embedder: embedderConfig,
     search: {
       vectorWeight: 0.7,
       lexicalWeight: 0.3,
