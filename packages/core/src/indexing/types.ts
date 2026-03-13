@@ -56,9 +56,11 @@ export interface IndexMetadata {
 export interface IndexConfig {
   // Embedding settings
   embedder: {
-    provider: "voyage" | "openai" | "local";
+    provider: "voyage" | "openai" | "local" | "nella";
     model: string;
     dimensions: number;
+    apiKey?: string;
+    apiBase?: string;
   };
 
   // Chunking settings
@@ -215,8 +217,9 @@ export interface EmbeddingResponse {
 }
 
 export interface EmbedderConfig {
-  provider: "voyage" | "openai" | "local";
+  provider: "voyage" | "openai" | "local" | "nella";
   apiKey?: string;
+  apiBase?: string;
   model: string;
   dimensions: number;
   batchSize: number;
