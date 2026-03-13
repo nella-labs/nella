@@ -142,55 +142,6 @@ nella_check_assumptions({});
 
 ---
 
-## nella_get_file_history
-
-Get the change history for a specific file within the current session.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `filePath` | `string` | Yes | Relative path to the file |
-
-### Example
-
-```typescript
-nella_get_file_history({
-  filePath: 'src/auth.ts',
-});
-```
-
-### Response
-
-```
-## File History: src/auth.ts
-
-### Summary
-- Total changes: 4
-- First change: 10:35:00
-- Last change: 11:02:00
-
-### Change Log
-
-#### 1. 10:35 — Modify
-- Run ID: run_abc123
-- Reason: Initial auth refactoring
-
-#### 2. 10:42 — Modify
-- Run ID: run_def456
-- Reason: Add async/await support
-
-#### 3. 10:55 — Modify
-- Run ID: run_ghi789
-- Reason: Fix type errors
-
-#### 4. 11:02 — Modify
-- Run ID: run_jkl012
-- Reason: Add error handling
-```
-
----
-
 ## nella_check_dependencies
 
 Check for dependency changes (package.json, lockfile) since the last snapshot.
@@ -217,47 +168,6 @@ nella_check_dependencies({});
 - Packages: 1,234 total
 - Status: Unchanged
 ```
-
----
-
-## nella_record_change
-
-Manually record file changes to keep context accurate. Use when making changes outside of `nella_run`.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `files` | `string[]` | Yes | List of file paths that were changed |
-| `operation` | `"create" \| "modify" \| "delete"` | Yes | Operation type |
-| `reason` | `string` | Yes | Why the change was made |
-
-### Example
-
-```typescript
-nella_record_change({
-  files: ['src/config.ts', 'src/utils.ts'],
-  operation: 'modify',
-  reason: 'Manual update to configuration handling',
-});
-```
-
-### Response
-
-```
-## Changes Recorded
-
-✅ Successfully recorded 2 change(s)
-
-### Recorded
-1. **src/config.ts** — modify
-2. **src/utils.ts** — modify
-
-### Reason
-Manual update to configuration handling
-```
-
-> **Tip:** Changes made through `nella_run` are automatically recorded. Use `nella_record_change` when making changes through other means (direct edits, other tools) to keep the session context accurate.
 
 ## Assumption Types
 

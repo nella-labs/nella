@@ -1,8 +1,7 @@
 /**
  * Services Layer Tests
  *
- * Tests for SafetyService (detectRisks), AuthService (hasScope),
- * and WorkspaceService (CRUD with temp registry).
+ * Tests for AuthService (hasScope) and WorkspaceService (CRUD with temp registry).
  */
 
 import { describe, it, beforeEach, afterEach } from "node:test";
@@ -10,73 +9,6 @@ import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-
-// =============================================================================
-// SafetyService — detectRisks (pure logic, no mocking)
-// =============================================================================
-
-import { SafetyService } from "../safety-service";
-
-describe("SafetyService", () => {
-  let svc: SafetyService;
-
-  beforeEach(() => {
-    svc = new SafetyService();
-  });
-
-  describe("detectRisks", () => {
-    it("detects credential logging risks", () => {
-      const result = svc.detectRisks("console.log(password)");
-      assert.ok(result.hasRisks);
-      assert.ok(result.count > 0);
-    });
-
-    it("detects auth bypass risks", () => {
-      const result = svc.detectRisks("disable authentication middleware");
-      assert.ok(result.hasRisks);
-    });
-
-    it("detects dangerous operations", () => {
-      const dangerousInputs = [
-        "DELETE ALL USERS from database",
-        "DROP TABLE sessions",
-        "run rm -rf /",
-        "add backdoor to login",
-        "hardcode password in config",
-      ];
-
-      for (const input of dangerousInputs) {
-        const result = svc.detectRisks(input);
-        assert.ok(result.hasRisks, `Should detect risk in: "${input}"`);
-      }
-    });
-
-    it("returns no risks for safe content", () => {
-      const safeInputs = [
-        "Create a user registration form with email validation",
-        "Add pagination to the users endpoint",
-        "Refactor the repository pattern",
-      ];
-
-      for (const input of safeInputs) {
-        const result = svc.detectRisks(input);
-        assert.ok(!result.hasRisks, `Should be safe: "${input}"`);
-      }
-    });
-
-    it("handles empty string", () => {
-      const result = svc.detectRisks("");
-      assert.ok(!result.hasRisks);
-      assert.equal(result.count, 0);
-    });
-
-    it("returns risk patterns list", () => {
-      const result = svc.detectRisks("log the token and expose credentials");
-      assert.ok(result.risks.length > 0);
-      assert.ok(Array.isArray(result.risks));
-    });
-  });
-});
 
 // =============================================================================
 // AuthService — hasScope (pure logic)

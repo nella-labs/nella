@@ -45,10 +45,7 @@ import Redis from "ioredis";
 
 let pkgVersion = "0.0.0";
 try { pkgVersion = require("../../package.json").version; } catch {}
-import { registerValidationTools, handleValidationTool } from "./tools/validation";
-import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
-import { registerCodeTools, handleCodeTool } from "./tools/code";
 import type { ServerContext } from "./server";
 
 // =============================================================================
@@ -512,10 +509,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
   // Collect all tools
   const allTools: Tool[] = [
-    ...registerValidationTools(),
-    ...registerSafetyTools(),
     ...registerContextTools(),
-    ...registerCodeTools(),
   ];
 
   log("info", "Nella hosted MCP server starting", { port, tools: allTools.length });
@@ -592,50 +586,14 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           };
 
           // Try each tool category
-          const validationResult = await handleValidationTool(
+          const contextResult = await handleContextTool(
             name,
             toolArgs || {},
             serverContext
           );
-          if (validationResult !== null) {
-            resultContent = validationResult as CallToolResult;
+          if (contextResult !== null) {
+            resultContent = contextResult as CallToolResult;
             success = !resultContent.isError;
-          }
-
-          if (resultContent === null) {
-            const safetyResult = await handleSafetyTool(
-              name,
-              toolArgs || {},
-              serverContext
-            );
-            if (safetyResult !== null) {
-              resultContent = safetyResult as CallToolResult;
-              success = !resultContent.isError;
-            }
-          }
-
-          if (resultContent === null) {
-            const contextResult = await handleContextTool(
-              name,
-              toolArgs || {},
-              serverContext
-            );
-            if (contextResult !== null) {
-              resultContent = contextResult as CallToolResult;
-              success = !resultContent.isError;
-            }
-          }
-
-          if (resultContent === null) {
-            const codeResult = await handleCodeTool(
-              name,
-              toolArgs || {},
-              serverContext
-            );
-            if (codeResult !== null) {
-              resultContent = codeResult as CallToolResult;
-              success = !resultContent.isError;
-            }
           }
 
           if (resultContent === null) {
@@ -1274,23 +1232,8 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           const contextManager = new ContextManager(tmpDir);
           const serverContext: ServerContext = { workspacePath: tmpDir, contextManager };
 
-          const validationResult = await handleValidationTool(toolName, toolArgs || {}, serverContext);
-          if (validationResult !== null) { result = validationResult; success = true; }
-
-          if (result === null) {
-            const safetyResult = await handleSafetyTool(toolName, toolArgs || {}, serverContext);
-            if (safetyResult !== null) { result = safetyResult; success = true; }
-          }
-
-          if (result === null) {
-            const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
-            if (contextResult !== null) { result = contextResult; success = true; }
-          }
-
-          if (result === null) {
-            const codeResult = await handleCodeTool(toolName, toolArgs || {}, serverContext);
-            if (codeResult !== null) { result = codeResult; success = true; }
-          }
+          const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
+          if (contextResult !== null) { result = contextResult; success = true; }
 
           if (result === null) {
             error = `Unknown tool: ${toolName}`;

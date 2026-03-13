@@ -16,7 +16,6 @@ import { requestLogger } from "./middleware/logging";
 import { healthRouter } from "./routes/health";
 import { workspacesRouter } from "./routes/workspaces";
 import { searchRouter } from "./routes/search";
-import { validateRouter } from "./routes/validate";
 import { contextRouter } from "./routes/context";
 import { authRouter } from "./routes/auth";
 import { apiKeyAuth } from "./middleware/auth";
@@ -85,7 +84,6 @@ export function createApp(): express.Application {
 
   protectedRouter.use("/api/v1/workspaces", workspacesRouter());
   protectedRouter.use("/api/v1/search", searchRouter());
-  protectedRouter.use("/api/v1/validate", validateRouter());
   protectedRouter.use("/api/v1/context", contextRouter());
   protectedRouter.use("/api/v1/auth", authRouter());
 

@@ -26,7 +26,6 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 import { createApp } from "../../app";
 import { workspacesRouter } from "../workspaces";
 import { searchRouter } from "../search";
-import { validateRouter } from "../validate";
 import { contextRouter } from "../context";
 import { errorHandler } from "../../middleware/error-handler";
 
@@ -79,7 +78,6 @@ describe("Auth enforcement on protected routes", () => {
     { method: "get" as const, path: "/api/v1/workspaces" },
     { method: "post" as const, path: "/api/v1/workspaces" },
     { method: "post" as const, path: "/api/v1/search" },
-    { method: "post" as const, path: "/api/v1/validate/check" },
     { method: "get" as const, path: "/api/v1/context" },
     { method: "post" as const, path: "/api/v1/auth/keys" },
   ];
@@ -119,14 +117,6 @@ describe("Scope enforcement", () => {
     const res = await request(app)
       .post("/api/v1/search")
       .send({ workspaceId: "ws1", query: "hello" });
-    assert.equal(res.status, 403);
-  });
-
-  it("validate:run scope required for POST /validate/check", async () => {
-    const app = buildAppWithUser(["search:read"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/check")
-      .send({ workspaceId: "ws1", taskId: "t1", prompt: "test" });
     assert.equal(res.status, 403);
   });
 
@@ -238,49 +228,6 @@ describe("Search route validation", () => {
   });
 });
 
-describe("Validate route validation", () => {
-  it("POST /validate/check rejects empty body", async () => {
-    const app = buildAppWithUser(["validate:run"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/check")
-      .send({});
-
-    assert.equal(res.status, 400);
-  });
-
-  it("POST /validate/check rejects missing taskId", async () => {
-    const app = buildAppWithUser(["validate:run"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/check")
-      .send({ workspaceId: "ws1", prompt: "do something" });
-
-    assert.equal(res.status, 400);
-  });
-
-  it("POST /validate/validate rejects missing constraints", async () => {
-    const app = buildAppWithUser(["validate:run"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/validate")
-      .send({ modifiedFiles: ["a.ts"], diff: "diff" });
-
-    assert.equal(res.status, 400);
-  });
-
-  it("POST /validate/run rejects missing changes", async () => {
-    const app = buildAppWithUser(["validate:run"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/run")
-      .send({
-        workspaceId: "ws1",
-        taskId: "t1",
-        taskName: "test",
-        prompt: "do something",
-      });
-
-    assert.equal(res.status, 400);
-  });
-});
-
 describe("Context route validation", () => {
   it("POST /context/assumptions rejects empty body", async () => {
     const app = buildAppWithUser(["context:write"], "/api/v1/context", contextRouter);
@@ -331,29 +278,6 @@ describe("Service error propagation", () => {
     assert.equal(res.status, 500);
   });
 
-  it("POST /validate/validate with valid body handles service result", async () => {
-    const app = buildAppWithUser(["validate:run"], "/api/v1/validate", validateRouter);
-    const res = await request(app)
-      .post("/api/v1/validate/validate")
-      .send({
-        modifiedFiles: ["src/app.ts"],
-        diff: "--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old\n+new",
-        constraints: [
-          {
-            id: "c1",
-            description: "Don't modify README",
-            rule: "no readme",
-            filesNotToModify: ["README.md"],
-          },
-        ],
-      });
-
-    // Either succeeds (200) or service error (500)
-    assert.ok([200, 500].includes(res.status));
-    if (res.status === 200) {
-      assert.ok(res.body.data);
-    }
-  });
 });
 
 // =============================================================================

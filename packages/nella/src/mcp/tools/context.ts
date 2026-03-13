@@ -97,28 +97,6 @@ Use this to review the current state of tracked assumptions.`,
       },
     },
     {
-      name: "nella_get_file_history",
-      description: `Get change history for a specific file.
-      
-Shows what changes have been made to a file:
-- Change timestamps
-- Operations performed
-- Reasons for changes
-- Dependencies between files
-
-Use this to understand the evolution of a file.`,
-      inputSchema: {
-        type: "object",
-        properties: {
-          filePath: {
-            type: "string",
-            description: "Path to the file (relative to workspace)",
-          },
-        },
-        required: ["filePath"],
-      },
-    },
-    {
       name: "nella_check_dependencies",
       description: `Check for dependency changes since last snapshot.
       
@@ -131,37 +109,6 @@ Use this to ensure dependency assumptions are still valid.`,
       inputSchema: {
         type: "object",
         properties: {},
-      },
-    },
-    {
-      name: "nella_record_change",
-      description: `Manually record file changes to the session context.
-      
-Use this when making changes outside of a full nella_run:
-- Quick edits
-- Manual modifications
-- Changes made by other tools
-
-Keeps the context accurate for assumption checking.`,
-      inputSchema: {
-        type: "object",
-        properties: {
-          files: {
-            type: "array",
-            items: { type: "string" },
-            description: "List of files that were changed",
-          },
-          operation: {
-            type: "string",
-            enum: ["create", "modify", "delete"],
-            description: "Type of operation (default: modify)",
-          },
-          reason: {
-            type: "string",
-            description: "Reason for the change",
-          },
-        },
-        required: ["files", "reason"],
       },
     },
   ];
@@ -188,12 +135,8 @@ export async function handleContextTool(
       return handleAddAssumption(args, context);
     case "nella_check_assumptions":
       return handleCheckAssumptions(args, context);
-    case "nella_get_file_history":
-      return handleGetFileHistory(args, context);
     case "nella_check_dependencies":
       return handleCheckDependencies(args, context);
-    case "nella_record_change":
-      return handleRecordChange(args, context);
     default:
       return null;
   }
@@ -388,48 +331,6 @@ async function handleCheckAssumptions(
   };
 }
 
-async function handleGetFileHistory(
-  args: Record<string, unknown>,
-  context: ServerContext
-): Promise<ToolCallResult> {
-  const filePath = args.filePath as string;
-
-  // Get file history from changes ledger
-  const fileHistory = context.contextManager.changes.getFileHistory(filePath);
-
-  const lines: string[] = [];
-  lines.push(`## File History: \`${filePath}\``);
-  lines.push("");
-
-  if (!fileHistory || fileHistory.changes.length === 0) {
-    lines.push(`No recorded changes for this file.`);
-  } else {
-    lines.push(`**Current state**: ${fileHistory.currentState}`);
-    if (fileHistory.lastModifiedAt) {
-      lines.push(`**Last modified**: ${new Date(fileHistory.lastModifiedAt).toLocaleString()}`);
-    }
-    lines.push(`**Total changes**: ${fileHistory.changes.length}`);
-    lines.push("");
-
-    lines.push("### Change History");
-    for (const change of fileHistory.changes) {
-      const date = new Date(change.timestamp).toLocaleString();
-      lines.push(`#### ${date}`);
-      lines.push(`- **Operation**: ${change.operation}`);
-      lines.push(`- **Reason**: ${change.reason || "Not specified"}`);
-      lines.push(`- **Run ID**: ${change.runId}`);
-      if (change.dependsOn.length > 0) {
-        lines.push(`- **Depends on**: ${change.dependsOn.join(", ")}`);
-      }
-      lines.push("");
-    }
-  }
-
-  return {
-    content: [{ type: "text", text: lines.join("\n") }],
-  };
-}
-
 async function handleCheckDependencies(
   _args: Record<string, unknown>,
   context: ServerContext
@@ -514,53 +415,3 @@ async function handleCheckDependencies(
   };
 }
 
-async function handleRecordChange(
-  args: Record<string, unknown>,
-  context: ServerContext
-): Promise<ToolCallResult> {
-  const files = args.files as string[];
-  const operation = (args.operation as "create" | "modify" | "delete") || "modify";
-  const reason = args.reason as string;
-
-  // Generate a run ID for this manual recording
-  const runId = `manual-${Date.now()}`;
-
-  // Record each file change via the changes ledger
-  const changes = files.map(file => ({
-    file,
-    operation,
-    reason,
-  }));
-
-  const recorded = context.contextManager.changes.recordChanges(runId, changes);
-  
-  // Check for invalidations
-  const invalidated = context.contextManager.assumptions.checkInvalidations(files, runId);
-
-  // Save
-  context.contextManager.save();
-
-  const lines: string[] = [];
-  lines.push(`## Change Recorded`);
-  lines.push("");
-  lines.push(`✅ Successfully recorded ${recorded.length} change(s):`);
-  lines.push("");
-  lines.push(`- **Operation**: ${operation}`);
-  lines.push(`- **Reason**: ${reason}`);
-  lines.push(`- **Files**: ${files.join(", ")}`);
-  lines.push(`- **Run ID**: ${runId}`);
-
-  // Report if this invalidated any assumptions
-  if (invalidated.length > 0) {
-    lines.push("");
-    lines.push(`### ⚠️ Invalidated Assumptions`);
-    lines.push(`This change invalidated ${invalidated.length} assumption(s):`);
-    for (const assumption of invalidated) {
-      lines.push(`- **[${assumption.type}]** ${assumption.description}`);
-    }
-  }
-
-  return {
-    content: [{ type: "text", text: lines.join("\n") }],
-  };
-}

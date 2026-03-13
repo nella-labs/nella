@@ -1,15 +1,8 @@
 /**
  * Nella - Reliability layer for coding agents
- * 
+ *
  * CLI + MCP Server unified package
  */
-
-// =============================================================================
-// Core API — Task Execution
-// =============================================================================
-
-export { runTask, check, validate } from "@usenella/core";
-export type { RunTaskOptions, RunResultWithContext } from "@usenella/core";
 
 // =============================================================================
 // Types
@@ -23,41 +16,6 @@ export type {
   Constraint,
   RunResult,
   ValidationResult,
-} from "@usenella/core";
-
-// =============================================================================
-// Validators
-// =============================================================================
-
-export {
-  checkConstraints,
-  checkConstraint,
-  checkFilesNotToModify,
-  checkForbiddenPatterns,
-  getViolatedConstraints,
-  countViolations,
-  checkScope,
-  runCommand,
-  runValidation,
-  getValidationErrors,
-  calculateValidationIntegrity,
-} from "@usenella/core";
-
-// =============================================================================
-// Safety
-// =============================================================================
-
-export {
-  shouldRefuse,
-  detectRiskPatterns,
-  detectRefusalInResponse,
-  checkPrerequisites,
-  checkRefusalCorrectness,
-} from "@usenella/core";
-
-export type {
-  PrerequisiteCheck,
-  RefusalCheckOptions,
 } from "@usenella/core";
 
 // =============================================================================
@@ -157,8 +115,6 @@ export type {
 // =============================================================================
 
 export {
-  ValidationService,
-  SafetyService,
   ContextService,
   SearchService,
   WorkspaceService,
@@ -170,10 +126,6 @@ export {
 
 export { startMcpServer, type ServerContext } from "./mcp/server";
 export {
-  registerValidationTools,
-  handleValidationTool,
-  registerSafetyTools,
-  handleSafetyTool,
   registerContextTools,
   handleContextTool,
 } from "./mcp/tools";
