@@ -9,7 +9,7 @@ graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
     subgraph nella_pkg["@getnella/mcp v0.0.0"]
-        CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
+        CLI["CLI<br/>nella index | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
         AuthCLI["Auth CLI<br/>login | logout | status"]

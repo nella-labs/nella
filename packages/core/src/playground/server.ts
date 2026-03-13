@@ -405,81 +405,31 @@ export class PlaygroundServer {
     app.get("/api/tools", (_req, res) => {
       res.json({
         tools: [
-          // Validation Tools
+          // Indexing Tools
           {
-            name: "nella_check",
-            category: "validation",
-            description: "Check if proposed changes comply with task constraints",
+            name: "nella_index",
+            category: "indexing",
+            description: "Index workspace for semantic and lexical search",
             inputSchema: {
               type: "object",
               properties: {
-                constraints: { type: "array", description: "Constraints to check against" },
-                modifiedFiles: { type: "array", items: { type: "string" }, description: "List of files modified" },
-                diff: { type: "string", description: "Unified diff of proposed changes" },
-              },
-              required: ["constraints", "modifiedFiles", "diff"],
-            },
-          },
-          {
-            name: "nella_validate",
-            category: "validation",
-            description: "Run validation commands (tests, lints, builds)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                test: { type: "string", description: "Test command (e.g., 'npm test')" },
-                lint: { type: "string", description: "Lint command (e.g., 'npm run lint')" },
-                compile: { type: "string", description: "Compile command (e.g., 'npm run build')" },
+                force: { type: "boolean", description: "Force full reindex" },
+                paths: { type: "array", items: { type: "string" }, description: "Specific paths to index" },
               },
             },
           },
           {
-            name: "nella_run",
-            category: "validation",
-            description: "Execute complete task validation (refusal + constraints + validation)",
+            name: "nella_search",
+            category: "indexing",
+            description: "Hybrid search (semantic + BM25) across indexed codebase",
             inputSchema: {
               type: "object",
               properties: {
-                taskId: { type: "string", description: "Task identifier" },
-                prompt: { type: "string", description: "Task prompt/description" },
+                query: { type: "string", description: "Search query" },
+                mode: { type: "string", enum: ["hybrid", "semantic", "lexical"], description: "Search mode" },
+                topK: { type: "number", description: "Number of results" },
               },
-              required: ["taskId", "prompt"],
-            },
-          },
-          // Safety Tools
-          {
-            name: "nella_detect_risks",
-            category: "safety",
-            description: "Analyze text for risky patterns (credentials, backdoors, dangerous ops)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                content: { type: "string", description: "Text content to analyze" },
-              },
-              required: ["content"],
-            },
-          },
-          {
-            name: "nella_should_refuse",
-            category: "safety",
-            description: "Determine if a task should be refused based on risk analysis",
-            inputSchema: {
-              type: "object",
-              properties: {
-                taskId: { type: "string", description: "Task identifier" },
-                prompt: { type: "string", description: "Task prompt to evaluate" },
-                skipPrerequisites: { type: "boolean", description: "Skip prerequisite checks" },
-              },
-              required: ["taskId", "prompt"],
-            },
-          },
-          {
-            name: "nella_check_prerequisites",
-            category: "safety",
-            description: "Verify required prerequisites are met (package.json, node_modules)",
-            inputSchema: {
-              type: "object",
-              properties: {},
+              required: ["query"],
             },
           },
           // Context Tools
@@ -519,38 +469,12 @@ export class PlaygroundServer {
             },
           },
           {
-            name: "nella_get_file_history",
-            category: "context",
-            description: "Get change history for a specific file",
-            inputSchema: {
-              type: "object",
-              properties: {
-                filePath: { type: "string", description: "Path to the file" },
-              },
-              required: ["filePath"],
-            },
-          },
-          {
             name: "nella_check_dependencies",
             category: "context",
             description: "Check for dependency changes since session start",
             inputSchema: {
               type: "object",
               properties: {},
-            },
-          },
-          {
-            name: "nella_record_change",
-            category: "context",
-            description: "Manually record a file change in the session",
-            inputSchema: {
-              type: "object",
-              properties: {
-                filePath: { type: "string", description: "Path to the changed file" },
-                operation: { type: "string", enum: ["create", "modify", "delete", "rename"], description: "Type of operation" },
-                reason: { type: "string", description: "Why the change was made" },
-              },
-              required: ["filePath", "operation"],
             },
           },
         ],

@@ -753,10 +753,8 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     if (pathname === "/api/tools" && req.method === "GET") {
       const toolsWithCategory = allTools.map((tool) => {
         let category = "context";
-        if (tool.name.startsWith("nella_check") || tool.name.startsWith("nella_validate") || tool.name.startsWith("nella_run")) {
-          category = "validation";
-        } else if (tool.name.startsWith("nella_safety") || tool.name.startsWith("nella_should_refuse") || tool.name.startsWith("nella_guardrails")) {
-          category = "safety";
+        if (tool.name === "nella_index" || tool.name === "nella_search") {
+          category = "indexing";
         }
         return {
           name: tool.name,
