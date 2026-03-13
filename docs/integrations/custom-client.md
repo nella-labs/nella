@@ -35,17 +35,9 @@ console.log(tools);
 
 // Call a tool
 const result = await client.callTool({
-  name: 'nella_check',
+  name: 'nella_search',
   arguments: {
-    constraints: [
-      {
-        id: 'no-console',
-        description: 'No console.log',
-        forbiddenPatterns: ['console.log'],
-      },
-    ],
-    modifiedFiles: ['src/index.ts'],
-    diff: '+ console.log("debug")',
+    query: 'authentication middleware',
   },
 });
 
@@ -94,17 +86,11 @@ Once connected, the client can call any of Nella's MCP tools:
 
 | Tool | Description |
 |------|-------------|
-| `nella_check` | Validate constraints against file changes |
-| `nella_validate` | Run test/lint/compile commands |
-| `nella_run` | Full validation pipeline |
-| `nella_detect_risks` | Scan for dangerous patterns |
-| `nella_should_refuse` | Pre-flight refusal check |
-| `nella_check_prerequisites` | Verify project setup |
+| `nella_index` | Index a workspace directory |
+| `nella_search` | Hybrid semantic + lexical codebase search |
 | `nella_get_context` | Get session context |
 | `nella_add_assumption` | Record an assumption |
 | `nella_check_assumptions` | Check assumption validity |
-| `nella_get_file_history` | Get file change history |
 | `nella_check_dependencies` | Detect dependency drift |
-| `nella_record_change` | Record a change manually |
 
 See the [MCP Tools Reference](../mcp/tools.md) for full input/output schemas.

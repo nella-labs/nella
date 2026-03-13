@@ -62,17 +62,17 @@ Open Cursor's AI chat and ask:
 In Cursor's Agent mode, Nella tools are automatically available:
 
 ```
-Add user authentication to the API. Don't modify any test files.
+Add user authentication to the API.
 ```
 
-Cursor's agent will use `nella_check` to verify constraints and `nella_validate` to run tests.
+Cursor's agent will use `nella_search` to find relevant code and `nella_add_assumption` to record beliefs about the codebase.
 
 ### Inline Chat
 
-When using inline chat (Cmd/Ctrl + K), you can request Nella validation:
+When using inline chat (Cmd/Ctrl + K), you can request Nella tools:
 
 ```
-Refactor this function to use async/await. Run nella_validate when done.
+Refactor this function to use async/await. Use nella_search to find all callers first.
 ```
 
 ### Composer
@@ -81,9 +81,9 @@ In Composer mode, explicitly request Nella features:
 
 ```
 I want to add pagination to the users endpoint. Please:
-1. Check constraints before making changes
-2. Validate with tests after each modification
-3. Use nella_run for the final check
+1. Use nella_search to find the existing endpoint
+2. Record assumptions about the codebase
+3. Check dependencies haven't drifted
 ```
 
 ## Troubleshooting

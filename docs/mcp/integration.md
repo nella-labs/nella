@@ -154,7 +154,7 @@ Required environment variables:
 
 ## Self-Hosted Server (nella serve)
 
-Run your own Nella MCP server with full access to all 18 tools, authentication, rate limiting, and workspace indexing.
+Run your own Nella MCP server with authentication, rate limiting, and workspace indexing.
 
 ### Starting the Server
 
@@ -352,7 +352,7 @@ After configuring, restart Claude Desktop and ask Claude:
 
 > "What Nella tools do you have available?"
 
-Claude should list all 18 tools (12 standard + 6 core) if configured correctly.
+Claude should list the available tools if configured correctly.
 
 ---
 
@@ -508,8 +508,10 @@ Example tool call:
   "id": 2,
   "method": "tools/call",
   "params": {
-    "name": "nella_check_prerequisites",
-    "arguments": {}
+    "name": "nella_search",
+    "arguments": {
+      "query": "authentication middleware"
+    }
   }
 }
 ```
@@ -587,18 +589,11 @@ Session data is stored in `~/.nella/auth.json` (macOS/Linux) or `%APPDATA%\nella
 
 ### Environment Variables
 
-The server respects these environment variables during validation:
-
-| Variable | Description |
-|----------|-------------|
-| `CI=true` | Set during validation command execution |
-| `FORCE_COLOR=0` | Disables color output in validation commands |
-
 ### Workspace Requirements
 
 The workspace should have:
 
-1. **package.json** — Required for prerequisite checks
+1. **package.json** — Required for dependency checks
 2. **node_modules/** — Required (run `npm install` first)
 3. **.nella/** — Created automatically for session data
 
@@ -619,16 +614,6 @@ The workspace should have:
 **Debug**: Run the server manually to see errors:
 ```bash
 npx @getnella/mcp mcp --workspace /path/to/project
-```
-
-### Prerequisites Failing
-
-**Symptom**: `nella_check_prerequisites` reports missing dependencies
-
-**Solution**: Run `npm install` in the workspace:
-```bash
-cd /path/to/project
-npm install
 ```
 
 ### Permission Errors
@@ -667,15 +652,6 @@ cat /path/to/project/.nella/session.json
 // Bad
 "--workspace", "C:\Users\name\project"
 ```
-
-### Timeout Errors
-
-**Symptom**: Validation commands timing out
-
-**Solution**: The default timeout is 2 minutes. For slow test suites, this is handled by the core library. Consider:
-1. Running a subset of tests
-2. Using `nella_validate` with just the lint/compile commands
-3. Splitting validation into multiple calls
 
 ### Debugging MCP Communication
 
@@ -738,11 +714,6 @@ The `.nella/` directory contains logs that can help diagnose issues:
 ```
 .nella/
 ├── session.json      # Current session state
-└── runs/
-    └── {runId}/
-        ├── logs.jsonl   # Detailed run logs
-        ├── diff.patch   # Changes made
-        └── metrics.json # Run metrics
 ```
 
 ### 5. Restart After Config Changes

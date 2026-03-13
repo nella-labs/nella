@@ -13,7 +13,6 @@ yarn.lock
 # Build outputs
 dist/
 build/
-
 # Environment files
 .env
 .env.local

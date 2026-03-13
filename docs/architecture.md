@@ -11,16 +11,13 @@ graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
     subgraph nella_pkg["@getnella/mcp v0.0.0"]
-        CLI["CLI<br/>nella check | validate | run | mcp | serve | connect | auth | playground"]
+        CLI["CLI<br/>nella index | mcp | serve | connect | auth | playground"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
         AuthCLI["Auth CLI<br/>login | logout | status"]
     end
 
     subgraph core_pkg["@usenella/core v0.0.0"]
-        RunEngine["Run Engine<br/>runTask() | check() | validate()"]
-        Validators["Validators"]
-        Safety["Safety"]
         Indexing["Indexing / RAG"]
         Context["Context Management"]
         Workspace["Workspace Management"]
@@ -51,11 +48,9 @@ graph TB
 
     Agent -->|"stdio (MCP protocol)"| MCP
     Agent -->|"direct"| CLI
-    MCP --> RunEngine
-    CLI --> RunEngine
-    RunEngine --> Validators
-    RunEngine --> Safety
-    RunEngine --> Context
+    MCP --> Indexing
+    MCP --> Context
+    CLI --> Indexing
     Indexing --> EmbeddingAPIs
     Indexing --> Cohere
     Sync --> Supabase
@@ -88,9 +83,6 @@ graph LR
     Packages --> Nella["nella/<br/>@getnella/mcp"]
     Packages --> Benchmark["benchmark/<br/>@usenella/benchmark"]
 
-    Core --> C_Run["run.ts"]
-    Core --> C_Safety["safety/"]
-    Core --> C_Validators["validators/"]
     Core --> C_Context["context/"]
     Core --> C_Indexing["indexing/"]
     Core --> C_Workspace["workspace/"]
@@ -204,20 +196,6 @@ graph LR
 
 ```mermaid
 graph TB
-    subgraph orchestration["Orchestration"]
-        run["run.ts<br/>runTask() | check() | validate()"]
-    end
-
-    subgraph validators["Validators"]
-        constraint["constraint-checker.ts<br/>checkConstraints()"]
-        scope["scope-checker.ts<br/>checkScope()"]
-        cmdRunner["command-runner.ts<br/>runValidation()"]
-    end
-
-    subgraph safety["Safety"]
-        refusal["refusal-detector.ts<br/>shouldRefuse() | detectRiskPatterns()"]
-    end
-
     subgraph indexing["Indexing / RAG"]
         chunker["chunker.ts"]
         embedder["embedder.ts"]
@@ -271,11 +249,6 @@ graph TB
         sharedCtxMgr["context-sharing/manager.ts"]
     end
 
-    run --> constraint
-    run --> scope
-    run --> cmdRunner
-    run --> refusal
-    run --> ctxManager
     ctxManager --> sessionStore
     ctxManager --> changeLedger
     ctxManager --> assumptionTracker
@@ -285,8 +258,6 @@ graph TB
     chunker --> lexicalIdx
     vectorStore --> hybridSearch
     lexicalIdx --> hybridSearch
-    mcpHandler --> run
-    mcpHandler --> refusal
     mcpHandler --> ctxManager
     ws --> registry
     switcher --> registry
@@ -298,9 +269,6 @@ graph TB
     syncMgr --> gcpAdapter
     syncMgr --> cloudFileSync
 
-    style orchestration fill:#6366f1,color:#fff
-    style validators fill:#8b5cf6,color:#fff
-    style safety fill:#ef4444,color:#fff
     style indexing fill:#06b6d4,color:#fff
     style context fill:#10b981,color:#fff
     style workspace fill:#f59e0b,color:#fff
@@ -312,76 +280,40 @@ graph TB
 
 ---
 
-## 5. Task Execution Pipeline
+## 5. MCP Tool Flow
 
 ```mermaid
 sequenceDiagram
-    participant C as Client (CLI/MCP)
-    participant R as runTask()
-    participant RF as RefusalDetector
+    participant A as AI Agent
+    participant MCP as MCP Server
+    participant IDX as IndexManager
     participant CTX as ContextManager
-    participant TW as TempWorkspace
-    participant CC as ConstraintChecker
-    participant SC as ScopeChecker
-    participant CR as CommandRunner
-    participant A as ArtifactWriter
+    participant SEARCH as HybridSearcher
 
-    C->>R: runTask(repoPath, task, changes, options)
-    R->>R: generateRunId(), createNellaDir()
+    A->>MCP: nella_index(workspace)
+    MCP->>IDX: index(workspace)
+    IDX-->>MCP: IndexResult
 
-    opt Context Tracking Enabled
-        R->>CTX: new ContextManager(repoPath)
-        R->>CTX: checkDependencies(repoPath)
-        CTX-->>R: DependencyDiff | null
-        R->>CTX: getConflicts(plannedFiles)
-        CTX-->>R: AssumptionConflict[]
-    end
+    A->>MCP: nella_search(query)
+    MCP->>SEARCH: search(query)
+    SEARCH-->>MCP: SearchResults
+    MCP-->>A: ranked results
 
-    opt Refusal Check
-        R->>RF: shouldRefuse(task, repoPath)
-        RF-->>R: RefusalResult
-        alt Should Refuse
-            R->>R: calculateMetrics(refused=true)
-            R-->>C: RunResult {passed: false, refusal}
-        end
-    end
+    A->>MCP: nella_add_assumption(description, files)
+    MCP->>CTX: addAssumption(desc, files)
+    CTX-->>MCP: Assumption
 
-    alt No Changes Provided
-        R->>R: calculateMetrics(check-only)
-        R-->>C: RunResult {passed: true}
-    end
+    A->>MCP: nella_check_assumptions(files)
+    MCP->>CTX: getConflicts(files)
+    CTX-->>MCP: AssumptionConflict[]
 
-    R->>TW: createTempWorkspace(repoPath)
-    TW-->>R: tempDir
-    R->>TW: applyChanges(tempDir, files)
-    R->>TW: getDiff(tempDir)
-    TW-->>R: diff string
+    A->>MCP: nella_check_dependencies(repoPath)
+    MCP->>CTX: checkDependencies(repoPath)
+    CTX-->>MCP: DependencyDiff
 
-    R->>CC: checkConstraints(modifiedFiles, diff, constraints)
-    CC-->>R: ConstraintResult[]
-
-    R->>SC: checkScope(modifiedFiles, expected)
-    SC-->>R: ScopeResult
-
-    opt Validation Not Skipped
-        R->>CR: runValidation(test/lint/compile, tempDir)
-        CR-->>R: ValidationResult
-    end
-
-    R->>R: passed = constraints OK && validation OK
-    R->>R: calculateMetrics(constraints, validation, scope)
-
-    opt Artifacts Enabled
-        R->>A: writeArtifacts(runDir, diff, metrics)
-    end
-
-    opt Context Tracking & Passed
-        R->>CTX: recordRunChanges(runId, changes)
-        CTX-->>R: invalidated assumptions count
-    end
-
-    R->>TW: cleanupTempWorkspace(tempDir)
-    R-->>C: RunResult | RunResultWithContext
+    A->>MCP: nella_get_context()
+    MCP->>CTX: getContext()
+    CTX-->>MCP: AgentContext
 ```
 
 ---
@@ -396,61 +328,40 @@ graph LR
         Transport["StdioServerTransport"]
         Router["Tool Router"]
 
-        subgraph validation_tools["Validation Tools"]
-            nella_check["nella_check<br/>Constraint checking"]
-            nella_validate["nella_validate<br/>Run test/lint/compile"]
-            nella_run["nella_run<br/>Full task validation"]
-        end
-
-        subgraph safety_tools["Safety Tools"]
-            nella_detect_risks["nella_detect_risks<br/>Risk pattern scanning"]
-            nella_should_refuse["nella_should_refuse<br/>Refusal decision"]
-            nella_check_prereqs["nella_check_prerequisites<br/>Prerequisite verification"]
+        subgraph indexing_tools["Indexing & Search Tools"]
+            nella_index["nella_index<br/>Index codebase"]
+            nella_search["nella_search<br/>Search indexed code"]
         end
 
         subgraph context_tools["Context Tools"]
             nella_get_context["nella_get_context<br/>Session context"]
             nella_add_assumption["nella_add_assumption<br/>Record assumption"]
             nella_check_assumptions["nella_check_assumptions<br/>Assumption status"]
-            nella_get_file_history["nella_get_file_history<br/>File change history"]
             nella_check_deps["nella_check_dependencies<br/>Dependency drift"]
-            nella_record_change["nella_record_change<br/>Manual change recording"]
         end
     end
 
     subgraph core["@usenella/core"]
-        checkConstraints["checkConstraints()"]
-        runValidation["runValidation()"]
-        runTask["runTask()"]
-        detectRiskPatterns["detectRiskPatterns()"]
-        shouldRefuse["shouldRefuse()"]
-        checkPrereqs["checkPrerequisites()"]
+        IndexMgr["IndexManager"]
+        HybridSearch["HybridSearcher"]
         ContextMgr["ContextManager"]
     end
 
     Agent -->|"stdio"| Transport
     Transport --> Router
-    Router --> validation_tools
-    Router --> safety_tools
+    Router --> indexing_tools
     Router --> context_tools
 
-    nella_check --> checkConstraints
-    nella_validate --> runValidation
-    nella_run --> runTask
-    nella_detect_risks --> detectRiskPatterns
-    nella_should_refuse --> shouldRefuse
-    nella_check_prereqs --> checkPrereqs
+    nella_index --> IndexMgr
+    nella_search --> HybridSearch
     nella_get_context --> ContextMgr
     nella_add_assumption --> ContextMgr
     nella_check_assumptions --> ContextMgr
-    nella_get_file_history --> ContextMgr
     nella_check_deps --> ContextMgr
-    nella_record_change --> ContextMgr
 
     style Agent fill:#6366f1,color:#fff
     style server fill:#f3e8ff,stroke:#7c3aed
-    style validation_tools fill:#ddd6fe
-    style safety_tools fill:#fecaca
+    style indexing_tools fill:#dbeafe
     style context_tools fill:#d1fae5
     style core fill:#ede9fe,stroke:#6d28d9
 ```
@@ -468,17 +379,15 @@ sequenceDiagram
 
     A->>T: ListToolsRequest
     T->>S: route request
-    S-->>T: 12 tool definitions (JSON Schema)
+    S-->>T: 6 tool definitions (JSON Schema)
     T-->>A: tool list
 
     A->>T: CallToolRequest {name, arguments}
     T->>S: route request
     S->>R: dispatch(name, args, serverContext)
 
-    alt Validation Tool
-        R->>H: handleValidationTool(name, args, ctx)
-    else Safety Tool
-        R->>H: handleSafetyTool(name, args, ctx)
+    alt Indexing/Search Tool
+        R->>H: handleIndexingTool(name, args, ctx)
     else Context Tool
         R->>H: handleContextTool(name, args, ctx)
     end
@@ -673,70 +582,7 @@ stateDiagram-v2
 
 ---
 
-## 9. Safety & Refusal Detection
-
-```mermaid
-graph TB
-    Input["Task + Workspace Path"]
-
-    subgraph prereqs["Prerequisite Checks"]
-        PkgJson{"package.json<br/>exists?"}
-        NodeMod{"node_modules<br/>exists?"}
-    end
-
-    subgraph risk_scan["Risk Pattern Scanning"]
-        RP1["Credential Exposure<br/>(log password, console.log token)"]
-        RP2["Security Bypass<br/>(disable auth, skip validation)"]
-        RP3["Dangerous Operations<br/>(rm -rf, drop table, truncate)"]
-        RP4["Data Exposure<br/>(dump database, export secrets)"]
-        RP5["Backdoor Indicators<br/>(hardcode password, add backdoor)"]
-    end
-
-    subgraph task_patterns["Task-Specific Patterns"]
-        TaskRefusal["task.refusalPatterns[]<br/>(custom patterns)"]
-    end
-
-    Confidence["Calculate Confidence<br/>patternConfidence + prereqConfidence"]
-
-    Decision{"reasons.length > 0<br/>OR patterns matched?"}
-
-    Refuse["RefusalResult<br/>{shouldRefuse: true,<br/>reason, patternsMatched,<br/>confidence}"]
-
-    Proceed["RefusalResult<br/>{shouldRefuse: false}"]
-
-    Input --> PkgJson
-    Input --> NodeMod
-    PkgJson -->|"missing"| Confidence
-    NodeMod -->|"missing"| Confidence
-    Input --> RP1
-    Input --> RP2
-    Input --> RP3
-    Input --> RP4
-    Input --> RP5
-    Input --> TaskRefusal
-    RP1 -->|"matched"| Confidence
-    RP2 -->|"matched"| Confidence
-    RP3 -->|"matched"| Confidence
-    RP4 -->|"matched"| Confidence
-    RP5 -->|"matched"| Confidence
-    TaskRefusal -->|"matched"| Confidence
-    PkgJson -->|"exists"| Decision
-    NodeMod -->|"exists"| Decision
-    Confidence --> Decision
-    Decision -->|"Yes"| Refuse
-    Decision -->|"No"| Proceed
-
-    style Input fill:#6366f1,color:#fff
-    style prereqs fill:#fef3c7
-    style risk_scan fill:#fecaca
-    style task_patterns fill:#ffedd5
-    style Refuse fill:#ef4444,color:#fff
-    style Proceed fill:#22c55e,color:#fff
-```
-
----
-
-## 10. Auth & Rate Limiting
+## 9. Auth & Rate Limiting
 
 ```mermaid
 sequenceDiagram
@@ -786,7 +632,7 @@ sequenceDiagram
 
 ---
 
-## 11. Cloud Sync Architecture
+## 10. Cloud Sync Architecture
 
 ```mermaid
 graph TB
@@ -847,7 +693,7 @@ graph TB
 
 ---
 
-## 12. Workspace Management
+## 11. Workspace Management
 
 ```mermaid
 graph TB
@@ -932,7 +778,7 @@ graph LR
 
 ---
 
-## 13. Benchmark System
+## 12. Benchmark System
 
 ```mermaid
 graph TB
@@ -1010,7 +856,7 @@ graph TB
 
 ---
 
-## 14. Playground Dashboard
+## 13. Playground Dashboard
 
 ```mermaid
 graph LR
@@ -1072,7 +918,7 @@ graph LR
 
 ---
 
-## 15. Event System
+## 14. Event System
 
 ```mermaid
 graph TB
@@ -1156,7 +1002,7 @@ graph TB
 
 ---
 
-## 16. Four Core Problems Addressed
+## 15. Core Problems Addressed
 
 ```mermaid
 graph LR
@@ -1167,37 +1013,29 @@ graph LR
 
     subgraph P2["2. Lost Context"]
         P2_Problem["Agent forgets decisions<br/>across turns"]
-        P2_Solution["SessionStore + ChangeLedger<br/>+ AssumptionTracker<br/>+ DependencyTracker"]
+        P2_Solution["SessionStore<br/>+ AssumptionTracker<br/>+ DependencyTracker"]
     end
 
-    subgraph P3["3. Prompt Injection"]
-        P3_Problem["Malicious prompts<br/>bypass safety"]
-        P3_Solution["RefusalDetector<br/>+ Risk Pattern Matching<br/>+ Constraint Enforcement"]
-    end
-
-    subgraph P4["4. Contradictions"]
-        P4_Problem["Agent contradicts<br/>earlier decisions"]
-        P4_Solution["Assumption Conflicts<br/>+ Scope Creep Analysis<br/>+ Symbol Verification"]
+    subgraph P3["3. Contradictions"]
+        P3_Problem["Agent contradicts<br/>earlier decisions"]
+        P3_Solution["Assumption Conflicts<br/>+ Symbol Verification"]
     end
 
     P1_Problem --> P1_Solution
     P2_Problem --> P2_Solution
     P3_Problem --> P3_Solution
-    P4_Problem --> P4_Solution
 
     style P1 fill:#fecaca,stroke:#ef4444
     style P2 fill:#fef3c7,stroke:#f59e0b
-    style P3 fill:#dbeafe,stroke:#3b82f6
-    style P4 fill:#d1fae5,stroke:#10b981
+    style P3 fill:#d1fae5,stroke:#10b981
     style P1_Solution fill:#fca5a5
     style P2_Solution fill:#fde68a
-    style P3_Solution fill:#93c5fd
-    style P4_Solution fill:#6ee7b7
+    style P3_Solution fill:#6ee7b7
 ```
 
 ---
 
-## 17. Agent Runner Architecture
+## 16. Agent Runner Architecture
 
 ```mermaid
 graph TB
@@ -1227,7 +1065,7 @@ graph TB
 
 ---
 
-## 18. Sync Module Architecture
+## 17. Sync Module Architecture
 
 ```mermaid
 graph TB
@@ -1262,7 +1100,7 @@ graph TB
 
 ---
 
-## 19. Hosted MCP Server Architecture
+## 18. Hosted MCP Server Architecture
 
 ```mermaid
 graph TB
@@ -1276,10 +1114,9 @@ graph TB
             RateLimit["Rate Limiting<br/>(Redis / In-Memory)"]
         end
         
-        subgraph Tools["MCP Tools"]
-            Validation["Validation Tools<br/>check, validate, run"]
-            SafetyTools["Safety Tools<br/>detect_risks, should_refuse"]
-            ContextTools["Context Tools<br/>get_context, add_assumption, ..."]
+        subgraph Tools["MCP Tools (6)"]
+            IndexTools["Indexing & Search<br/>index, search"]
+            ContextTools["Context Tools<br/>get_context, add_assumption,<br/>check_assumptions, check_dependencies"]
         end
     end
     
@@ -1294,7 +1131,7 @@ graph TB
 
 ---
 
-## 20. CLI Auth & Connect Flow
+## 19. CLI Auth & Connect Flow
 
 ```mermaid
 sequenceDiagram

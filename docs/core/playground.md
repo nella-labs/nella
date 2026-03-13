@@ -33,7 +33,7 @@ The playground provides:
 - **Chat Interface** — Invoke MCP tools using a chat-like UI with tool response rendering
 - **Workspace Browser** — Browse and search files in the indexed workspace
 - **Context Viewer** — View session context (changes, assumptions, dependencies) and shared context (cross-agent entries)
-- **Tool Explorer** — Browse all 18 available MCP tools with parameter schemas
+- **Tool Explorer** — Browse all available MCP tools with parameter schemas
 - **Real-Time Updates** — WebSocket connection for live tool responses
 
 ## WebSocket Protocol
@@ -45,12 +45,12 @@ The playground uses WebSocket for real-time communication:
 ws.send(JSON.stringify({
   type: 'tool_call',
   id: 'msg-1',
-  tool: 'nella_check_prerequisites',
+  tool: 'nella_get_context',
   arguments: {},
 }));
 
 // Server → Client: tool result
-// { type: 'tool_result', id: 'msg-1', content: '## ✅ Prerequisites Met...' }
+// { type: 'tool_result', id: 'msg-1', content: '## Session Context...' }
 
 // Server → Client: context update
 // { type: 'context_update', data: { changes: [...], assumptions: [...] } }

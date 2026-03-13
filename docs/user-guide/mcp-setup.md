@@ -6,10 +6,8 @@ Connect Nella to your AI coding agent via the Model Context Protocol (MCP). This
 
 The Model Context Protocol lets AI agents call external tools during a conversation. When connected to Nella's MCP server, your agent can:
 
-- Check constraints and validate code changes
-- Detect dangerous patterns and decide whether to refuse
-- Track session context, assumptions, and dependencies
 - Search your indexed codebase for relevant code
+- Track session context, assumptions, and dependencies
 
 ## Claude Desktop
 
@@ -56,7 +54,7 @@ In Claude Desktop, you should see Nella's tools listed in the tool picker. Ask C
 
 > "What Nella tools are available?"
 
-It should list tools like `nella_check`, `nella_validate`, `nella_run`, etc.
+It should list tools like `nella_search`, `nella_get_context`, `nella_index`, etc.
 
 ### Troubleshooting Claude Desktop
 
@@ -184,9 +182,9 @@ const tools = await client.listTools();
 
 // Call a tool
 const result = await client.callTool({
-  name: 'nella_check',
+  name: 'nella_search',
   arguments: {
-    task_yaml_path: './tasks/my-task.yaml',
+    query: 'user authentication',
     repo_path: '/path/to/repo',
   },
 });
@@ -206,18 +204,12 @@ Once connected, these tools are available to the agent:
 
 | Tool | Category | Description |
 |------|----------|-------------|
-| `nella_check` | Validation | Check constraints against file changes |
-| `nella_validate` | Validation | Run test/lint/compile commands |
-| `nella_run` | Validation | Full validation pipeline |
-| `nella_detect_risks` | Safety | Scan for dangerous patterns |
-| `nella_should_refuse` | Safety | Decide whether to refuse a task |
-| `nella_check_prerequisites` | Safety | Verify project prerequisites |
+| `nella_index` | Indexing | Index workspace codebase for search |
+| `nella_search` | Indexing | Search indexed codebase (hybrid/semantic/lexical) |
 | `nella_get_context` | Context | Get current session context |
 | `nella_add_assumption` | Context | Record an assumption |
 | `nella_check_assumptions` | Context | Check assumption validity |
-| `nella_get_file_history` | Context | Get file change history |
 | `nella_check_dependencies` | Context | Detect dependency drift |
-| `nella_record_change` | Context | Manually record a change |
 
 ## Related Docs
 
