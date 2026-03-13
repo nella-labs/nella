@@ -19,12 +19,12 @@ test("createPlaygroundMetrics returns all expected metric objects", () => {
 
 test("counter increments and reads correctly", () => {
   const m = createPlaygroundMetrics();
-  m.toolCallsTotal.inc({ tool: "nella_check", status: "success" });
-  m.toolCallsTotal.inc({ tool: "nella_check", status: "success" });
-  m.toolCallsTotal.inc({ tool: "nella_check", status: "error" });
+  m.toolCallsTotal.inc({ tool: "nella_search", status: "success" });
+  m.toolCallsTotal.inc({ tool: "nella_search", status: "success" });
+  m.toolCallsTotal.inc({ tool: "nella_search", status: "error" });
 
-  assert.equal(m.toolCallsTotal.get({ tool: "nella_check", status: "success" }), 2);
-  assert.equal(m.toolCallsTotal.get({ tool: "nella_check", status: "error" }), 1);
+  assert.equal(m.toolCallsTotal.get({ tool: "nella_search", status: "success" }), 2);
+  assert.equal(m.toolCallsTotal.get({ tool: "nella_search", status: "error" }), 1);
 });
 
 test("gauge set/inc/dec works correctly", () => {
@@ -41,10 +41,10 @@ test("gauge set/inc/dec works correctly", () => {
 
 test("histogram observe and get works correctly", () => {
   const m = createPlaygroundMetrics();
-  m.toolDurationSeconds.observe(0.05, { tool: "nella_check" });
-  m.toolDurationSeconds.observe(1.5, { tool: "nella_check" });
+  m.toolDurationSeconds.observe(0.05, { tool: "nella_search" });
+  m.toolDurationSeconds.observe(1.5, { tool: "nella_search" });
 
-  const data = m.toolDurationSeconds.get({ tool: "nella_check" });
+  const data = m.toolDurationSeconds.get({ tool: "nella_search" });
   assert.equal(data.count, 2);
   assert.equal(data.sum, 1.55);
 });

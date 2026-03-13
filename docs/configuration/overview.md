@@ -2,7 +2,7 @@
 
 Learn how to configure Nella for your project.
 
-Nella is configured through constraints and validation settings that you pass to its tools. This page provides an overview of the configuration options.
+Nella is configured through its MCP tools and CLI commands. This page provides an overview of the configuration options.
 
 ## Configuration Approach
 

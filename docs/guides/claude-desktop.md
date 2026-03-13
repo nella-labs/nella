@@ -85,67 +85,43 @@ You can configure multiple Nella instances for different projects:
 
 Once configured, Claude will automatically use Nella tools when appropriate. You can also explicitly request Nella features:
 
-### Check Constraints
+### Search Codebase
 
 ```
-Please use nella_check to verify my changes don't violate any constraints.
-The constraints are:
-- Don't modify package.json
-- No console.log statements
+Use nella_search to find how authentication is implemented in this project.
 ```
 
-### Run Validation
+### Track Assumptions
 
 ```
-Use nella_validate to run tests and lints after making changes.
+Use nella_add_assumption to record that the User model has id, name, and email fields.
 ```
 
-### Complete Workflow
+### Check Dependencies
 
 ```
-Use nella_run to validate the complete task with constraints and tests.
+Use nella_check_dependencies to see if any packages have changed.
 ```
 
-> **Tip:** You don't need to use exact tool names. Claude understands natural language requests like "check if these changes are safe" or "run the validation workflow."
+> **Tip:** You don't need to use exact tool names. Claude understands natural language requests like "search the codebase for auth middleware" or "check if my assumptions are still valid."
 
 ## Example Conversation
 
-**You:** I need to refactor the authentication module to use async/await. Please make sure you don't modify any migration files or introduce console.log statements.
+**You:** I need to refactor the authentication module to use async/await.
 
-**Claude:** I'll help you refactor the authentication module. Let me first check the constraints...
+**Claude:** I'll help you refactor the authentication module. Let me first search the codebase for the current implementation...
 
-_[Claude uses nella_should_refuse to check if the task is safe]_
+_[Claude uses nella_search to find auth-related code]_
 
-The task is safe to proceed. Now let me make the changes...
+Found the auth module. Let me record some assumptions before making changes...
 
-_[Claude edits files and uses nella_validate to verify]_
+_[Claude uses nella_add_assumption to track assumptions]_
 
-All validations passed! Here's a summary of what I changed:
+Now let me make the changes and verify assumptions are still valid...
 
-- Converted callback-based auth to async/await
-- Updated 3 files: auth.ts, auth.utils.ts, auth.test.ts
-- All tests pass
+_[Claude uses nella_check_assumptions to verify]_
 
-## Common Workflows
-
-### Pre-flight Check
-
-1. `nella_should_refuse` — Check if task is safe
-2. `nella_check_prerequisites` — Verify project setup
-3. `nella_get_context` — See what's already been done
-
-### Making Changes
-
-1. `nella_add_assumption` — Record assumptions
-2. Make code changes
-3. `nella_record_change` — Track what was changed
-4. `nella_validate` — Run tests
-
-### Final Validation
-
-1. `nella_check_assumptions` — Verify assumptions still valid
-2. `nella_check_dependencies` — Check for drift
-3. `nella_run` — Full validation with metrics
+All assumptions are still valid! Here's a summary of what I changed.
 
 ## Troubleshooting
 

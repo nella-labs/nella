@@ -814,18 +814,12 @@
         
         // Update default args
         const defaultArgs = {
-          nella_check: { constraints: [], modifiedFiles: [], diff: '' },
-          nella_validate: { test: 'npm test' },
-          nella_run: { taskId: 'example', prompt: 'Fix the bug' },
-          nella_detect_risks: { content: 'console.log(process.env.SECRET)' },
-          nella_should_refuse: { taskId: 'example', prompt: 'Drop all tables' },
-          nella_check_prerequisites: {},
+          nella_index: { force: false },
+          nella_search: { query: 'authentication middleware', mode: 'hybrid', topK: 5 },
           nella_get_context: { changesLimit: 10 },
           nella_add_assumption: { type: 'behavior', description: 'Users are authenticated' },
           nella_check_assumptions: {},
-          nella_get_file_history: { filePath: 'src/index.ts' },
           nella_check_dependencies: {},
-          nella_record_change: { filePath: 'src/index.ts', operation: 'modify' },
         };
         toolArgs.value = JSON.stringify(defaultArgs[currentTool] || {}, null, 2);
       }
