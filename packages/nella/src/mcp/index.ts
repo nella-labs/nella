@@ -19,10 +19,6 @@ export { startHostedServer } from "./hosted-server";
 
 // Re-export tool registration for custom servers
 export {
-  registerValidationTools,
-  handleValidationTool,
-  registerSafetyTools,
-  handleSafetyTool,
   registerContextTools,
   handleContextTool,
 } from "./tools";

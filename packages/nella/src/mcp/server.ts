@@ -21,10 +21,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ContextManager } from "@usenella/core";
 import { parseWorkspaceArg } from "./utils/args";
-import { registerValidationTools, handleValidationTool } from "./tools/validation";
-import { registerSafetyTools, handleSafetyTool } from "./tools/safety";
 import { registerContextTools, handleContextTool } from "./tools/context";
-import { registerCodeTools, handleCodeTool } from "./tools/code";
 import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
 
 // =============================================================================
@@ -91,10 +88,7 @@ Example:
 
   // Collect all tools
   const allTools: Tool[] = [
-    ...registerValidationTools(),
-    ...registerSafetyTools(),
     ...registerContextTools(),
-    ...registerCodeTools(),
     ...registerIndexingTools(),
   ];
 
@@ -110,24 +104,9 @@ Example:
       const { name, arguments: toolArgs } = request.params;
       try {
         // Try each tool category
-        const validationResult = await handleValidationTool(name, toolArgs || {}, serverContext);
-        if (validationResult !== null) {
-          return validationResult as CallToolResult;
-        }
-
-        const safetyResult = await handleSafetyTool(name, toolArgs || {}, serverContext);
-        if (safetyResult !== null) {
-          return safetyResult as CallToolResult;
-        }
-
         const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
         if (contextResult !== null) {
           return contextResult as CallToolResult;
-        }
-
-        const codeResult = await handleCodeTool(name, toolArgs || {}, serverContext);
-        if (codeResult !== null) {
-          return codeResult as CallToolResult;
         }
 
         const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);

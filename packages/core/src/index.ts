@@ -26,60 +26,10 @@
  */
 
 // =============================================================================
-// Main API
-// =============================================================================
-
-export { runTask, check, validate } from "./run";
-export type { RunTaskOptions, RunResultWithContext } from "./run";
-
-// =============================================================================
 // Types
 // =============================================================================
 
 export * from "./types";
-
-// =============================================================================
-// Validators
-// =============================================================================
-
-export {
-  checkConstraints,
-  checkConstraint,
-  checkFilesNotToModify,
-  checkForbiddenPatterns,
-  getViolatedConstraints,
-  countViolations,
-} from "./validators/constraint-checker";
-
-export {
-  checkScope,
-} from "./validators/scope-checker";
-
-export {
-  runCommand,
-  runValidation,
-  getValidationErrors,
-  calculateValidationIntegrity,
-} from "./validators/command-runner";
-
-// =============================================================================
-// Safety
-// =============================================================================
-
-export {
-  shouldRefuse,
-  detectRiskPatterns,
-  detectRefusalInResponse,
-  checkPrerequisites,
-  checkRefusalCorrectness,
-  RISK_PATTERNS,
-  REFUSAL_RESPONSE_PATTERNS,
-} from "./safety/refusal-detector";
-
-export type {
-  PrerequisiteCheck,
-  RefusalCheckOptions,
-} from "./safety/refusal-detector";
 
 // =============================================================================
 // Utilities
@@ -554,8 +504,6 @@ export type {
 // =============================================================================
 
 export {
-  ValidationService,
-  SafetyService,
   ContextService,
   SearchService,
   WorkspaceService,
@@ -563,10 +511,6 @@ export {
 } from "./services";
 
 export type {
-  ValidateConstraintsParams,
-  RunFullTaskParams,
-  DetectRisksResult,
-  RefusalCheckParams,
   AddAssumptionParams,
   RecordChangesParams,
   RecordChangesResult,
