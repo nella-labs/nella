@@ -12,6 +12,7 @@ import {
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import type { ServerContext } from "../server";
+import { getValidSession } from "../../auth";
 
 // =============================================================================
 // Tool Definitions
@@ -98,13 +99,32 @@ Returns matching code chunks with file paths, line numbers, and relevance scores
 let cachedManager: ReturnType<typeof createIndexManager> | null = null;
 let cachedWorkspacePath: string | null = null;
 
-function getOrCreateManager(workspacePath: string): ReturnType<typeof createIndexManager> {
+async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typeof createIndexManager>> {
   if (cachedManager && cachedWorkspacePath === workspacePath) {
     return cachedManager;
   }
 
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
+
+  // Use Nella cloud embeddings when authenticated, fall back to local OpenAI key
+  const session = await getValidSession();
+  let embedderConfig: IndexManagerConfig["embedder"];
+  if (session) {
+    embedderConfig = {
+      provider: "nella" as any,
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      apiKey: session.access_token,
+      apiBase: "https://app.getnella.dev/api",
+    };
+  } else {
+    embedderConfig = {
+      provider: "openai",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
+  }
 
   const config: IndexManagerConfig = {
     workspaceId,
@@ -115,11 +135,7 @@ function getOrCreateManager(workspacePath: string): ReturnType<typeof createInde
       overlap: 50,
       strategy: "ast",
     },
-    embedder: {
-      provider: "openai",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    },
+    embedder: embedderConfig,
     search: {
       vectorWeight: 0.7,
       lexicalWeight: 0.3,
@@ -165,7 +181,7 @@ async function handleIndex(
   const force = (args.force as boolean) || false;
   const paths = args.paths as string[] | undefined;
 
-  const manager = getOrCreateManager(context.workspacePath);
+  const manager = await getOrCreateManager(context.workspacePath);
 
   try {
     const metadata = await manager.index({ force, paths });
@@ -209,7 +225,7 @@ async function handleSearch(
   const language = args.language as string | undefined;
   const filePattern = args.filePattern as string | undefined;
 
-  const manager = getOrCreateManager(context.workspacePath);
+  const manager = await getOrCreateManager(context.workspacePath);
   const status = manager.getStatus();
 
   if (!status.ready) {
