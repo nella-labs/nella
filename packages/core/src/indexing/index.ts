@@ -74,6 +74,8 @@ export class IndexManager {
       provider: config.embedder.provider,
       model: config.embedder.model,
       dimensions: config.embedder.dimensions,
+      apiKey: config.embedder.apiKey,
+      apiBase: config.embedder.apiBase,
     });
 
     this.vectorStore = createVectorStore({
