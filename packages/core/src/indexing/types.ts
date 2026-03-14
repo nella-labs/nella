@@ -48,7 +48,10 @@ export interface IndexMetadata {
     filesIndexed: number;
     chunksCount: number;
     totalTokens: number;
+    estimatedTokens?: number;
     embeddingsCount: number;
+    totalCost?: number;
+    durationMs?: number;
   };
   config: IndexConfig;
 }
@@ -91,7 +94,7 @@ export const DEFAULT_INDEX_CONFIG: IndexConfig = {
     dimensions: 1536,
   },
   chunking: {
-    maxTokens: 512,
+    maxTokens: 1024,
     overlap: 50,
     strategy: "ast",
   },

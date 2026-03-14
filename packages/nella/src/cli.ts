@@ -726,7 +726,9 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
       `   Files indexed:    ${theme.primary.bold(String(stats.filesIndexed))}`,
       `   Chunks created:   ${theme.primary.bold(String(stats.chunksCount))}`,
       `   Embeddings:       ${theme.primary.bold(String(stats.embeddingsCount))}`,
-      `   Tokens processed: ${theme.primary.bold(String(stats.totalTokens))}`,
+      `   API tokens:       ${theme.primary.bold(String(stats.totalTokens))}`,
+      ...(stats.totalCost != null ? [`   Cost:             ${theme.primary.bold("$" + stats.totalCost.toFixed(4))}`] : []),
+      ...(stats.durationMs != null ? [`   Duration:         ${theme.primary.bold((stats.durationMs / 1000).toFixed(1) + "s")}`] : []),
       "",
       `   Storage: ${theme.muted(path.relative(workspacePath, storagePath) + "/")}`,
     ].join("\n"), "Index"));
