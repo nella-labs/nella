@@ -79,15 +79,12 @@ class HNSWBackend implements VectorBackend {
       const usearch = require("usearch");
       
       this.index = new usearch.Index({
-        metric: this.config.metric === "cosine" ? "cos" : 
+        metric: this.config.metric === "cosine" ? "cos" :
                 this.config.metric === "ip" ? "ip" : "l2sq",
         connectivity: this.config.M,
         dimensions: this.config.dimensions,
         quantization: "f32",
       });
-      
-      // Reserve capacity
-      this.index.reserve(this.config.maxElements);
     } catch (error) {
       throw new Error(`Failed to initialize HNSW: ${error}`);
     }
