@@ -520,8 +520,8 @@ export class Embedder {
       }
     }
 
-    // Save JSON cache if using it
-    this.jsonCache?.save();
+    // Don't save cache here — let the caller decide when to persist.
+    // The index manager calls saveCache() once after all batches complete.
 
     // Calculate cost
     const pricePerMillion = PRICING[model] || PRICING["voyage-code-2"];
@@ -744,6 +744,14 @@ export class Embedder {
       tokensUsed: response.tokensUsed,
       cost: response.cost,
     };
+  }
+
+  /**
+   * Persist the embedding cache to disk.
+   * Call this once after all embedding batches are complete.
+   */
+  saveCache(): void {
+    this.jsonCache?.save();
   }
 
   /**
