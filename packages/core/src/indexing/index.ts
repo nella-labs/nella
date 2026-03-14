@@ -266,7 +266,8 @@ export class IndexManager {
       }
     }
 
-    // Save all indexes
+    // Save all indexes and embedding cache (once, after all batches)
+    this.embedder.saveCache();
     this.vectorStore.save();
     this.lexicalIndex.save();
     this.saveChunks();
