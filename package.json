@@ -47,5 +47,8 @@
     "tsx": "^4.21.0",
     "typedoc": "^0.28.17",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "usearch": "^2.21.4"
   }
 }
