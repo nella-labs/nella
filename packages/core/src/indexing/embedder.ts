@@ -630,8 +630,8 @@ export class Embedder {
     }
 
     // Truncate inputs that would exceed the model's context limit (8192 tokens for text-embedding-3-small).
-    // Conservative estimate: 1 token ≈ 3 chars to avoid edge cases.
-    const maxChars = 8000 * 3;
+    // Code tokenizes at ~2-3 chars/token; use 2 chars/token for safety.
+    const maxChars = 8000 * 2;
     const truncatedTexts = texts.map((t) => t.length > maxChars ? t.slice(0, maxChars) : t);
 
     const response = await fetch("https://api.openai.com/v1/embeddings", {
@@ -673,7 +673,7 @@ export class Embedder {
 
     const apiBase = this.config.apiBase || "https://app.getnella.dev/api";
 
-    const maxChars = 8000 * 3;
+    const maxChars = 8000 * 2;
     const truncatedTexts = texts.map((t) => t.length > maxChars ? t.slice(0, maxChars) : t);
 
     const response = await fetch(`${apiBase}/embeddings`, {

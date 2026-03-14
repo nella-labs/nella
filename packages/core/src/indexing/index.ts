@@ -161,7 +161,8 @@ export class IndexManager {
     });
 
     let totalChunks = 0;
-    let totalTokens = 0;
+    let estimatedTokens = 0;
+    let actualApiTokens = 0;
     let totalCost = 0;
     const startTime = Date.now();
 
@@ -207,7 +208,7 @@ export class IndexManager {
           });
 
           totalChunks++;
-          totalTokens += chunk.tokens;
+          estimatedTokens += chunk.tokens;
         }
 
         // Update file hash
@@ -228,23 +229,24 @@ export class IndexManager {
 
     if (chunksToEmbed.length > 0) {
       // Token-aware batching to avoid exceeding API limits (e.g. OpenAI 8192 token limit).
-      const maxBatchTokens = 8000;
+      const maxBatchTokens = 7500;
       const maxBatchSize = 50;
       let i = 0;
       while (i < chunksToEmbed.length) {
         const batch: CodeChunk[] = [];
         let batchTokens = 0;
         while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
-          // Estimate tokens from content length if chunk.tokens is 0
-          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 4);
+          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
           if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
           batchTokens += chunkTokens;
           batch.push(chunksToEmbed[i]);
           i++;
         }
 
-        const texts = batch.map((c) => c.content);
+        // Enrich chunk content with metadata for better semantic embeddings
+        const texts = batch.map((c) => this.enrichChunkContent(c));
         const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
+        actualApiTokens += tokensUsed;
         totalCost += cost;
 
         this.emit({
@@ -281,8 +283,11 @@ export class IndexManager {
       stats: {
         filesIndexed: files.length,
         chunksCount: this.chunks.size,
-        totalTokens,
+        totalTokens: actualApiTokens,
+        estimatedTokens,
         embeddingsCount: this.vectorStore.size,
+        totalCost,
+        durationMs: duration,
       },
       config: this.config,
     };
@@ -406,6 +411,33 @@ export class IndexManager {
   // =============================================================================
   // Private Methods
   // =============================================================================
+
+  /**
+   * Prepend file path and symbol metadata to chunk content for better embeddings.
+   * Only used for the embedding API call — stored chunk content stays as raw code.
+   */
+  private enrichChunkContent(chunk: CodeChunk): string {
+    const parts: string[] = [];
+
+    const relativePath = path.relative(this.config.workspacePath, chunk.filePath);
+    parts.push(`// File: ${relativePath}`);
+
+    if (chunk.symbols.length > 0) {
+      const symbolNames = chunk.symbols
+        .map((s) => `${s.kind} ${s.name}`)
+        .join(", ");
+      parts.push(`// Defines: ${symbolNames}`);
+    }
+
+    if (chunk.imports && chunk.imports.length > 0) {
+      parts.push(`// Imports: ${chunk.imports.join(", ")}`);
+    }
+
+    parts.push("");
+    parts.push(chunk.content);
+
+    return parts.join("\n");
+  }
 
   private getFilesToIndex(rootPath: string): string[] {
     const files: string[] = [];

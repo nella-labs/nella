@@ -25,15 +25,15 @@ export interface ChunkerConfig {
 
 const DEFAULT_CONFIG: ChunkerConfig = {
   maxTokens: 512,
-  minTokens: 50,
+  minTokens: 100,
   overlap: 50,
   strategy: "ast",
   includeComments: true,
   includeJSDoc: true,
 };
 
-// Rough token estimate: ~4 chars per token
-const CHARS_PER_TOKEN = 4;
+// Rough token estimate: ~3 chars per token (code tokenizes denser than prose)
+const CHARS_PER_TOKEN = 3;
 
 // =============================================================================
 // AST Node Types we care about
@@ -412,6 +412,22 @@ export class Chunker {
     const classBody = (node.body as any).body as ASTNode[];
     const className = node.id?.name || "AnonymousClass";
 
+    // Build class header: declaration line + property definitions
+    // This gets prepended to every method chunk for context
+    let classHeader = "";
+    if (node.loc) {
+      const classLine = lines[node.loc.start.line - 1]?.trimEnd() || "";
+      const propertyLines: string[] = [];
+      for (const member of classBody) {
+        if ((member.type === "PropertyDefinition" || member.type === "TSPropertySignature") && member.loc) {
+          propertyLines.push(...lines.slice(member.loc.start.line - 1, member.loc.end.line));
+        }
+      }
+      classHeader = propertyLines.length > 0
+        ? classLine + "\n" + propertyLines.join("\n") + "\n  // ...\n"
+        : classLine + "\n  // ...\n";
+    }
+
     for (const member of classBody) {
       if (!member.loc) continue;
 
@@ -446,7 +462,11 @@ export class Chunker {
         }
       }
 
-      const memberContent = lines.slice(actualStartLine - 1, endLine).join("\n");
+      // Prepend class header to every method chunk for context
+      const memberBody = lines.slice(actualStartLine - 1, endLine).join("\n");
+      const memberContent = memberKind === "method" && classHeader
+        ? classHeader + memberBody
+        : memberBody;
 
       chunks.push(this.createChunkFromText(
         filePath,
@@ -473,18 +493,9 @@ export class Chunker {
       });
     }
 
-    // Prepend the class declaration line to the first member chunk
-    // so that extractExports() regex can detect the export.
-    if (chunks.length > 0 && node.loc) {
-      const classLine = lines[node.loc.start.line - 1];
-      if (classLine && classLine.match(/\bclass\b/)) {
-        const first = chunks[0];
-        // Use the actual declaration line (e.g. "export class Foo {")
-        // so regex-based export detection picks it up
-        first.content = classLine.trimEnd() + "\n" + first.content;
-        // Re-extract exports from the updated content
-        first.exports = this.extractExports(first.content);
-      }
+    // Re-extract exports from first chunk (class header includes declaration line)
+    if (chunks.length > 0) {
+      chunks[0].exports = this.extractExports(chunks[0].content);
     }
 
     // If no members extracted, return class as single chunk
@@ -794,45 +805,30 @@ export class Chunker {
   }
 
   /**
-   * Merge chunks that are too small
+   * Merge small chunks to target optimal embedding size.
+   * Aims for ~60% of maxTokens per merged chunk.
    */
   private mergeSmallChunks(chunks: CodeChunk[]): CodeChunk[] {
     const merged: CodeChunk[] = [];
     let buffer: CodeChunk | null = null;
+    const targetTokens = Math.floor(this.config.maxTokens * 0.6);
 
     for (const chunk of chunks) {
-      if (chunk.tokens < this.config.minTokens) {
-        if (buffer) {
-          const mergedContent: string = buffer.content + "\n\n" + chunk.content;
-          buffer = {
-            id: buffer.id,
-            filePath: buffer.filePath,
-            content: mergedContent,
-            lines: [buffer.lines[0], chunk.lines[1]],
-            type: buffer.type,
-            language: buffer.language,
-            symbols: [...buffer.symbols, ...chunk.symbols],
-            imports: [...(buffer.imports || []), ...(chunk.imports || [])],
-            exports: [...(buffer.exports || []), ...(chunk.exports || [])],
-            hash: crypto.createHash("sha256").update(mergedContent).digest("hex"),
-            tokens: this.estimateTokens(mergedContent),
-            createdAt: buffer.createdAt,
-            updatedAt: new Date().toISOString(),
-          };
+      if (chunk.tokens >= targetTokens) {
+        // Large enough on its own — flush buffer first
+        if (buffer) { merged.push(buffer); buffer = null; }
+        merged.push(chunk);
+      } else if (buffer) {
+        const combinedTokens = buffer.tokens + chunk.tokens;
+        if (combinedTokens <= this.config.maxTokens) {
+          buffer = this.mergeTwoChunks(buffer, chunk);
         } else {
+          // Buffer would exceed max — flush and start new
+          merged.push(buffer);
           buffer = chunk;
         }
       } else {
-        if (buffer) {
-          merged.push(buffer);
-          buffer = null;
-        }
-        merged.push(chunk);
-      }
-
-      if (buffer && buffer.tokens >= this.config.minTokens) {
-        merged.push(buffer);
-        buffer = null;
+        buffer = chunk;
       }
     }
 
@@ -841,6 +837,25 @@ export class Chunker {
     }
 
     return merged;
+  }
+
+  private mergeTwoChunks(a: CodeChunk, b: CodeChunk): CodeChunk {
+    const mergedContent = a.content + "\n\n" + b.content;
+    return {
+      id: a.id,
+      filePath: a.filePath,
+      content: mergedContent,
+      lines: [a.lines[0], b.lines[1]],
+      type: a.type,
+      language: a.language,
+      symbols: [...a.symbols, ...b.symbols],
+      imports: [...(a.imports || []), ...(b.imports || [])],
+      exports: [...(a.exports || []), ...(b.exports || [])],
+      hash: crypto.createHash("sha256").update(mergedContent).digest("hex"),
+      tokens: this.estimateTokens(mergedContent),
+      createdAt: a.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   // =============================================================================
