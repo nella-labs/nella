@@ -19,10 +19,46 @@ import {
   type Tool,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import * as https from "https";
 import { ContextManager } from "@usenella/core";
 import { parseWorkspaceArg } from "./utils/args";
+import { getValidSession } from "../auth";
 import { registerContextTools, handleContextTool } from "./tools/context";
 import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
+
+// =============================================================================
+// Usage Logging (fire-and-forget to nella API)
+// =============================================================================
+
+function logUsage(toolName: string, durationMs: number, success: boolean): void {
+  getValidSession().then((session) => {
+    if (!session) return;
+    const body = JSON.stringify({
+      tool_name: toolName,
+      duration_ms: durationMs,
+      success,
+    });
+    const url = new URL("https://app.getnella.dev/api/usage/log");
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      () => {} // ignore response
+    );
+    req.on("error", () => {}); // swallow errors — don't break tool calls
+    req.setTimeout(5000, () => req.destroy());
+    req.write(body);
+    req.end();
+  }).catch(() => {}); // swallow — usage logging must never fail tool calls
+}
 
 // =============================================================================
 // Types
@@ -102,15 +138,18 @@ Example:
     CallToolRequestSchema,
     async (request: { params: { name: string; arguments?: Record<string, unknown> } }): Promise<CallToolResult> => {
       const { name, arguments: toolArgs } = request.params;
+      const start = Date.now();
       try {
         // Try each tool category
         const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
         if (contextResult !== null) {
+          logUsage(name, Date.now() - start, !contextResult.isError);
           return contextResult as CallToolResult;
         }
 
         const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);
         if (indexingResult !== null) {
+          logUsage(name, Date.now() - start, !indexingResult.isError);
           return indexingResult as CallToolResult;
         }
 
@@ -125,6 +164,7 @@ Example:
           isError: true,
         } as CallToolResult;
       } catch (error) {
+        logUsage(name, Date.now() - start, false);
         const message = error instanceof Error ? error.message : String(error);
         return {
           content: [
