@@ -61,7 +61,6 @@
     "cli-table3": "^0.6.5",
     "dotenv": "^16.6.1",
     "figures": "^3.2.0",
-    "js-yaml": "^4.1.0",
     "minimatch": "^10.2.1",
     "natural": "^6.10.0"
   },
@@ -85,7 +84,6 @@
   },
   "devDependencies": {
     "@types/figures": "^3.0.3",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.5.0",
     "@usenella/core": "workspace:*",
