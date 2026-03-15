@@ -552,63 +552,46 @@ async function runConnectCommand(args: CliArgs): Promise<void> {
 // =============================================================================
 
 function runSetupCommand(): void {
-  const pluginSrc = path.join(__dirname, "..", "claude-plugin");
+  const commandSrc = path.join(__dirname, "..", "claude-plugin", "commands", "nella.md");
   const claudeDir = path.join(os.homedir(), ".claude");
-  const marketplacesDir = path.join(claudeDir, "plugins", "marketplaces");
-  const nellaMarketplace = path.join(marketplacesDir, "nella");
-  const pluginDest = path.join(nellaMarketplace, "plugins", "nella");
-  const knownMarketplacesPath = path.join(claudeDir, "plugins", "known_marketplaces.json");
+  const commandsDir = path.join(claudeDir, "commands");
+  const commandDest = path.join(commandsDir, "nella.md");
 
-  if (!fs.existsSync(pluginSrc)) {
-    console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Plugin source not found.")} ${theme.muted("Try reinstalling @getnella/mcp.")}\n`);
+  if (!fs.existsSync(commandSrc)) {
+    console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Command source not found.")} ${theme.muted("Try reinstalling @getnella/mcp.")}\n`);
     process.exit(1);
   }
 
-  function copyDir(src: string, dest: string): void {
-    fs.mkdirSync(dest, { recursive: true });
-    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-      const srcPath = path.join(src, entry.name);
-      const destPath = path.join(dest, entry.name);
-      if (entry.isDirectory()) {
-        copyDir(srcPath, destPath);
-      } else {
-        fs.copyFileSync(srcPath, destPath);
-      }
-    }
+  // Install slash command to ~/.claude/commands/nella.md
+  fs.mkdirSync(commandsDir, { recursive: true });
+  const isUpdate = fs.existsSync(commandDest);
+  fs.copyFileSync(commandSrc, commandDest);
+
+  // Clean up legacy marketplace plugin (pre-v0.1.6)
+  const legacyMarketplace = path.join(claudeDir, "plugins", "marketplaces", "nella");
+  if (fs.existsSync(legacyMarketplace)) {
+    fs.rmSync(legacyMarketplace, { recursive: true, force: true });
   }
-
-  const isUpdate = fs.existsSync(pluginDest);
-  copyDir(pluginSrc, pluginDest);
-
-  // Register nella as a known marketplace so Claude Code discovers the plugin
-  let knownMarketplaces: Record<string, unknown> = {};
-  try {
-    knownMarketplaces = JSON.parse(fs.readFileSync(knownMarketplacesPath, "utf-8"));
-  } catch {}
-  if (!knownMarketplaces["nella"]) {
-    knownMarketplaces["nella"] = {
-      source: { source: "local" },
-      installLocation: nellaMarketplace,
-      lastUpdated: new Date().toISOString(),
-    };
-    fs.writeFileSync(knownMarketplacesPath, JSON.stringify(knownMarketplaces, null, 2) + "\n");
-  }
-
-  // Clean up legacy plugin location (pre-v0.1.4)
   const legacyDest = path.join(claudeDir, "plugins", "nella");
   if (fs.existsSync(legacyDest) && fs.statSync(legacyDest).isDirectory()) {
-    const legacyPlugin = path.join(legacyDest, ".claude-plugin");
-    if (fs.existsSync(legacyPlugin)) {
-      fs.rmSync(legacyDest, { recursive: true, force: true });
-    }
+    fs.rmSync(legacyDest, { recursive: true, force: true });
   }
+  // Remove nella from known_marketplaces
+  const knownMarketplacesPath = path.join(claudeDir, "plugins", "known_marketplaces.json");
+  try {
+    const km = JSON.parse(fs.readFileSync(knownMarketplacesPath, "utf-8"));
+    if (km["nella"]) {
+      delete km["nella"];
+      fs.writeFileSync(knownMarketplacesPath, JSON.stringify(km, null, 2) + "\n");
+    }
+  } catch {}
 
   console.log(logo);
   console.log(tagline);
   if (isUpdate) {
-    console.log(`  ${theme.icons.success}  ${theme.success.bold("Plugin updated")} ${theme.muted("→")} ${theme.primary(pluginDest)}`);
+    console.log(`  ${theme.icons.success}  ${theme.success.bold("/nella command updated")} ${theme.muted("→")} ${theme.primary(commandDest)}`);
   } else {
-    console.log(`  ${theme.icons.success}  ${theme.success.bold("Plugin installed")} ${theme.muted("→")} ${theme.primary(pluginDest)}`);
+    console.log(`  ${theme.icons.success}  ${theme.success.bold("/nella command installed")} ${theme.muted("→")} ${theme.primary(commandDest)}`);
   }
   console.log(`\n  ${theme.icons.arrow}  Restart Claude Code, then use ${theme.primary.bold("/nella")} to get started.\n`);
 }
