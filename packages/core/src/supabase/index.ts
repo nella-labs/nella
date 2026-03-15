@@ -47,21 +47,6 @@ export {
   supabaseManager,
 } from "./client";
 
-// Auth
-export {
-  signInWithEmail,
-  signUpWithEmail,
-  signInWithMagicLink,
-  signInWithOAuth,
-  signOut,
-  getSession,
-  getUser,
-  refreshSession,
-  updateUser,
-  resetPassword,
-  verifyOtp,
-} from "./auth";
-
 // Realtime
 export {
   subscribeToContext,

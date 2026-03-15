@@ -13,94 +13,13 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- =============================================================================
--- API Keys Table
--- =============================================================================
+-- REMOVED 2026-03-15: api_keys table unused by application code
+-- CREATE TABLE IF NOT EXISTS api_keys (...);
+-- + indexes, RLS policies
 
-CREATE TABLE IF NOT EXISTS api_keys (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  key_hash TEXT NOT NULL,
-  key_prefix TEXT NOT NULL,  -- First 8 chars for identification (e.g., "nella_k_")
-  permissions JSONB DEFAULT '[]'::jsonb,
-  rate_limits JSONB DEFAULT '{
-    "requests_per_minute": 60,
-    "requests_per_hour": 1000,
-    "requests_per_day": 10000
-  }'::jsonb,
-  expires_at TIMESTAMPTZ,
-  last_used_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  revoked_at TIMESTAMPTZ,
-  
-  CONSTRAINT valid_permissions CHECK (jsonb_typeof(permissions) = 'array'),
-  CONSTRAINT valid_rate_limits CHECK (jsonb_typeof(rate_limits) = 'object')
-);
-
--- Indexes
-CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
-CREATE INDEX idx_api_keys_key_prefix ON api_keys(key_prefix);
-CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
-
--- RLS
-ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own keys" ON api_keys
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create own keys" ON api_keys
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own keys" ON api_keys
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own keys" ON api_keys
-  FOR DELETE USING (auth.uid() = user_id);
-
--- =============================================================================
--- Agents Table
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS agents (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('claude', 'gpt', 'gemini', 'codex', 'cursor', 'copilot', 'custom')),
-  api_key_id UUID REFERENCES api_keys(id) ON DELETE SET NULL,
-  config JSONB DEFAULT '{}'::jsonb,
-  stats JSONB DEFAULT '{
-    "total_calls": 0,
-    "total_tokens": 0,
-    "total_cost": 0,
-    "success_rate": 1.0,
-    "avg_latency_ms": 0
-  }'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_active_at TIMESTAMPTZ,
-  
-  CONSTRAINT unique_agent_name_per_user UNIQUE (user_id, name)
-);
-
--- Indexes
-CREATE INDEX idx_agents_user_id ON agents(user_id);
-CREATE INDEX idx_agents_api_key_id ON agents(api_key_id);
-CREATE INDEX idx_agents_type ON agents(type);
-
--- RLS
-ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own agents" ON agents
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create own agents" ON agents
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own agents" ON agents
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own agents" ON agents
-  FOR DELETE USING (auth.uid() = user_id);
+-- REMOVED 2026-03-15: agents table unused by application code
+-- CREATE TABLE IF NOT EXISTS agents (...);
+-- + indexes, RLS policies
 
 -- =============================================================================
 -- Context Table (with Realtime)
@@ -181,33 +100,8 @@ CREATE TRIGGER context_set_expires
   FOR EACH ROW
   EXECUTE FUNCTION set_expires_at();
 
--- Clean up expired context entries (run via pg_cron or scheduled function)
-CREATE OR REPLACE FUNCTION cleanup_expired_context()
-RETURNS void AS $$
-BEGIN
-  DELETE FROM context WHERE expires_at IS NOT NULL AND expires_at < NOW();
-END;
-$$ LANGUAGE plpgsql;
+-- REMOVED 2026-03-15: cleanup_expired_context() never called from application
+-- CREATE OR REPLACE FUNCTION cleanup_expired_context() ...;
 
--- =============================================================================
--- Usage Statistics View
--- =============================================================================
-
-CREATE OR REPLACE VIEW user_stats AS
-SELECT
-  u.id AS user_id,
-  u.email,
-  COUNT(DISTINCT ak.id) AS api_key_count,
-  COUNT(DISTINCT ag.id) AS agent_count,
-  COUNT(DISTINCT c.workspace_id) AS workspace_count,
-  COALESCE(SUM((ag.stats->>'total_calls')::int), 0) AS total_calls,
-  COALESCE(SUM((ag.stats->>'total_tokens')::int), 0) AS total_tokens,
-  COALESCE(SUM((ag.stats->>'total_cost')::numeric), 0) AS total_cost
-FROM auth.users u
-LEFT JOIN api_keys ak ON ak.user_id = u.id AND ak.revoked_at IS NULL
-LEFT JOIN agents ag ON ag.user_id = u.id
-LEFT JOIN context c ON c.user_id = u.id
-GROUP BY u.id, u.email;
-
--- Grant access to authenticated users (for their own stats only)
--- Note: This view needs RLS or a function wrapper for security
+-- REMOVED 2026-03-15: user_stats view unused — references removed api_keys/agents tables
+-- CREATE OR REPLACE VIEW user_stats AS ...;
