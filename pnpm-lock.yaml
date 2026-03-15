@@ -236,9 +236,6 @@ importers:
       figures:
         specifier: ^3.2.0
         version: 3.2.0
-      js-yaml:
-        specifier: ^4.1.0
-        version: 4.1.1
       minimatch:
         specifier: '>=10.2.1'
         version: 10.2.2
@@ -249,9 +246,6 @@ importers:
       '@types/figures':
         specifier: ^3.0.3
         version: 3.0.3
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.28
