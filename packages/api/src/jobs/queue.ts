@@ -95,58 +95,6 @@ export async function initJobQueue(): Promise<void> {
 }
 
 /**
- * Enqueue an indexing job.
- */
-export async function enqueueIndexingJob(workspaceId: string, options?: Record<string, unknown>): Promise<string | null> {
-  if (!indexingQueue) return null;
-  const job = await indexingQueue.add("index-workspace", { workspaceId, ...options });
-  return job.id;
-}
-
-/**
- * Enqueue a sync job.
- */
-export async function enqueueSyncJob(workspaceId: string): Promise<string | null> {
-  if (!syncQueue) return null;
-  const job = await syncQueue.add("sync-workspace", { workspaceId });
-  return job.id;
-}
-
-/**
- * Enqueue a cleanup job.
- */
-export async function enqueueCleanupJob(type: "sessions" | "audit" | "cache"): Promise<string | null> {
-  if (!cleanupQueue) return null;
-  const job = await cleanupQueue.add("cleanup", { type });
-  return job.id;
-}
-
-/**
- * Get job status.
- */
-export async function getJobStatus(queueName: string, jobId: string): Promise<any | null> {
-  const queues: Record<string, any> = {
-    indexing: indexingQueue,
-    sync: syncQueue,
-    cleanup: cleanupQueue,
-  };
-  const queue = queues[queueName];
-  if (!queue) return null;
-  const job = await queue.getJob(jobId);
-  if (!job) return null;
-  const state = await job.getState();
-  return {
-    id: job.id,
-    state,
-    progress: job.progress,
-    data: job.data,
-    result: job.returnvalue,
-    failedReason: job.failedReason,
-    createdAt: job.timestamp,
-  };
-}
-
-/**
  * Shutdown all workers and queues.
  */
 export async function shutdownJobQueue(): Promise<void> {

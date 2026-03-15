@@ -23,14 +23,6 @@ interface WSClient {
   lastPing: number;
 }
 
-type WSEventType =
-  | "index:progress"
-  | "index:complete"
-  | "context:updated"
-  | "validation:result"
-  | "workspace:changed"
-  | "session:event";
-
 interface WSMessage {
   type: string;
   channel?: string;
@@ -174,31 +166,6 @@ function handleMessage(client: WSClient, msg: WSMessage): void {
 // =============================================================================
 // Broadcasting
 // =============================================================================
-
-/**
- * Broadcast an event to all clients subscribed to a channel.
- */
-export function broadcast(channel: string, eventType: WSEventType, data: unknown): void {
-  const message = JSON.stringify({
-    type: eventType,
-    channel,
-    data,
-    timestamp: new Date().toISOString(),
-  });
-
-  clients.forEach((client) => {
-    if (client.channels.has(channel) && client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(message);
-    }
-  });
-}
-
-/**
- * Get the number of connected clients.
- */
-export function getClientCount(): number {
-  return clients.size;
-}
 
 function sendToClient(ws: WebSocket, msg: WSMessage): void {
   if (ws.readyState === WebSocket.OPEN) {
