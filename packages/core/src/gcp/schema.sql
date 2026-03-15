@@ -56,12 +56,13 @@ CREATE TABLE IF NOT EXISTS files (
 
 -- Indexes for files
 CREATE INDEX IF NOT EXISTS idx_files_workspace_id ON files(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
-CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
+-- REMOVED 2026-03-15: unused indexes — no queries filter by language or hash alone
+-- CREATE INDEX IF NOT EXISTS idx_files_language ON files(language);
+-- CREATE INDEX IF NOT EXISTS idx_files_hash ON files(hash);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_files_workspace_path ON files(workspace_id, relative_path);
 
--- Trigram index for path pattern matching
-CREATE INDEX IF NOT EXISTS idx_files_path_trgm ON files USING gin(relative_path gin_trgm_ops);
+-- REMOVED 2026-03-15: trigram index unused — no pattern matching queries
+-- CREATE INDEX IF NOT EXISTS idx_files_path_trgm ON files USING gin(relative_path gin_trgm_ops);
 
 -- ============================================================================
 -- Chunks Table (with pgvector)
@@ -94,14 +95,15 @@ CREATE TABLE IF NOT EXISTS chunks (
 -- Indexes for chunks
 CREATE INDEX IF NOT EXISTS idx_chunks_file_id ON chunks(file_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_workspace_id ON chunks(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_chunks_chunk_type ON chunks(chunk_type);
-CREATE INDEX IF NOT EXISTS idx_chunks_symbol_name ON chunks(symbol_name) WHERE symbol_name IS NOT NULL;
+-- REMOVED 2026-03-15: unused indexes — filtering done in application, not DB
+-- CREATE INDEX IF NOT EXISTS idx_chunks_chunk_type ON chunks(chunk_type);
+-- CREATE INDEX IF NOT EXISTS idx_chunks_symbol_name ON chunks(symbol_name) WHERE symbol_name IS NOT NULL;
 
 -- Unique constraint for deduplication
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_file_lines ON chunks(file_id, start_line, end_line);
 
--- Full-text search index
-CREATE INDEX IF NOT EXISTS idx_chunks_content_tsv ON chunks USING gin(content_tsv);
+-- REMOVED 2026-03-15: full-text search index unused — hybrid search reimplemented in TypeScript
+-- CREATE INDEX IF NOT EXISTS idx_chunks_content_tsv ON chunks USING gin(content_tsv);
 
 -- HNSW index for vector similarity search (faster than IVFFlat for small-medium datasets)
 -- Note: Create after data is loaded for better index quality
@@ -115,27 +117,9 @@ WITH (m = 16, ef_construction = 64);
 -- USING ivfflat(embedding vector_cosine_ops) 
 -- WITH (lists = 100);
 
--- ============================================================================
--- Index Stats Table (for optimization)
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS index_stats (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    stat_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    file_count INTEGER NOT NULL DEFAULT 0,
-    chunk_count INTEGER NOT NULL DEFAULT 0,
-    embedding_count INTEGER NOT NULL DEFAULT 0,
-    total_size_bytes BIGINT NOT NULL DEFAULT 0,
-    index_time_ms INTEGER NOT NULL DEFAULT 0,
-    search_count INTEGER NOT NULL DEFAULT 0,
-    avg_search_time_ms REAL NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
-    CONSTRAINT index_stats_unique UNIQUE (workspace_id, stat_date)
-);
-
-CREATE INDEX IF NOT EXISTS idx_index_stats_workspace_date ON index_stats(workspace_id, stat_date DESC);
+-- REMOVED 2026-03-15: index_stats table unused by application code
+-- CREATE TABLE IF NOT EXISTS index_stats (...);
+-- CREATE INDEX IF NOT EXISTS idx_index_stats_workspace_date ON index_stats(...);
 
 -- ============================================================================
 -- Functions
@@ -163,54 +147,8 @@ CREATE TRIGGER files_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
--- Function for hybrid search (vector + text)
-CREATE OR REPLACE FUNCTION hybrid_search(
-    p_workspace_id UUID,
-    p_query TEXT,
-    p_embedding vector(384),
-    p_limit INTEGER DEFAULT 10,
-    p_vector_weight REAL DEFAULT 0.7,
-    p_text_weight REAL DEFAULT 0.3,
-    p_threshold REAL DEFAULT 0.5
-)
-RETURNS TABLE (
-    chunk_id UUID,
-    file_id UUID,
-    workspace_id UUID,
-    relative_path TEXT,
-    content TEXT,
-    start_line INTEGER,
-    end_line INTEGER,
-    chunk_type TEXT,
-    symbol_name TEXT,
-    similarity REAL,
-    language TEXT
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        c.id AS chunk_id,
-        c.file_id,
-        c.workspace_id,
-        f.relative_path,
-        c.content,
-        c.start_line,
-        c.end_line,
-        c.chunk_type,
-        c.symbol_name,
-        (p_vector_weight * (1 - (c.embedding <=> p_embedding)) +
-         p_text_weight * COALESCE(ts_rank(c.content_tsv, plainto_tsquery('english', p_query)), 0))::REAL AS similarity,
-        f.language
-    FROM chunks c
-    JOIN files f ON c.file_id = f.id
-    WHERE c.workspace_id = p_workspace_id
-      AND c.embedding IS NOT NULL
-      AND (p_vector_weight * (1 - (c.embedding <=> p_embedding)) +
-           p_text_weight * COALESCE(ts_rank(c.content_tsv, plainto_tsquery('english', p_query)), 0)) >= p_threshold
-    ORDER BY similarity DESC
-    LIMIT p_limit;
-END;
-$$ LANGUAGE plpgsql;
+-- REMOVED 2026-03-15: hybrid_search() reimplemented in TypeScript (gcp/cloudsql.ts:610)
+-- CREATE OR REPLACE FUNCTION hybrid_search(...) ...;
 
 -- Function to cleanup old chunks when file is re-indexed
 CREATE OR REPLACE FUNCTION cleanup_file_chunks()
@@ -258,37 +196,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================================
--- Maintenance Functions
--- ============================================================================
-
--- Function to vacuum and reindex (run periodically)
-CREATE OR REPLACE FUNCTION maintenance_vacuum_analyze()
-RETURNS void AS $$
-BEGIN
-    VACUUM ANALYZE workspaces;
-    VACUUM ANALYZE files;
-    VACUUM ANALYZE chunks;
-    VACUUM ANALYZE index_stats;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to delete old workspaces (not updated in N days)
-CREATE OR REPLACE FUNCTION cleanup_stale_workspaces(p_days INTEGER DEFAULT 90)
-RETURNS INTEGER AS $$
-DECLARE
-    v_count INTEGER;
-BEGIN
-    WITH deleted AS (
-        DELETE FROM workspaces
-        WHERE updated_at < NOW() - (p_days || ' days')::INTERVAL
-        RETURNING id
-    )
-    SELECT COUNT(*) INTO v_count FROM deleted;
-    
-    RETURN v_count;
-END;
-$$ LANGUAGE plpgsql;
+-- REMOVED 2026-03-15: maintenance functions unused by application code
+-- CREATE OR REPLACE FUNCTION maintenance_vacuum_analyze() ...;
+-- CREATE OR REPLACE FUNCTION cleanup_stale_workspaces(...) ...;
 
 -- ============================================================================
 -- Grants (adjust for your user)
