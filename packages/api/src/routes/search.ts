@@ -12,7 +12,7 @@ import { SearchService } from "@usenella/core/dist/services/search-service";
 import { sendSuccess, sendError } from "../utils/responses";
 import { validateBody } from "../middleware/validation";
 import { requireScope } from "../middleware/auth";
-import { requirePlanFeature, requireSearchTier } from "../middleware/plan-gate";
+import { requirePlanFeature } from "../middleware/plan-gate";
 
 // =============================================================================
 // Schemas

@@ -5,7 +5,7 @@
  * Uses opaque base64-encoded cursors wrapping an offset.
  */
 
-export interface PaginationParams {
+interface PaginationParams {
   cursor?: string;
   limit: number;
 }
