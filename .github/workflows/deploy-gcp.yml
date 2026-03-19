@@ -1,26 +1,15 @@
-name: Deploy to GCP Cloud Run (DISABLED)
-
-# DISABLED 2026-03-18: Production runs on Vercel, not Cloud Run.
-# Cloud Run service exists but is unused. Keeping config for reference.
-# To re-enable: uncomment the 'on' triggers below.
-#
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - "packages/core/**"
-#       - "packages/nella/**"
-#       - "Dockerfile"
-#       - "cloudbuild.yaml"
-#       - ".github/workflows/deploy-gcp.yml"
-#   workflow_dispatch:
+name: Deploy to GCP Cloud Run
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/core/**"
+      - "packages/nella/**"
+      - "Dockerfile"
+      - "cloudbuild.yaml"
+      - ".github/workflows/deploy-gcp.yml"
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type DEPLOY to confirm'
-        required: true
 
 permissions:
   contents: read
