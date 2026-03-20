@@ -53,6 +53,12 @@ Returns stats on files indexed, chunks created, and embeddings generated.`,
       name: "nella_search",
       description: `Search the indexed codebase using hybrid (semantic + lexical) search.
 
+USE THIS FIRST when you need to find, understand, or locate code. This is faster and more token-efficient than grep/glob — one search replaces multiple manual lookups. Use it for:
+- Finding where something is defined or implemented
+- Understanding how a module or function works
+- Locating code to modify or refactor
+- Discovering patterns the codebase uses
+
 Requires the workspace to be indexed first with nella_index.
 
 Search modes:
