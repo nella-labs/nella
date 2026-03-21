@@ -172,3 +172,15 @@ function sendToClient(ws: WebSocket, msg: WSMessage): void {
     ws.send(JSON.stringify(msg));
   }
 }
+
+/**
+ * Broadcast a message to all clients subscribed to a channel.
+ */
+export function broadcastToChannel(channel: string, data: unknown): void {
+  const msg = JSON.stringify({ type: "channel:message", channel, data });
+  clients.forEach((client) => {
+    if (client.channels.has(channel) && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(msg);
+    }
+  });
+}
