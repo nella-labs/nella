@@ -1,0 +1,790 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "projectName": "nella",
+    "generatedAt": "2026-03-15T00:00:00.000Z",
+    "generatedBy": "claude-code",
+    "codebaseRoot": "/Users/pablo/Projects/nella"
+  },
+  "objects": [
+    {
+      "id": "actor-developer",
+      "name": "Developer",
+      "type": "actor",
+      "scope": "external",
+      "status": "live",
+      "description": "Engineers using Nella CLI and slash commands to improve AI coding agent reliability in their codebases.",
+      "technologies": [],
+      "metadata": {}
+    },
+    {
+      "id": "actor-ai-agent",
+      "name": "AI Coding Agent",
+      "type": "actor",
+      "scope": "external",
+      "status": "live",
+      "description": "Claude, GPT-4, or Gemini agents that call Nella tools via MCP protocol to get code context and validation.",
+      "technologies": [],
+      "metadata": {}
+    },
+    {
+      "id": "actor-api-consumer",
+      "name": "API Consumer",
+      "type": "actor",
+      "scope": "external",
+      "status": "live",
+      "description": "External applications and services consuming the Nella REST API with API key authentication.",
+      "technologies": [],
+      "metadata": {}
+    },
+    {
+      "id": "actor-researcher",
+      "name": "Researcher",
+      "type": "actor",
+      "scope": "external",
+      "status": "live",
+      "description": "Users evaluating agent reliability and safety by running the benchmark suite.",
+      "technologies": [],
+      "metadata": {}
+    },
+    {
+      "id": "system-nella",
+      "name": "Nella",
+      "type": "system",
+      "scope": "internal",
+      "status": "live",
+      "description": "Reliability layer for AI coding agents — provides codebase indexing, hybrid search, context tracking, and validation to prevent unsafe code changes.",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-nodejs", "name": "Node.js" }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "app-mcp-server",
+      "name": "MCP Server",
+      "type": "app",
+      "scope": "internal",
+      "status": "live",
+      "description": "Model Context Protocol server exposing Nella tools (search, context, assumptions, dependencies) to AI agents via stdio or HTTP transport.",
+      "parentId": "system-nella",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-mcp", "name": "MCP SDK" },
+        { "id": "tech-nodejs", "name": "Node.js" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/nella/src/mcp/server.ts",
+          "packages/nella/src/mcp/hosted-server.ts",
+          "packages/nella/src/mcp/tools/"
+        ]
+      }
+    },
+    {
+      "id": "app-cli",
+      "name": "Nella CLI",
+      "type": "app",
+      "scope": "internal",
+      "status": "live",
+      "description": "Command-line interface for workspace indexing, auth management, client configuration, and starting the MCP server or playground.",
+      "parentId": "system-nella",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-nodejs", "name": "Node.js" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/nella/src/cli.ts",
+          "packages/nella/src/auth.ts",
+          "packages/nella/src/playground.ts"
+        ]
+      }
+    },
+    {
+      "id": "app-api",
+      "name": "REST API",
+      "type": "app",
+      "scope": "internal",
+      "status": "live",
+      "description": "Express REST API exposing workspace CRUD, hybrid search, code verification, context tracking, and auth endpoints with API key authentication.",
+      "parentId": "system-nella",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-nodejs", "name": "Node.js" },
+        { "id": "tech-express", "name": "Express" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/api/src/server.ts",
+          "packages/api/src/app.ts",
+          "packages/api/src/routes/"
+        ]
+      }
+    },
+    {
+      "id": "app-core",
+      "name": "Core Library",
+      "type": "app",
+      "scope": "internal",
+      "status": "live",
+      "description": "Shared library with indexing engine, hybrid search, context management, auth, cloud sync, and workspace registry — used by both API and MCP server.",
+      "parentId": "system-nella",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-nodejs", "name": "Node.js" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/indexing/",
+          "packages/core/src/services/",
+          "packages/core/src/context-sharing/",
+          "packages/core/src/auth/",
+          "packages/core/src/workspace/"
+        ]
+      }
+    },
+    {
+      "id": "app-benchmark",
+      "name": "Benchmark Suite",
+      "type": "app",
+      "scope": "internal",
+      "status": "live",
+      "description": "Evaluation framework for scoring AI coding agents on capability and safety with adapters for Claude, GPT-4, and custom agents.",
+      "parentId": "system-nella",
+      "technologies": [
+        { "id": "tech-typescript", "name": "TypeScript" },
+        { "id": "tech-nodejs", "name": "Node.js" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/benchmark/src/cli.ts",
+          "packages/benchmark/src/adapters/",
+          "packages/benchmark/src/runner/"
+        ]
+      }
+    },
+    {
+      "id": "store-supabase",
+      "name": "Supabase",
+      "type": "store",
+      "scope": "external",
+      "status": "live",
+      "description": "Cloud PostgreSQL backend for API keys, auth, organizations, plans, usage events, and real-time context sync via Postgres changes.",
+      "technologies": [
+        { "id": "tech-supabase", "name": "Supabase" },
+        { "id": "tech-postgresql", "name": "PostgreSQL" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/supabase/client.ts",
+          "packages/core/src/supabase/realtime.ts",
+          "packages/core/src/supabase/schema.sql"
+        ]
+      }
+    },
+    {
+      "id": "store-gcp-cloudsql",
+      "name": "GCP Cloud SQL",
+      "type": "store",
+      "scope": "external",
+      "status": "live",
+      "description": "PostgreSQL with pgvector extension for large-scale vector storage, full-text search, and workspace/file/chunk persistence.",
+      "technologies": [
+        { "id": "tech-postgresql", "name": "PostgreSQL" },
+        { "id": "tech-gcp", "name": "Google Cloud" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/gcp/cloudsql.ts",
+          "packages/core/src/gcp/schema.sql"
+        ]
+      }
+    },
+    {
+      "id": "store-gcs",
+      "name": "Google Cloud Storage",
+      "type": "store",
+      "scope": "external",
+      "status": "live",
+      "description": "Object storage for ONNX model files, workspace backups, and cloud sync artifacts.",
+      "technologies": [
+        { "id": "tech-gcp", "name": "Google Cloud" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/gcp/storage.ts"
+        ]
+      }
+    },
+    {
+      "id": "store-redis",
+      "name": "Redis",
+      "type": "store",
+      "scope": "external",
+      "status": "live",
+      "description": "In-memory store for distributed rate limiting (Lua-based sliding window), BullMQ job queues, and plan resolution caching.",
+      "technologies": [
+        { "id": "tech-redis", "name": "Redis" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/rate-limit/backends/redis.ts",
+          "packages/api/src/utils/redis.ts",
+          "packages/api/src/jobs/queue.ts"
+        ]
+      }
+    },
+    {
+      "id": "store-sqlite",
+      "name": "SQLite (Local)",
+      "type": "store",
+      "scope": "internal",
+      "status": "live",
+      "description": "Per-workspace local database (.nella/context.db) for context entries, assumption tracking, change history, and cross-agent memory.",
+      "technologies": [
+        { "id": "tech-sqlite", "name": "SQLite" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/context-sharing/"
+        ]
+      }
+    },
+    {
+      "id": "system-openai",
+      "name": "OpenAI API",
+      "type": "system",
+      "scope": "external",
+      "status": "live",
+      "description": "Embedding API (text-embedding-3-small/large) for semantic vector generation and chat completions for agent operations.",
+      "technologies": [
+        { "id": "tech-openai", "name": "OpenAI" }
+      ],
+      "metadata": {
+        "files": [
+          "packages/core/src/indexing/embedder.ts",
+          "packages/core/src/agents/openai.ts"
+        ]
+      }
+    },
+    {
+      "id": "system-voyageai",
+      "name": "Voyage AI",
+      "type": "system",
+      "scope": "external",
+      "status": "live",
+      "description": "Code-optimized embedding API (voyage-code-2) — primary recommendation for semantic search vectorization.",
+      "technologies": [],
+      "metadata": {
+        "files": [
+          "packages/core/src/indexing/embedder.ts"
+        ]
+      }
+    },
+    {
+      "id": "system-cohere",
+      "name": "Cohere API",
+      "type": "system",
+      "scope": "external",
+      "status": "live",
+      "description": "Reranking API (rerank-english-v3.0) for improving search result relevance after hybrid search.",
+      "technologies": [],
+      "metadata": {
+        "files": [
+          "packages/core/src/indexing/hybrid-search.ts"
+        ]
+      }
+    },
+    {
+      "id": "system-anthropic",
+      "name": "Anthropic API",
+      "type": "system",
+      "scope": "external",
+      "status": "live",
+      "description": "Claude API used as an agent adapter in the benchmark suite for evaluating coding agent reliability.",
+      "technologies": [],
+      "metadata": {
+        "files": [
+          "packages/benchmark/src/adapters/anthropic.ts"
+        ]
+      }
+    },
+    {
+      "id": "system-gcp-cloudrun",
+      "name": "GCP Cloud Run",
+      "type": "system",
+      "scope": "external",
+      "status": "live",
+      "description": "Serverless container platform hosting the MCP server (nella-mcp) and REST API (nella-api) services.",
+      "technologies": [
+        { "id": "tech-gcp", "name": "Google Cloud" },
+        { "id": "tech-docker", "name": "Docker" }
+      ],
+      "metadata": {
+        "files": [
+          "Dockerfile",
+          "packages/api/Dockerfile",
+          "cloudbuild.yaml",
+          "packages/api/cloudbuild.yaml"
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-developer-cli",
+      "sourceId": "actor-developer",
+      "targetId": "app-cli",
+      "label": "runs CLI commands (index, auth, connect, setup)",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-agent-mcp",
+      "sourceId": "actor-ai-agent",
+      "targetId": "app-mcp-server",
+      "label": "calls MCP tools via stdio or HTTP transport",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-consumer-api",
+      "sourceId": "actor-api-consumer",
+      "targetId": "app-api",
+      "label": "sends authenticated REST requests",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-researcher-benchmark",
+      "sourceId": "actor-researcher",
+      "targetId": "app-benchmark",
+      "label": "runs agent evaluations via benchmark CLI",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-cli-core",
+      "sourceId": "app-cli",
+      "targetId": "app-core",
+      "label": "uses core services for indexing and workspace management",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-mcp-core",
+      "sourceId": "app-mcp-server",
+      "targetId": "app-core",
+      "label": "delegates tool calls to core services",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-api-core",
+      "sourceId": "app-api",
+      "targetId": "app-core",
+      "label": "uses WorkspaceService, SearchService, ContextService",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-benchmark-anthropic",
+      "sourceId": "app-benchmark",
+      "targetId": "system-anthropic",
+      "label": "evaluates Claude agents via messages API",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-benchmark-openai",
+      "sourceId": "app-benchmark",
+      "targetId": "system-openai",
+      "label": "evaluates GPT agents via chat completions",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-core-supabase",
+      "sourceId": "app-core",
+      "targetId": "store-supabase",
+      "label": "queries API keys, auth, orgs, plans, context sync",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-core-supabase-realtime",
+      "sourceId": "app-core",
+      "targetId": "store-supabase",
+      "label": "subscribes to real-time context changes",
+      "status": "live",
+      "type": "event"
+    },
+    {
+      "id": "conn-core-cloudsql",
+      "sourceId": "app-core",
+      "targetId": "store-gcp-cloudsql",
+      "label": "stores and queries vector embeddings via pgvector",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-core-gcs",
+      "sourceId": "app-core",
+      "targetId": "store-gcs",
+      "label": "uploads/downloads ONNX models and sync artifacts",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-core-sqlite",
+      "sourceId": "app-core",
+      "targetId": "store-sqlite",
+      "label": "persists session context, assumptions, change history",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-core-openai",
+      "sourceId": "app-core",
+      "targetId": "system-openai",
+      "label": "generates text embeddings for semantic search",
+      "status": "live",
+      "type": "async"
+    },
+    {
+      "id": "conn-core-voyageai",
+      "sourceId": "app-core",
+      "targetId": "system-voyageai",
+      "label": "generates code-optimized embeddings",
+      "status": "live",
+      "type": "async"
+    },
+    {
+      "id": "conn-core-cohere",
+      "sourceId": "app-core",
+      "targetId": "system-cohere",
+      "label": "reranks search results for relevance",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-api-redis",
+      "sourceId": "app-api",
+      "targetId": "store-redis",
+      "label": "rate limiting, job queues, plan caching",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-mcp-supabase",
+      "sourceId": "app-mcp-server",
+      "targetId": "store-supabase",
+      "label": "authenticates API keys and logs usage events",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-mcp-redis",
+      "sourceId": "app-mcp-server",
+      "targetId": "store-redis",
+      "label": "enforces per-key rate limits",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-cli-supabase",
+      "sourceId": "app-cli",
+      "targetId": "store-supabase",
+      "label": "authenticates via OAuth flow",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-mcp-cloudrun",
+      "sourceId": "app-mcp-server",
+      "targetId": "system-gcp-cloudrun",
+      "label": "deployed as nella-mcp service",
+      "status": "live",
+      "type": "data"
+    },
+    {
+      "id": "conn-api-cloudrun",
+      "sourceId": "app-api",
+      "targetId": "system-gcp-cloudrun",
+      "label": "deployed as nella-api service",
+      "status": "live",
+      "type": "data"
+    },
+    {
+      "id": "conn-l1-developer-nella",
+      "sourceId": "actor-developer",
+      "targetId": "system-nella",
+      "label": "indexes codebases, configures agents",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-agent-nella",
+      "sourceId": "actor-ai-agent",
+      "targetId": "system-nella",
+      "label": "calls MCP tools for search and context",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-consumer-nella",
+      "sourceId": "actor-api-consumer",
+      "targetId": "system-nella",
+      "label": "sends authenticated REST requests",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-researcher-nella",
+      "sourceId": "actor-researcher",
+      "targetId": "system-nella",
+      "label": "runs agent evaluations",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-supabase",
+      "sourceId": "system-nella",
+      "targetId": "store-supabase",
+      "label": "auth, API keys, context sync",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-cloudsql",
+      "sourceId": "system-nella",
+      "targetId": "store-gcp-cloudsql",
+      "label": "vector embeddings via pgvector",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-redis",
+      "sourceId": "system-nella",
+      "targetId": "store-redis",
+      "label": "rate limiting and job queues",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-openai",
+      "sourceId": "system-nella",
+      "targetId": "system-openai",
+      "label": "generates embeddings",
+      "status": "live",
+      "type": "async"
+    },
+    {
+      "id": "conn-l1-nella-voyageai",
+      "sourceId": "system-nella",
+      "targetId": "system-voyageai",
+      "label": "generates code embeddings",
+      "status": "live",
+      "type": "async"
+    },
+    {
+      "id": "conn-l1-nella-cohere",
+      "sourceId": "system-nella",
+      "targetId": "system-cohere",
+      "label": "reranks search results",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-anthropic",
+      "sourceId": "system-nella",
+      "targetId": "system-anthropic",
+      "label": "evaluates agents",
+      "status": "live",
+      "type": "sync"
+    },
+    {
+      "id": "conn-l1-nella-cloudrun",
+      "sourceId": "system-nella",
+      "targetId": "system-gcp-cloudrun",
+      "label": "deployed on Cloud Run",
+      "status": "live",
+      "type": "data"
+    }
+  ],
+  "groups": [
+    {
+      "id": "group-frontend",
+      "name": "Client Layer",
+      "objectIds": ["app-cli", "app-benchmark"]
+    },
+    {
+      "id": "group-backend",
+      "name": "Backend Services",
+      "objectIds": ["app-mcp-server", "app-api", "app-core"]
+    },
+    {
+      "id": "group-data-stores",
+      "name": "Data Stores",
+      "objectIds": ["store-supabase", "store-gcp-cloudsql", "store-gcs", "store-redis", "store-sqlite"]
+    },
+    {
+      "id": "group-ai-services",
+      "name": "AI & Embedding Services",
+      "objectIds": ["system-openai", "system-voyageai", "system-cohere", "system-anthropic"]
+    },
+    {
+      "id": "group-infrastructure",
+      "name": "Infrastructure",
+      "objectIds": ["system-gcp-cloudrun"]
+    }
+  ],
+  "technologies": [
+    { "id": "tech-typescript", "name": "TypeScript", "color": "#3178c6", "category": "language" },
+    { "id": "tech-nodejs", "name": "Node.js", "color": "#339933", "category": "runtime" },
+    { "id": "tech-express", "name": "Express", "color": "#000000", "category": "framework" },
+    { "id": "tech-mcp", "name": "MCP SDK", "color": "#6366f1", "category": "protocol" },
+    { "id": "tech-supabase", "name": "Supabase", "color": "#3ecf8e", "category": "platform" },
+    { "id": "tech-postgresql", "name": "PostgreSQL", "color": "#336791", "category": "database" },
+    { "id": "tech-redis", "name": "Redis", "color": "#dc382d", "category": "database" },
+    { "id": "tech-sqlite", "name": "SQLite", "color": "#003b57", "category": "database" },
+    { "id": "tech-openai", "name": "OpenAI", "color": "#10a37f", "category": "ai" },
+    { "id": "tech-gcp", "name": "Google Cloud", "color": "#4285f4", "category": "cloud" },
+    { "id": "tech-docker", "name": "Docker", "color": "#2496ed", "category": "infrastructure" }
+  ],
+  "tags": [],
+  "diagrams": [
+    {
+      "id": "diagram-context",
+      "name": "System Context",
+      "level": 1,
+      "objectIds": [
+        "actor-developer",
+        "actor-ai-agent",
+        "actor-api-consumer",
+        "actor-researcher",
+        "system-nella",
+        "store-supabase",
+        "store-gcp-cloudsql",
+        "store-redis",
+        "system-openai",
+        "system-voyageai",
+        "system-cohere",
+        "system-anthropic",
+        "system-gcp-cloudrun"
+      ],
+      "connectionIds": [
+        "conn-l1-developer-nella",
+        "conn-l1-agent-nella",
+        "conn-l1-consumer-nella",
+        "conn-l1-researcher-nella",
+        "conn-l1-nella-supabase",
+        "conn-l1-nella-cloudsql",
+        "conn-l1-nella-redis",
+        "conn-l1-nella-openai",
+        "conn-l1-nella-voyageai",
+        "conn-l1-nella-cohere",
+        "conn-l1-nella-anthropic",
+        "conn-l1-nella-cloudrun"
+      ],
+      "positions": {}
+    },
+    {
+      "id": "diagram-container",
+      "name": "Container Diagram",
+      "level": 2,
+      "objectIds": [
+        "actor-developer",
+        "actor-ai-agent",
+        "actor-api-consumer",
+        "actor-researcher",
+        "app-cli",
+        "app-mcp-server",
+        "app-api",
+        "app-core",
+        "app-benchmark",
+        "store-supabase",
+        "store-gcp-cloudsql",
+        "store-gcs",
+        "store-redis",
+        "store-sqlite",
+        "system-openai",
+        "system-voyageai",
+        "system-cohere",
+        "system-anthropic",
+        "system-gcp-cloudrun"
+      ],
+      "connectionIds": [
+        "conn-developer-cli",
+        "conn-agent-mcp",
+        "conn-consumer-api",
+        "conn-researcher-benchmark",
+        "conn-cli-core",
+        "conn-mcp-core",
+        "conn-api-core",
+        "conn-benchmark-anthropic",
+        "conn-benchmark-openai",
+        "conn-core-supabase",
+        "conn-core-supabase-realtime",
+        "conn-core-cloudsql",
+        "conn-core-gcs",
+        "conn-core-sqlite",
+        "conn-core-openai",
+        "conn-core-voyageai",
+        "conn-core-cohere",
+        "conn-api-redis",
+        "conn-mcp-supabase",
+        "conn-mcp-redis",
+        "conn-cli-supabase",
+        "conn-mcp-cloudrun",
+        "conn-api-cloudrun"
+      ],
+      "positions": {}
+    }
+  ],
+  "flows": [
+    {
+      "id": "flow-agent-search",
+      "name": "AI Agent Search Flow",
+      "steps": [
+        { "order": 1, "connectionId": "conn-agent-mcp", "description": "Agent calls nella_search tool via MCP" },
+        { "order": 2, "connectionId": "conn-mcp-core", "description": "MCP server delegates to SearchService in core" },
+        { "order": 3, "connectionId": "conn-core-openai", "description": "Core generates query embedding via OpenAI or Voyage" },
+        { "order": 4, "connectionId": "conn-core-cloudsql", "description": "Core queries pgvector for semantic matches + BM25 lexical search" },
+        { "order": 5, "connectionId": "conn-core-cohere", "description": "Optional: reranks results via Cohere API" }
+      ]
+    },
+    {
+      "id": "flow-developer-setup",
+      "name": "Developer Setup Flow",
+      "steps": [
+        { "order": 1, "connectionId": "conn-developer-cli", "description": "Developer runs 'nella auth login'" },
+        { "order": 2, "connectionId": "conn-cli-supabase", "description": "CLI opens browser for OAuth, receives tokens from Supabase" },
+        { "order": 3, "connectionId": "conn-developer-cli", "description": "Developer runs 'nella connect --client claude'" },
+        { "order": 4, "connectionId": "conn-cli-core", "description": "CLI configures MCP server in Claude Desktop config" }
+      ]
+    },
+    {
+      "id": "flow-api-request",
+      "name": "Authenticated API Request",
+      "steps": [
+        { "order": 1, "connectionId": "conn-consumer-api", "description": "Client sends request with API key in Authorization header" },
+        { "order": 2, "connectionId": "conn-core-supabase", "description": "API middleware hashes key and looks up in Supabase api_keys table" },
+        { "order": 3, "connectionId": "conn-api-redis", "description": "Rate limit check via Redis sliding window" },
+        { "order": 4, "connectionId": "conn-api-core", "description": "Route handler calls core service (Search, Context, Workspace)" }
+      ]
+    },
+    {
+      "id": "flow-context-tracking",
+      "name": "Agent Context & Assumption Tracking",
+      "steps": [
+        { "order": 1, "connectionId": "conn-agent-mcp", "description": "Agent calls nella_add_assumption with schema/dependency assumptions" },
+        { "order": 2, "connectionId": "conn-mcp-core", "description": "MCP server delegates to ContextManager" },
+        { "order": 3, "connectionId": "conn-core-sqlite", "description": "Assumption persisted to .nella/context.db" },
+        { "order": 4, "connectionId": "conn-agent-mcp", "description": "Agent calls nella_check_assumptions after changes" },
+        { "order": 5, "connectionId": "conn-core-sqlite", "description": "Core checks for invalidated assumptions against change ledger" }
+      ]
+    }
+  ]
+}
