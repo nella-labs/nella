@@ -12,6 +12,7 @@ jobs:
   release:
     name: Version & Publish
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       contents: write
       pull-requests: write
