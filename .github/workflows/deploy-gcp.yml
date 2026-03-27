@@ -94,7 +94,6 @@ jobs:
             GCP_DB_NAME=GCP_DB_NAME:latest
             NELLA_AUTH_ENCRYPTION_KEY=NELLA_AUTH_ENCRYPTION_KEY:latest
             NELLA_JWT_SECRET=NELLA_JWT_SECRET:latest
-            VOYAGE_API_KEY=VOYAGE_API_KEY:latest
 
       - name: Verify deployment
         run: |
@@ -103,6 +102,42 @@ jobs:
             --format='value(status.url)')
           echo "Service URL: $URL"
           curl -sf "$URL/health" | python3 -m json.tool
+
+      - name: Notify Pushover (Success)
+        if: success()
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          curl -sf -X POST https://api.pushover.net/1/messages.json \
+            --form-string "token=$PUSHOVER_TOKEN" \
+            --form-string "user=$PUSHOVER_USER" \
+            --form-string "title=Deploy Success" \
+            --form-string "message=nella-mcp deployed to Cloud Run. Commit ${GITHUB_SHA::7}" \
+            --form-string "priority=0" \
+            --form-string "sound=cashregister" \
+            --form-string "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --form-string "url_title=View Run" \
+            --form-string "html=1" || true
+
+      - name: Notify Pushover (Failure)
+        if: failure()
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          curl -sf -X POST https://api.pushover.net/1/messages.json \
+            --form-string "token=$PUSHOVER_TOKEN" \
+            --form-string "user=$PUSHOVER_USER" \
+            --form-string "title=DEPLOY FAILED" \
+            --form-string "message=nella-mcp deploy FAILED. Commit ${GITHUB_SHA::7}" \
+            --form-string "priority=2" \
+            --form-string "sound=siren" \
+            --form-string "retry=300" \
+            --form-string "expire=3600" \
+            --form-string "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --form-string "url_title=View Run" \
+            --form-string "html=1" || true
 
   post-deploy-health:
     name: Post-Deploy Health Check

@@ -407,3 +407,22 @@ jobs:
                 });
               }
             }
+
+      - name: Notify Pushover
+        if: failure()
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          curl -sf -X POST https://api.pushover.net/1/messages.json \
+            --form-string "token=$PUSHOVER_TOKEN" \
+            --form-string "user=$PUSHOVER_USER" \
+            --form-string "title=Nella Health Alert" \
+            --form-string "message=Health check failed — services may be down. Check GitHub issue." \
+            --form-string "priority=2" \
+            --form-string "sound=spacealarm" \
+            --form-string "retry=300" \
+            --form-string "expire=3600" \
+            --form-string "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --form-string "url_title=View Run" \
+            --form-string "html=1" || true
