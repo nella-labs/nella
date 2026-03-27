@@ -36,3 +36,20 @@ jobs:
         run: cd packages/nella && npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Notify Pushover
+        if: success()
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          curl -sf -X POST https://api.pushover.net/1/messages.json \
+            --form-string "token=$PUSHOVER_TOKEN" \
+            --form-string "user=$PUSHOVER_USER" \
+            --form-string "title=npm Published" \
+            --form-string "message=@getnella/mcp ${{ github.ref_name }} published to npm" \
+            --form-string "priority=0" \
+            --form-string "sound=magic" \
+            --form-string "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --form-string "url_title=View Run" \
+            --form-string "html=1" || true
