@@ -62,7 +62,7 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
   rrfK: 60,
   topK: 10,
   minScore: 0.0,
-  rerankEnabled: false,
+  rerankEnabled: true,
   rerankTopK: 20,
   rerankModel: "rerank-english-v3.0",
 };
