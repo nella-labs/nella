@@ -66,4 +66,22 @@ jobs:
           }
 
       - name: Audit dependencies
+        continue-on-error: true
         run: pnpm audit --audit-level=high
+
+      - name: Notify Pushover
+        if: failure()
+        env:
+          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
+        run: |
+          curl -sf -X POST https://api.pushover.net/1/messages.json \
+            --form-string "token=$PUSHOVER_TOKEN" \
+            --form-string "user=$PUSHOVER_USER" \
+            --form-string "title=Nella CI Failed" \
+            --form-string "message=CI failed on ${{ github.ref_name }}" \
+            --form-string "priority=1" \
+            --form-string "sound=bugle" \
+            --form-string "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --form-string "url_title=View Run" \
+            --form-string "html=1" || true
