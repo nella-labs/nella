@@ -25,9 +25,14 @@ const envSchema = z.object({
   JWT_SECRET: z.string().optional(),
   API_KEY_SALT: z.string().optional(),
 
-  // AI / Embeddings
-  VOYAGE_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
+  // Azure OpenAI (embeddings)
+  AZURE_EMBEDDING_API_KEY: z.string().optional(),
+  AZURE_ENDPOINT: z.string().optional(),
+  AZURE_EMBEDDING_DEPLOYMENT: z.string().optional(),
+
+  // Azure AI Cohere (reranking)
+  AZURE_RERANK_API_KEY: z.string().optional(),
+  AZURE_RERANK_ENDPOINT: z.string().optional(),
 
   // CORS
   ALLOWED_ORIGINS: z

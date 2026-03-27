@@ -47,7 +47,7 @@ export interface WorkspaceConfig {
 }
 
 export interface EmbedderConfig {
-  provider: "voyage" | "openai" | "local";
+  provider: "azure";
   model: string;
   dimensions?: number;
 }
@@ -78,8 +78,8 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     "**/.git/**",
   ],
   embedder: {
-    provider: "voyage",
-    model: "voyage-code-2",
+    provider: "azure",
+    model: "text-embedding-3-small",
     dimensions: 1536,
   },
   search: {

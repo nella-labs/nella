@@ -20,7 +20,9 @@ services:
       REDIS_URL: redis://redis:6379
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      AZURE_EMBEDDING_API_KEY: ${AZURE_EMBEDDING_API_KEY:-}
+      AZURE_ENDPOINT: ${AZURE_ENDPOINT:-}
+      AZURE_EMBEDDING_DEPLOYMENT: ${AZURE_EMBEDDING_DEPLOYMENT:-text-embedding-3-small}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
       ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000"
       LOG_LEVEL: debug
@@ -47,7 +49,9 @@ services:
       REDIS_URL: redis://redis:6379
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      AZURE_EMBEDDING_API_KEY: ${AZURE_EMBEDDING_API_KEY:-}
+      AZURE_ENDPOINT: ${AZURE_ENDPOINT:-}
+      AZURE_EMBEDDING_DEPLOYMENT: ${AZURE_EMBEDDING_DEPLOYMENT:-text-embedding-3-small}
     depends_on:
       redis:
         condition: service_healthy

@@ -14,7 +14,6 @@ import {
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import type { ServerContext } from "../server";
-import { getValidSession } from "../../auth";
 import {
   generateNonce,
   wrapSearchResult,
@@ -120,24 +119,11 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
 
-  // Use Nella cloud embeddings when authenticated, fall back to local OpenAI key
-  const session = await getValidSession();
-  let embedderConfig: IndexManagerConfig["embedder"];
-  if (session) {
-    embedderConfig = {
-      provider: "nella" as any,
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-      apiKey: session.access_token,
-      apiBase: "https://app.getnella.dev/api",
-    };
-  } else {
-    embedderConfig = {
-      provider: "openai",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    };
-  }
+  const embedderConfig: IndexManagerConfig["embedder"] = {
+    provider: "azure",
+    model: "text-embedding-3-small",
+    dimensions: 1536,
+  };
 
   const config: IndexManagerConfig = {
     workspaceId,

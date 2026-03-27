@@ -626,29 +626,16 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
     console.log(`  ${theme.muted("Mode: full reindex (--force)")}\n`);
   }
 
-  // Use Nella's server-side embedding proxy when authenticated
-  const session = await getValidSession();
-  let embedderConfig: IndexManagerConfig["embedder"];
-  if (session) {
-    console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
-    embedderConfig = {
-      provider: "nella",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-      apiKey: session.access_token,
-      apiBase: "https://app.getnella.dev/api",
-    };
-  } else if (process.env.OPENAI_API_KEY) {
-    console.log(`  ${theme.muted("Using local OpenAI API key")}\n`);
-    embedderConfig = {
-      provider: "openai",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    };
-  } else {
-    console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
+  if (!process.env.AZURE_EMBEDDING_API_KEY || !process.env.AZURE_ENDPOINT) {
+    console.log(`  ${theme.icons.error}  ${theme.error("AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT must be set.")}\n`);
     process.exit(1);
   }
+  console.log(`  ${theme.muted("Using Azure OpenAI embeddings")}\n`);
+  const embedderConfig: IndexManagerConfig["embedder"] = {
+    provider: "azure",
+    model: "text-embedding-3-small",
+    dimensions: 1536,
+  };
 
   const config: IndexManagerConfig = {
     workspaceId,

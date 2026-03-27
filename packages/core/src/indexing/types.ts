@@ -72,11 +72,12 @@ export interface IndexMetadata {
 export interface IndexConfig {
   // Embedding settings
   embedder: {
-    provider: "voyage" | "openai" | "local" | "nella";
+    provider: "azure";
     model: string;
     dimensions: number;
     apiKey?: string;
-    apiBase?: string;
+    endpoint?: string;
+    deployment?: string;
   };
 
   // Chunking settings
@@ -102,8 +103,8 @@ export interface IndexConfig {
 
 export const DEFAULT_INDEX_CONFIG: IndexConfig = {
   embedder: {
-    provider: "voyage",
-    model: "voyage-code-2",
+    provider: "azure",
+    model: "text-embedding-3-small",
     dimensions: 1536,
   },
   chunking: {
@@ -233,9 +234,10 @@ export interface EmbeddingResponse {
 }
 
 export interface EmbedderConfig {
-  provider: "voyage" | "openai" | "local" | "nella";
+  provider: "azure";
   apiKey?: string;
-  apiBase?: string;
+  endpoint?: string;
+  deployment?: string;
   model: string;
   dimensions: number;
   batchSize: number;

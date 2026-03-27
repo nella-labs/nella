@@ -73,41 +73,38 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
 
 class CohereReranker {
   private apiKey: string | null = null;
+  private endpoint: string | null = null;
   private available: boolean = false;
 
   constructor() {
-    this.apiKey = process.env.COHERE_API_KEY || null;
-    this.available = !!this.apiKey;
+    this.apiKey = process.env.AZURE_RERANK_API_KEY || null;
+    this.endpoint = process.env.AZURE_RERANK_ENDPOINT || null;
+    this.available = !!(this.apiKey && this.endpoint);
   }
 
   isAvailable(): boolean {
     return this.available;
   }
 
-  setApiKey(key: string): void {
-    this.apiKey = key;
-    this.available = true;
-  }
-
   async rerank(
     query: string,
     documents: { id: string; text: string }[],
-    model: string = "rerank-english-v3.0",
+    _model?: string,
     topN?: number
   ): Promise<{ id: string; score: number }[]> {
-    if (!this.available || !this.apiKey) {
-      throw new Error("Cohere API key not set");
+    if (!this.available || !this.apiKey || !this.endpoint) {
+      throw new Error("Azure rerank not configured — set AZURE_RERANK_API_KEY and AZURE_RERANK_ENDPOINT");
     }
 
     const request: CohereRerankRequest = {
-      model,
+      model: "Cohere-rerank-v4.0-pro",
       query,
       documents: documents.map((d) => d.text),
       top_n: topN ?? documents.length,
       return_documents: false,
     };
 
-    const response = await fetch("https://api.cohere.ai/v1/rerank", {
+    const response = await fetch(this.endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -119,7 +116,7 @@ class CohereReranker {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Cohere API error: ${response.status} ${error}`);
+      throw new Error(`Azure Cohere rerank API error: ${response.status} ${error}`);
     }
 
     const data = await response.json() as CohereRerankResponse;
@@ -233,14 +230,7 @@ export class HybridSearcher {
   }
 
   /**
-   * Set Cohere API key for reranking
-   */
-  setCohereApiKey(key: string): void {
-    this.cohereReranker.setApiKey(key);
-  }
-
-  /**
-   * Check if Cohere reranking is available
+   * Check if reranking is available (Azure Cohere deployment configured)
    */
   isRerankingAvailable(): boolean {
     return this.cohereReranker.isAvailable();
