@@ -26,8 +26,8 @@
   "scripts": {
     "build": "tsup",
     "build:tsc": "tsc",
-    "test": "tsx --test src/**/__tests__/*.test.ts",
-    "test:ci": "tsx --test src/**/__tests__/*.test.ts",
+    "test": "tsx --test 'src/**/__tests__/*.test.ts'",
+    "test:ci": "tsx --test 'src/**/__tests__/*.test.ts'",
     "dev": "tsup --watch",
     "start:mcp": "node dist/mcp/server.js",
     "prepublishOnly": "npm run build"
