@@ -316,7 +316,7 @@
       "type": "system",
       "scope": "external",
       "status": "live",
-      "description": "Serverless container platform hosting the MCP server (nella-mcp) and REST API (nella-api) services.",
+      "description": "Serverless container platform hosting the MCP server (nella-mcp). REST API (nella-api) is not yet deployed.",
       "technologies": [
         { "id": "tech-gcp", "name": "Google Cloud" },
         { "id": "tech-docker", "name": "Docker" }
@@ -512,8 +512,8 @@
       "id": "conn-api-cloudrun",
       "sourceId": "app-api",
       "targetId": "system-gcp-cloudrun",
-      "label": "deployed as nella-api service",
-      "status": "live",
+      "label": "nella-api service (not yet deployed)",
+      "status": "planned",
       "type": "data"
     },
     {
