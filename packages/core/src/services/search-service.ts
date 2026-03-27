@@ -60,9 +60,9 @@ export class SearchService {
         strategy: "ast" as any,
       },
       embedder: {
-        provider: (config.embeddingProvider || "voyage") as any,
-        model: config.embeddingModel || "voyage-code-3",
-        dimensions: 1024,
+        provider: "azure",
+        model: "text-embedding-3-small",
+        dimensions: 1536,
       },
       search: {
         vectorWeight: 0.7,

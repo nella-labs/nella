@@ -700,8 +700,8 @@ export class WorkspaceRegistry {
         "**/.git/**",
       ],
       embedder: {
-        provider: "voyage",
-        model: "voyage-code-2",
+        provider: "azure",
+        model: "text-embedding-3-small",
         dimensions: 1536,
       },
       search: {
