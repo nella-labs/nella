@@ -355,3 +355,4 @@ The `CloudSyncManager` from `cloud-sync/` is a legacy compatibility wrapper. New
 - [Core Modules](./core-modules.md) — Run engine, validators, context, and workspace
 - [MCP Server](./mcp-server.md) — MCP protocol implementation and tool routing
 - [Indexing & RAG](./indexing-rag.md) — Code chunking, embedding, and hybrid search
+- [Prompt Injection Defense](./prompt-injection-defense.md) — 5-layer defense system protecting agents from injection attacks through search results

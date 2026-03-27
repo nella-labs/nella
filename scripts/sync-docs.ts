@@ -145,11 +145,25 @@ const SYNC_MAPPINGS: SyncMapping[] = [
   },
 
   // =========================================================================
+  // Architecture
+  // =========================================================================
+  {
+    source: "architecture/prompt-injection-defense.md",
+    target: "architecture/prompt-injection-defense.mdx",
+    transform: transformGeneric,
+  },
+
+  // =========================================================================
   // Guides
   // =========================================================================
   {
     source: "guides/tips-and-best-practices.md",
     target: "guides/tips-and-best-practices.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "guides/securing-agents-against-injection.md",
+    target: "guides/securing-agents-against-injection.mdx",
     transform: transformGeneric,
   },
 
