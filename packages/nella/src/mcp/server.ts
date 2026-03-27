@@ -31,13 +31,17 @@ import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
 // Usage Logging (fire-and-forget to nella API)
 // =============================================================================
 
-function logUsage(toolName: string, durationMs: number, success: boolean): void {
+function logUsage(toolName: string, durationMs: number, success: boolean, result?: CallToolResult, args?: Record<string, unknown>): void {
   getValidSession().then((session) => {
     if (!session) return;
+    const inputText = JSON.stringify(args || {});
+    const outputText = result?.content?.map((c: any) => c.text || "").join("") || "";
+    const tokensUsed = Math.ceil(inputText.length / 4) + Math.ceil(outputText.length / 4);
     const body = JSON.stringify({
       tool_name: toolName,
       duration_ms: durationMs,
       success,
+      tokens_used: Math.max(tokensUsed, 1),
     });
     const url = new URL("https://app.getnella.dev/api/usage/log");
     const req = https.request(
@@ -150,13 +154,13 @@ Example:
         // Try each tool category
         const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
         if (contextResult !== null) {
-          logUsage(name, Date.now() - start, !contextResult.isError);
+          logUsage(name, Date.now() - start, !contextResult.isError, contextResult as CallToolResult, toolArgs);
           return contextResult as CallToolResult;
         }
 
         const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);
         if (indexingResult !== null) {
-          logUsage(name, Date.now() - start, !indexingResult.isError);
+          logUsage(name, Date.now() - start, !indexingResult.isError, indexingResult as CallToolResult, toolArgs);
           return indexingResult as CallToolResult;
         }
 
