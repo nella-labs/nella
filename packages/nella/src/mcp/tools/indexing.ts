@@ -14,6 +14,7 @@ import {
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import type { ServerContext } from "../server";
+import { getValidSession } from "../../auth";
 import {
   generateNonce,
   wrapSearchResult,
@@ -119,11 +120,23 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
 
-  const embedderConfig: IndexManagerConfig["embedder"] = {
-    provider: "azure",
-    model: "text-embedding-3-small",
-    dimensions: 1536,
-  };
+  const session = await getValidSession();
+  let embedderConfig: IndexManagerConfig["embedder"];
+  if (session) {
+    embedderConfig = {
+      provider: "nella",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+      apiKey: session.access_token,
+      apiBase: "https://app.getnella.dev/api",
+    };
+  } else {
+    embedderConfig = {
+      provider: "azure",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
+  }
 
   const config: IndexManagerConfig = {
     workspaceId,

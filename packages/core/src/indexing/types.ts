@@ -72,12 +72,13 @@ export interface IndexMetadata {
 export interface IndexConfig {
   // Embedding settings
   embedder: {
-    provider: "azure";
+    provider: "azure" | "nella";
     model: string;
     dimensions: number;
     apiKey?: string;
     endpoint?: string;
     deployment?: string;
+    apiBase?: string;
   };
 
   // Chunking settings
@@ -234,10 +235,11 @@ export interface EmbeddingResponse {
 }
 
 export interface EmbedderConfig {
-  provider: "azure";
+  provider: "azure" | "nella";
   apiKey?: string;
   endpoint?: string;
   deployment?: string;
+  apiBase?: string;
   model: string;
   dimensions: number;
   batchSize: number;
