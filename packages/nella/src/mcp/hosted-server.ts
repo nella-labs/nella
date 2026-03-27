@@ -350,6 +350,54 @@ async function validateApiKey(
 }
 
 // =============================================================================
+// Pushover Notifications (fire-and-forget)
+// =============================================================================
+
+async function notifyPushover(title: string, message: string, priority: number = 0, sound: string = "pushover") {
+  const token = process.env.PUSHOVER_APP_TOKEN;
+  const user = process.env.PUSHOVER_USER_KEY;
+  if (!token || !user) return;
+  try {
+    const body: Record<string, string> = { token, user, message, title, priority: String(priority), sound, html: "1" };
+    if (priority === 2) { body.retry = "300"; body.expire = "3600"; }
+    await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      body: new URLSearchParams(body),
+    });
+  } catch { /* don't break main flow */ }
+}
+
+// =============================================================================
+// Usage Milestone Tracking (in-memory, resets daily)
+// =============================================================================
+
+const dailyUsageCounts = new Map<string, { count: number; date: string; firstRunNotified: boolean; powerNotified: boolean }>();
+
+function checkUsageMilestones(apiKeyId: string, toolName: string): void {
+  const today = new Date().toISOString().slice(0, 10);
+  let entry = dailyUsageCounts.get(apiKeyId);
+
+  if (!entry || entry.date !== today) {
+    entry = { count: 0, date: today, firstRunNotified: false, powerNotified: false };
+    dailyUsageCounts.set(apiKeyId, entry);
+  }
+
+  entry.count++;
+
+  // First run ever for this key (count === 1 on first day we see it)
+  if (entry.count === 1 && !entry.firstRunNotified) {
+    entry.firstRunNotified = true;
+    notifyPushover("Usage: First Run", `First run! API key ${apiKeyId.slice(0, 8)}... used ${toolName}`, 1, "cosmic");
+  }
+
+  // Power user: crossed 50 calls today
+  if (entry.count === 50 && !entry.powerNotified) {
+    entry.powerNotified = true;
+    notifyPushover("Usage: Power User", `API key ${apiKeyId.slice(0, 8)}... hit 50 calls today`, 0, "climb");
+  }
+}
+
+// =============================================================================
 // Usage Logging
 // =============================================================================
 
@@ -385,6 +433,8 @@ async function logUsageEvent(params: {
         durationMs: params.durationMs,
         success: params.success,
       });
+      // Check for usage milestones (first run, power user)
+      checkUsageMilestones(params.apiKeyId, params.toolName);
     }
   } catch (err) {
     log("error", "Usage logging threw exception", {
@@ -580,9 +630,11 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           }
 
           const contextManager = new ContextManager(tmpDir);
+          const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
           const serverContext: ServerContext = {
             workspacePath: tmpDir,
             contextManager,
+            sessionToken,
           };
 
           // Try each tool category
@@ -1228,7 +1280,8 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
           const contextManager = new ContextManager(tmpDir);
-          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager };
+          const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
+          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager, sessionToken };
 
           const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
           if (contextResult !== null) { result = contextResult; success = true; }

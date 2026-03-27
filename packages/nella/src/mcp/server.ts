@@ -11,6 +11,7 @@
  *   nella mcp --workspace /path/to/project           # via CLI subcommand
  */
 
+import * as crypto from "crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -67,6 +68,8 @@ function logUsage(toolName: string, durationMs: number, success: boolean): void 
 export interface ServerContext {
   workspacePath: string;
   contextManager: ContextManager;
+  /** Per-session trust token for prompt injection defense (L4) */
+  sessionToken?: string;
 }
 
 // =============================================================================
@@ -104,9 +107,13 @@ Example:
   // Initialize context manager for stateful tracking
   const contextManager = new ContextManager(workspacePath);
 
+  // Generate per-session trust token for prompt injection defense (L4)
+  const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
+
   const serverContext: ServerContext = {
     workspacePath,
     contextManager,
+    sessionToken,
   };
 
   // Create MCP server

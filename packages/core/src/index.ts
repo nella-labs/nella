@@ -77,6 +77,9 @@ export {
   createHybridSearcher,
   CodeVerifier,
   createCodeVerifier,
+  // Content scanning (prompt injection defense)
+  scanContent,
+  formatInjectionWarning,
 } from "./indexing";
 
 export type {
@@ -85,6 +88,7 @@ export type {
   CodeChunk,
   ChunkType,
   CodeSymbol,
+  ContentSource,
   IndexMetadata,
   IndexConfig,
   SearchQuery,
@@ -98,6 +102,10 @@ export type {
   EmbeddingResponse,
   EmbedderConfig as IndexEmbedderConfig,
   IndexEvent,
+  ScanResult,
+  DetectedPattern,
+  InjectionPatternType,
+  PatternSeverity,
 } from "./indexing";
 
 // =============================================================================
