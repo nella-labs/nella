@@ -439,9 +439,11 @@ const indexConfig = {
 | Variable | Module | Description |
 |----------|--------|-------------|
 | `ANTHROPIC_API_KEY` | Agents | Anthropic API key for Claude models |
-| `OPENAI_API_KEY` | Agents | OpenAI API key for GPT models |
-| `VOYAGE_API_KEY` | Indexing | Voyage AI API key for embeddings |
-| `COHERE_API_KEY` | Indexing | Cohere API key for reranking |
+| `AZURE_EMBEDDING_API_KEY` | Indexing | Azure OpenAI embedding API key |
+| `AZURE_ENDPOINT` | Indexing | Azure OpenAI endpoint URL |
+| `AZURE_EMBEDDING_DEPLOYMENT` | Indexing | Azure OpenAI embedding deployment name |
+| `AZURE_RERANK_API_KEY` | Indexing | Azure-hosted Cohere rerank API key |
+| `AZURE_RERANK_ENDPOINT` | Indexing | Azure-hosted Cohere rerank endpoint URL |
 | `SUPABASE_URL` | Sync, Auth | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Sync, Auth | Supabase service role key |
 | `REDIS_URL` | Rate Limiting | Redis connection URL |

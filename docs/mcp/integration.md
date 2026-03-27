@@ -187,7 +187,8 @@ nella serve --port 3001 --api-key nella_my_secret_key
 | `REDIS_URL` | No | Redis for distributed rate limiting |
 | `NELLA_API_KEY` | No | API key for authentication |
 | `ANTHROPIC_API_KEY` | For agents | Anthropic API key |
-| `OPENAI_API_KEY` | For agents | OpenAI API key |
+| `AZURE_EMBEDDING_API_KEY` | For indexing | Azure OpenAI embedding API key |
+| `AZURE_ENDPOINT` | For indexing | Azure OpenAI endpoint URL |
 
 ### Connecting Clients
 
