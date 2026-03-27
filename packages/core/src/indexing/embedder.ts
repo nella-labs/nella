@@ -389,6 +389,9 @@ export class Embedder {
   private async callAPI(texts: string[], model: string): Promise<{ embeddings: number[][]; tokens: number }> {
     for (let attempt = 0; attempt < this.config.maxRetries; attempt++) {
       try {
+        if (this.config.provider === "nella") {
+          return await this.callNellaAPI(texts, model);
+        }
         return await this.callAzureAPI(texts, model);
       } catch (error) {
         if (attempt === this.config.maxRetries - 1) {
@@ -438,6 +441,44 @@ export class Embedder {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Azure OpenAI API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json() as {
+      data: { embedding: number[] }[];
+      usage: { total_tokens: number };
+    };
+
+    return {
+      embeddings: data.data.map((d) => d.embedding),
+      tokens: data.usage.total_tokens,
+    };
+  }
+
+  /**
+   * Call Nella's server-side embedding proxy
+   */
+  private async callNellaAPI(texts: string[], model: string): Promise<{ embeddings: number[][]; tokens: number }> {
+    const apiKey = this.config.apiKey;
+    if (!apiKey) {
+      throw new Error("Nella auth token not set — run 'nella auth login' first");
+    }
+
+    const apiBase = this.config.apiBase || "https://app.getnella.dev/api";
+    const maxChars = 8000 * 3;
+    const truncatedTexts = texts.map((t) => t.length > maxChars ? t.slice(0, maxChars) : t);
+
+    const response = await fetch(`${apiBase}/embeddings`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, input: truncatedTexts }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Nella embedding API error: ${response.status} ${error}`);
     }
 
     const data = await response.json() as {
