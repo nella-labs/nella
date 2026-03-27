@@ -120,6 +120,7 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
 
+  // Use Nella cloud embeddings when authenticated, fall back to Azure (requires env vars)
   const session = await getValidSession();
   let embedderConfig: IndexManagerConfig["embedder"];
   if (session) {
@@ -130,12 +131,17 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
       apiKey: session.access_token,
       apiBase: "https://app.getnella.dev/api",
     };
-  } else {
+  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
     embedderConfig = {
       provider: "azure",
       model: "text-embedding-3-small",
       dimensions: 1536,
     };
+  } else {
+    throw new Error(
+      "No embedding provider configured. Either run 'nella auth login' for cloud embeddings, " +
+      "or set AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT environment variables.",
+    );
   }
 
   const config: IndexManagerConfig = {
