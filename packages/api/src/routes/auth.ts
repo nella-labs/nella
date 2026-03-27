@@ -218,30 +218,26 @@ export function authRouter(): Router {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      // Count today
-      const { count: todayCount } = await supabase
-        .from("usage_events")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .gte("created_at", todayStart);
+      // Sum usage units (matches sum_usage_by_user RPC logic)
+      const { data: todayData } = await supabase.rpc("sum_usage_units", {
+        p_user_id: userId,
+        p_since: todayStart,
+      });
 
-      // Count this month
-      const { count: monthCount } = await supabase
-        .from("usage_events")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .gte("created_at", monthStart);
+      const { data: monthData } = await supabase.rpc("sum_usage_units", {
+        p_user_id: userId,
+        p_since: monthStart,
+      });
 
-      // Count total
-      const { count: totalCount } = await supabase
-        .from("usage_events")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId);
+      const { data: totalData } = await supabase.rpc("sum_usage_units", {
+        p_user_id: userId,
+        p_since: "1970-01-01T00:00:00Z",
+      });
 
       sendSuccess(res, {
-        today: todayCount || 0,
-        month: monthCount || 0,
-        total: totalCount || 0,
+        today: todayData || 0,
+        month: monthData || 0,
+        total: totalData || 0,
       });
     } catch (err) {
       next(err);

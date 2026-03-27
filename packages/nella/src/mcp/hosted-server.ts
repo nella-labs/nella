@@ -403,6 +403,7 @@ function checkUsageMilestones(apiKeyId: string, toolName: string): void {
 
 async function logUsageEvent(params: {
   apiKeyId: string;
+  userId?: string;
   toolName: string;
   durationMs: number;
   success: boolean;
@@ -412,13 +413,11 @@ async function logUsageEvent(params: {
 }): Promise<void> {
   try {
     const supabase = getSupabase();
-    // Table columns: id, api_key_id, tool_name, tokens_used, workspace, created_at
-    // (no duration_ms, success, or error columns)
-    const { error } = await supabase.from("usage_events").insert({
+    const { error } = await supabase.from("usage_logs").insert({
       api_key_id: params.apiKeyId,
+      user_id: params.userId || null,
       tool_name: params.toolName,
       tokens_used: params.tokensUsed || 0,
-      workspace: params.workspace || null,
     });
     if (error) {
       log("error", "Failed to log usage event to Supabase", {
@@ -729,6 +728,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           if (ownerApiKeyId) {
             await logUsageEvent({
               apiKeyId: ownerApiKeyId,
+              userId: ownerUserId,
               toolName: name,
               durationMs: duration,
               success,
@@ -1370,6 +1370,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         // Log usage
         logUsageEvent({
           apiKeyId: client.apiKeyId,
+          userId: client.userId,
           toolName,
           durationMs: duration,
           success,
