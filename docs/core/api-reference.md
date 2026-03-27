@@ -1197,7 +1197,8 @@ Factory function to create the right adapter.
 const adapter = createAgentAdapter({
   provider: 'openai',           // 'anthropic' | 'openai'
   model: 'gpt-4o',
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.AZURE_EMBEDDING_API_KEY,
+  endpoint: process.env.AZURE_ENDPOINT
 });
 ```
 

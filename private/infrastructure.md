@@ -42,6 +42,7 @@
 | `app.getnella.dev` | Vercel (app) | nella-website |
 | `docs.getnella.dev` | Vercel (docs) | nella-website |
 | `mcp.getnella.dev` | GCP Cloud Run | nella |
+| `api.getnella.dev` | GCP Cloud Run (not yet deployed) | nella |
 
 ## GCP Resources (nella-sync project)
 
