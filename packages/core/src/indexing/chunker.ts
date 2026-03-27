@@ -485,11 +485,12 @@ export class Chunker {
 
     // Annotate each member chunk with the class-level symbol so the
     // verifier and symbol index can resolve the class name.
+    const isExported = !!(node as any).exported;
     for (const chunk of chunks) {
       chunk.symbols.push({
         name: className,
         kind: "class",
-        exported: false,
+        exported: isExported,
       });
     }
 
@@ -814,7 +815,13 @@ export class Chunker {
     const targetTokens = Math.floor(this.config.maxTokens * 0.6);
 
     for (const chunk of chunks) {
-      if (chunk.tokens >= targetTokens) {
+      // Never merge class member chunks — they were intentionally split
+      const isClassMember = chunk.symbols.some(s => s.kind === "class") &&
+        chunk.symbols.some(s => s.kind === "method" || s.kind === "property");
+      if (isClassMember) {
+        if (buffer) { merged.push(buffer); buffer = null; }
+        merged.push(chunk);
+      } else if (chunk.tokens >= targetTokens) {
         // Large enough on its own — flush buffer first
         if (buffer) { merged.push(buffer); buffer = null; }
         merged.push(chunk);
