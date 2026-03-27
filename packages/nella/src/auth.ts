@@ -310,6 +310,17 @@ export async function login(): Promise<{
       const server = http.createServer((req, res) => {
         const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
 
+        // Handle CORS preflight for fetch() from https://app.getnella.dev
+        if (req.method === "OPTIONS") {
+          res.writeHead(204, {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Max-Age": "86400",
+          });
+          res.end();
+          return;
+        }
+
         if (url.pathname !== "/callback") {
           res.writeHead(404, { "Content-Type": "text/plain" });
           res.end("Not found");
