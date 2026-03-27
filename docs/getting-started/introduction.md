@@ -17,6 +17,7 @@ AI coding agents are powerful, but they suffer from fundamental reliability issu
 Nella runs as an MCP server alongside your IDE, giving your AI agent access to search, context, and dependency-tracking tools in real-time:
 
 - **Codebase search** — Hybrid semantic + lexical search across your indexed codebase
+- **Prompt injection defense** — 5-layer protection against malicious instructions embedded in code and docs
 - **Session context** — Track changes, assumptions, and dependencies across an entire coding session
 - **Assumption tracking** — Record and verify assumptions to catch contradictions early
 - **Dependency checking** — Detect when dependencies change under you
