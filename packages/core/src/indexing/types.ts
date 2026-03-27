@@ -17,6 +17,17 @@ export interface CodeSymbol {
   exported?: boolean;
 }
 
+export interface ContentSource {
+  /** Where this content originated */
+  origin: "workspace" | "external_docs" | "external_repo" | "user_provided";
+  /** URL or path of the original source */
+  sourceUrl?: string;
+  /** Trust level computed from origin + injection scan */
+  trustLevel: "trusted" | "semi-trusted" | "untrusted";
+  /** Injection risk score from content scanner (0.0 - 1.0) */
+  injectionScore?: number;
+}
+
 export interface CodeChunk {
   id: string;
   filePath: string;
@@ -30,6 +41,8 @@ export interface CodeChunk {
   hash: string;
   tokens: number;
   embedding?: number[];
+  /** Source trust classification for prompt injection defense */
+  source?: ContentSource;
   createdAt: string;
   updatedAt: string;
 }
