@@ -6,7 +6,6 @@
  * Commands:
  *   nella index      - Index workspace for search & code verification
  *   nella mcp        - Start MCP server for AI agent integration
- *   nella playground  - Start the playground server with real-time dashboard
  *   nella connect    - Configure Claude, VS Code & Cursor
  *   nella auth       - Login, logout, or check status
  *
@@ -28,7 +27,6 @@ import {
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
 import { startHostedServer } from "./mcp/hosted-server";
-import { startPlaygroundServer } from "./playground";
 import {
   login,
   loadSession,
@@ -132,7 +130,7 @@ function divider(): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "index" | "mcp" | "serve" | "connect" | "auth" | "playground" | "setup" | "help";
+  command: "index" | "mcp" | "serve" | "connect" | "auth" | "setup" | "help";
   force?: boolean;
   repoPath?: string;
   output?: "json" | "pretty";
@@ -162,7 +160,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "playground" || arg === "setup" || arg === "help") {
+    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "setup" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -756,8 +754,7 @@ function showHelp(): void {
   srvTable.push(
     [theme.primary("mcp"), theme.muted("Start MCP server for AI agents (stdio)")],
     [theme.primary("serve"), theme.muted("Start hosted MCP server (HTTP)")],
-    [theme.primary("playground"), theme.muted("Real-time debugging dashboard")],
-  );
+);
   console.log(srvTable.toString());
   console.log("");
 
@@ -777,7 +774,7 @@ function showHelp(): void {
   console.log(sectionHeader("Options"));
   const optTable = new Table({ chars: tableChars, style: tableStyle });
   optTable.push(
-    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (mcp/playground)"],
+    [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (mcp)"],
     [theme.accent("--port, -p"), theme.muted("<num>"), "Server port (default: 3847)"],
     [theme.accent("--host"), theme.muted("<host>"), "Server host (default: localhost)"],
     [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect"],
@@ -846,29 +843,7 @@ async function main(): Promise<void> {
     case "setup":
       runSetupCommand();
       break;
-    case "playground":
-      if (args.showHelp) {
-        console.log(logo);
-        console.log(tagline);
-        console.log(`  ${theme.primary.bold("nella playground")} — Start playground server with real-time dashboard\n`);
-        console.log(`  ${theme.primary.bold("Usage:")}\n`);
-        console.log(`    ${theme.muted("$")} ${theme.primary("nella playground [--workspace <path>] [--repo <url>] [--port <number>] [--host <host>]")}\n`);
-        console.log(`  ${theme.primary.bold("Options:")}\n`);
-        console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}      Workspace path`);
-        console.log(`    ${theme.accent("--repo, -r")} ${theme.muted("<url|path>")}       Git repo URL or local path to use as workspace`);
-        console.log(`    ${theme.accent("--port, -p")} ${theme.muted("<number>")}         Port (default: 3847)`);
-        console.log(`    ${theme.accent("--host")} ${theme.muted("<host>")}               Host (default: localhost)`);
-        console.log("");
-        break;
-      }
-      await startPlaygroundServer({
-        workspace: args.workspace,
-        port: args.port,
-        host: args.host,
-        repo: args.repoPath,
-      });
-      break;
-    case "help":
+case "help":
     default:
       showHelp();
       break;
