@@ -10,6 +10,7 @@ import * as path from "path";
 import { minimatch } from "minimatch";
 import type {
   CodeChunk,
+  ContentSource,
   IndexMetadata,
   IndexConfig,
   DEFAULT_INDEX_CONFIG,
@@ -25,6 +26,7 @@ import { VectorStore, createVectorStore } from "./vector-store";
 import { LexicalIndex, createLexicalIndex } from "./lexical-index";
 import { HybridSearcher, createHybridSearcher } from "./hybrid-search";
 import { CodeVerifier, createCodeVerifier } from "./verifier";
+import { scoreInjectionRisk } from "./injection-scorer";
 import { saveBest, loadAny, removePersistedFile } from "./persistence";
 
 // =============================================================================
@@ -193,8 +195,26 @@ export class IndexManager {
         // Chunk the file
         const fileChunks = await this.chunker.chunkFile(filePath);
 
-        // Add chunks to indexes
+        // Add chunks to indexes (with source trust classification — L3, L5)
         for (const chunk of fileChunks) {
+          if (!chunk.source) {
+            chunk.source = {
+              origin: "workspace",
+              trustLevel: "trusted",
+            };
+          }
+
+          // L5: Compute injection risk score at index time
+          const assessment = scoreInjectionRisk(chunk);
+          chunk.source.injectionScore = assessment.score;
+
+          // Update trust level based on injection score + origin
+          if (chunk.source.origin === "workspace") {
+            chunk.source.trustLevel = assessment.score >= 0.3 ? "semi-trusted" : "trusted";
+          } else {
+            chunk.source.trustLevel = assessment.score >= 0.2 ? "untrusted" : "semi-trusted";
+          }
+
           this.chunks.set(chunk.id, chunk);
           this.lexicalIndex.add(chunk);
           this.hybridSearcher.registerChunk(chunk);
@@ -602,4 +622,8 @@ export { VectorStore, createVectorStore } from "./vector-store";
 export { LexicalIndex, createLexicalIndex } from "./lexical-index";
 export { HybridSearcher, createHybridSearcher } from "./hybrid-search";
 export { CodeVerifier, createCodeVerifier } from "./verifier";
+export { scanContent, formatInjectionWarning } from "./content-scanner";
+export type { ScanResult, DetectedPattern, InjectionPatternType, PatternSeverity } from "./content-scanner";
+export { scoreInjectionRisk } from "./injection-scorer";
+export type { InjectionAssessment, ScoringFactor } from "./injection-scorer";
 export * from "./types";

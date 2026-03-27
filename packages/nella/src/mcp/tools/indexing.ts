@@ -9,10 +9,17 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import {
   createIndexManager,
   DEFAULT_INDEX_CONFIG,
+  scanContent,
+  formatInjectionWarning,
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import type { ServerContext } from "../server";
 import { getValidSession } from "../../auth";
+import {
+  generateNonce,
+  wrapSearchResult,
+  wrapSearchResponse,
+} from "./result-isolation";
 
 // =============================================================================
 // Tool Definitions
@@ -264,29 +271,56 @@ async function handleSearch(
       };
     }
 
-    const lines: string[] = [
-      `Found ${response.results.length} results for "${query}" (${response.searchTime}ms):`,
-      "",
-    ];
+    const header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms):`;
+    const nonce = generateNonce();
+    const totalResults = response.results.length;
 
-    for (const result of response.results) {
+    const wrappedResults: string[] = [];
+
+    for (let i = 0; i < response.results.length; i++) {
+      const result = response.results[i];
       const relPath = path.relative(context.workspacePath, result.chunk.filePath);
       const [startLine, endLine] = result.chunk.lines;
       const score = (result.score * 100).toFixed(1);
+      const trustLevel = result.chunk.source?.trustLevel || "workspace";
 
-      lines.push(`## ${relPath}:${startLine}-${endLine} (${score}% match)`);
-      lines.push(`Type: ${result.chunk.type} | Language: ${result.chunk.language}`);
+      // L2: Scan content for injection patterns
+      const scan = scanContent(result.chunk.content);
+      const injectionWarning = formatInjectionWarning(scan);
+
+      // Format the result content
+      const resultLines: string[] = [];
+      resultLines.push(`## ${relPath}:${startLine}-${endLine} (${score}% match)`);
+      resultLines.push(`Type: ${result.chunk.type} | Language: ${result.chunk.language}`);
       if (result.chunk.symbols.length > 0) {
-        lines.push(`Symbols: ${result.chunk.symbols.map((s) => s.name).join(", ")}`);
+        resultLines.push(`Symbols: ${result.chunk.symbols.map((s) => s.name).join(", ")}`);
       }
-      lines.push("```" + result.chunk.language);
-      lines.push(result.chunk.content);
-      lines.push("```");
-      lines.push("");
+      resultLines.push("```" + result.chunk.language);
+      resultLines.push(result.chunk.content);
+      resultLines.push("```");
+
+      const wrapped = wrapSearchResult(
+        resultLines.join("\n"),
+        {
+          filePath: relPath,
+          lines: result.chunk.lines,
+          trustLevel,
+          resultIndex: i,
+          totalResults,
+          injectionWarning,
+        },
+        nonce,
+      );
+
+      wrappedResults.push(wrapped.content);
     }
 
+    const output = wrapSearchResponse(header, wrappedResults, {
+      sessionToken: context.sessionToken,
+    });
+
     return {
-      content: [{ type: "text", text: lines.join("\n") }],
+      content: [{ type: "text", text: output }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
