@@ -23,6 +23,10 @@ graph LR
             nella_check_assumptions["nella_check_assumptions<br/>Assumption status"]
             nella_check_deps["nella_check_dependencies<br/>Dependency drift"]
         end
+
+        subgraph trust_tools["Trust Chain"]
+            nella_heartbeat["nella_heartbeat<br/>Challenge continuity"]
+        end
     end
 
     subgraph core["@usenella/core"]
@@ -35,6 +39,7 @@ graph LR
     Transport --> Router
     Router --> indexing_tools
     Router --> context_tools
+    Router --> trust_tools
 
     nella_index --> IndexEngine
     nella_search --> SearchEngine
@@ -42,6 +47,7 @@ graph LR
     nella_add_assumption --> ContextMgr
     nella_check_assumptions --> ContextMgr
     nella_check_deps --> ContextMgr
+    nella_heartbeat --> ContextMgr
 
     style Agent fill:#6366f1,color:#fff
     style server fill:#f3e8ff,stroke:#7c3aed
@@ -56,6 +62,7 @@ graph LR
 |----------|-------|---------|
 | **Indexing** | `nella_index`, `nella_search` | Index workspace codebase and search via hybrid/semantic/lexical modes |
 | **Context** | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_check_dependencies` | Track session state, manage assumptions, detect dependency drift |
+| **Trust chain** | `nella_heartbeat` | Continue the challenge-response flow exposed through session context |
 
 ## Tool Call Lifecycle
 
@@ -72,7 +79,7 @@ sequenceDiagram
 
     A->>T: ListToolsRequest
     T->>S: route request
-    S-->>T: 6 tool definitions (JSON Schema)
+    S-->>T: 7 tool definitions (JSON Schema)
     T-->>A: tool list
 
     A->>T: CallToolRequest {name, arguments}
@@ -83,6 +90,8 @@ sequenceDiagram
         R->>H: handleIndexingTool(name, args, ctx)
     else Context Tool
         R->>H: handleContextTool(name, args, ctx)
+    else Heartbeat Tool
+        R->>H: handleHeartbeat(name, args, ctx)
     end
 
     H->>F: core function call
@@ -95,7 +104,7 @@ sequenceDiagram
 
 Key points:
 - The server registers all tools on startup with JSON Schema definitions for each tool's input parameters
-- The router dispatches by tool name prefix: `nella_index/search` -> indexing handler, all others -> context handler
+- The router dispatches by capability group: indexing, context, and heartbeat each have dedicated handlers
 - Tool results are formatted as markdown text for the agent to parse
 - Errors are returned as `{isError: true}` with a human-readable error message
 
@@ -118,6 +127,7 @@ graph TB
         subgraph Tools["MCP Tools"]
             IndexingTools["Indexing Tools<br/>index, search"]
             ContextTools["Context Tools<br/>get_context, add_assumption, ..."]
+            TrustTools["Trust Chain<br/>heartbeat"]
         end
     end
 
