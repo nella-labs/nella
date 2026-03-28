@@ -707,7 +707,7 @@ export class WorkspaceRegistry {
       search: {
         vectorWeight: 0.4,
         lexicalWeight: 0.6,
-        rerankEnabled: false,
+        rerankEnabled: true,
         topK: 10,
       },
     };
