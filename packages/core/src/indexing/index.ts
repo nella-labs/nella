@@ -637,4 +637,6 @@ export { scoreInjectionRisk } from "./injection-scorer";
 export type { InjectionAssessment, ScoringFactor } from "./injection-scorer";
 export { deriveHmacKey, signResultHmac, verifyResultHmac, signResponseHmac, verifyResponseHmac } from "./hmac";
 export type { HmacSignature, SignedResult } from "./hmac";
+export { buildDependencyGraph, dependencyGraphToArchgraphModel } from "./graph";
+export type { FileNode, DependencyEdge, DependencyGraph, GraphOptions } from "./graph";
 export * from "./types";

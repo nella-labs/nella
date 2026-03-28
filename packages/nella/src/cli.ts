@@ -23,6 +23,8 @@ import figures from "figures";
 import {
   createIndexManager,
   DEFAULT_INDEX_CONFIG,
+  buildDependencyGraph,
+  dependencyGraphToArchgraphModel,
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
@@ -148,6 +150,8 @@ interface CliArgs {
   yes?: boolean;
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
+  // Graph flag
+  graph?: boolean;
   // Help flag (per-command)
   showHelp?: boolean;
 }
@@ -186,6 +190,8 @@ function parseArgs(args: string[]): CliArgs {
       result.force = true;
     } else if (arg === "--json") {
       result.output = "json";
+    } else if (arg === "--graph") {
+      result.graph = true;
     } else if (arg === "--help" || arg === "-h") {
       if (result.command === "help") {
         // No command set yet — show global help
@@ -303,10 +309,11 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
     console.log(tagline);
     console.log(`  ${theme.primary.bold("nella index")} — Index workspace for search & code verification\n`);
     console.log(`  ${theme.primary.bold("Usage:")}\n`);
-    console.log(`    ${theme.muted("$")} ${theme.primary("nella index [--workspace <path>] [--force]")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella index [--workspace <path>] [--force] [--graph]")}\n`);
     console.log(`  ${theme.primary.bold("Options:")}\n`);
     console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}    Workspace path (default: cwd)`);
     console.log(`    ${theme.accent("--force, -f")}                    Force full reindex`);
+    console.log(`    ${theme.accent("--graph")}                        Generate dependency graph from index`);
     console.log("");
     return;
   }
@@ -314,36 +321,53 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
   const workspacePath = path.resolve(args.workspace || process.cwd());
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
+  const graphOnly = args.graph && !args.force;
+  const needsIndex = !graphOnly;
 
   console.log(logo);
   console.log(tagline);
-  console.log(`  ${theme.icons.arrow}  Indexing ${theme.primary.bold(workspacePath)}\n`);
+
+  if (graphOnly) {
+    console.log(`  ${theme.icons.arrow}  Generating dependency graph for ${theme.primary.bold(workspacePath)}\n`);
+  } else {
+    console.log(`  ${theme.icons.arrow}  Indexing ${theme.primary.bold(workspacePath)}\n`);
+  }
 
   if (args.force) {
     console.log(`  ${theme.muted("Mode: full reindex (--force)")}\n`);
   }
 
-  const session = await getValidSession();
+  // Resolve embedder config — graph-only mode doesn't need auth
   let embedderConfig: IndexManagerConfig["embedder"];
-  if (session) {
-    console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
-    embedderConfig = {
-      provider: "nella",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-      apiKey: session.access_token,
-      apiBase: "https://app.getnella.dev/api",
-    };
-  } else if (process.env.AZURE_EMBEDDING_API_KEY) {
-    console.log(`  ${theme.muted("Using Azure OpenAI embeddings")}\n`);
+  if (needsIndex) {
+    const session = await getValidSession();
+    if (session) {
+      console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
+      embedderConfig = {
+        provider: "nella",
+        model: "text-embedding-3-small",
+        dimensions: 1536,
+        apiKey: session.access_token,
+        apiBase: "https://app.getnella.dev/api",
+      };
+    } else if (process.env.AZURE_EMBEDDING_API_KEY) {
+      console.log(`  ${theme.muted("Using Azure OpenAI embeddings")}\n`);
+      embedderConfig = {
+        provider: "azure",
+        model: "text-embedding-3-small",
+        dimensions: 1536,
+      };
+    } else {
+      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
+      process.exit(1);
+    }
+  } else {
+    // Dummy config for graph-only mode (embedder is never called)
     embedderConfig = {
       provider: "azure",
       model: "text-embedding-3-small",
       dimensions: 1536,
     };
-  } else {
-    console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
-    process.exit(1);
   }
 
   const config: IndexManagerConfig = {
@@ -368,57 +392,105 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
 
   const manager = createIndexManager(config);
 
-  let lastProgressLine = "";
-  manager.onEvent((event: IndexEvent) => {
-    switch (event.type) {
-      case "index:start":
-        console.log(`  ${theme.icons.info}  Found ${theme.primary.bold(String(event.totalFiles))} files to process\n`);
-        break;
-      case "index:progress": {
-        const pct = Math.round((event.processed / event.total) * 100);
-        lastProgressLine = `  ${theme.muted(`[${pct}%]`)} ${theme.muted(event.currentFile)}`;
-        process.stderr.write(`\r${lastProgressLine}${"".padEnd(20)}`);
-        break;
+  // Run indexing if needed
+  if (needsIndex) {
+    let lastProgressLine = "";
+    manager.onEvent((event: IndexEvent) => {
+      switch (event.type) {
+        case "index:start":
+          console.log(`  ${theme.icons.info}  Found ${theme.primary.bold(String(event.totalFiles))} files to process\n`);
+          break;
+        case "index:progress": {
+          const pct = Math.round((event.processed / event.total) * 100);
+          lastProgressLine = `  ${theme.muted(`[${pct}%]`)} ${theme.muted(event.currentFile)}`;
+          process.stderr.write(`\r${lastProgressLine}${"".padEnd(20)}`);
+          break;
+        }
+        case "index:embed":
+          process.stderr.write("\r" + " ".repeat(80) + "\r");
+          console.log(`  ${theme.icons.info}  Embedded batch of ${theme.primary(String(event.batchSize))} chunks ${theme.muted(`(${event.tokensUsed} tokens)`)}`);
+          break;
+        case "index:error":
+          process.stderr.write("\r" + " ".repeat(80) + "\r");
+          console.log(`  ${theme.icons.error}  ${theme.error(event.error)} ${event.filePath ? theme.muted(event.filePath) : ""}`);
+          break;
+        case "index:complete":
+          process.stderr.write("\r" + " ".repeat(80) + "\r");
+          break;
       }
-      case "index:embed":
-        process.stderr.write("\r" + " ".repeat(80) + "\r");
-        console.log(`  ${theme.icons.info}  Embedded batch of ${theme.primary(String(event.batchSize))} chunks ${theme.muted(`(${event.tokensUsed} tokens)`)}`);
-        break;
-      case "index:error":
-        process.stderr.write("\r" + " ".repeat(80) + "\r");
-        console.log(`  ${theme.icons.error}  ${theme.error(event.error)} ${event.filePath ? theme.muted(event.filePath) : ""}`);
-        break;
-      case "index:complete":
-        process.stderr.write("\r" + " ".repeat(80) + "\r");
-        break;
+    });
+
+    try {
+      const metadata = await manager.index({ force: args.force });
+      const stats = metadata.stats;
+
+      console.log("");
+      console.log(box([
+        `${theme.icons.success}  ${theme.success.bold("Index Complete")}`,
+        "",
+        `   Files indexed:    ${theme.primary.bold(String(stats.filesIndexed))}`,
+        `   Chunks created:   ${theme.primary.bold(String(stats.chunksCount))}`,
+        `   Embeddings:       ${theme.primary.bold(String(stats.embeddingsCount))}`,
+        `   API tokens:       ${theme.primary.bold(String(stats.totalTokens))}`,
+        ...(stats.totalCost != null ? [`   Cost:             ${theme.primary.bold("$" + stats.totalCost.toFixed(4))}`] : []),
+        ...(stats.durationMs != null ? [`   Duration:         ${theme.primary.bold((stats.durationMs / 1000).toFixed(1) + "s")}`] : []),
+        "",
+        `   Storage: ${theme.muted(path.relative(workspacePath, storagePath) + "/")}`,
+      ].join("\n"), "Index"));
+      console.log("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log("");
+      console.log(`  ${theme.icons.error}  ${theme.error.bold("Indexing failed")}`);
+      console.log(`  ${theme.muted(message)}`);
+      console.log("");
+      process.exit(1);
     }
-  });
+  }
 
-  try {
-    const metadata = await manager.index({ force: args.force });
-    const stats = metadata.stats;
+  // Generate dependency graph if requested
+  if (args.graph) {
+    const chunks = manager.getAllChunks();
+    if (chunks.length === 0) {
+      console.log(`  ${theme.icons.error}  No index data found. Run ${theme.primary.bold("nella index")} first.\n`);
+      process.exit(1);
+    }
 
-    console.log("");
+    console.log(`  ${theme.icons.info}  Building dependency graph from ${theme.primary.bold(String(chunks.length))} chunks...\n`);
+
+    const graph = buildDependencyGraph(chunks, { workspacePath });
+    const model = dependencyGraphToArchgraphModel(graph, workspaceId);
+
+    // Write model
+    const graphDir = path.join(workspacePath, ".nella", "graph");
+    if (!fs.existsSync(graphDir)) fs.mkdirSync(graphDir, { recursive: true });
+    const modelPath = path.join(graphDir, "model.json");
+    fs.writeFileSync(modelPath, JSON.stringify(model, null, 2));
+
     console.log(box([
-      `${theme.icons.success}  ${theme.success.bold("Index Complete")}`,
+      `${theme.icons.success}  ${theme.success.bold("Dependency Graph")}`,
       "",
-      `   Files indexed:    ${theme.primary.bold(String(stats.filesIndexed))}`,
-      `   Chunks created:   ${theme.primary.bold(String(stats.chunksCount))}`,
-      `   Embeddings:       ${theme.primary.bold(String(stats.embeddingsCount))}`,
-      `   API tokens:       ${theme.primary.bold(String(stats.totalTokens))}`,
-      ...(stats.totalCost != null ? [`   Cost:             ${theme.primary.bold("$" + stats.totalCost.toFixed(4))}`] : []),
-      ...(stats.durationMs != null ? [`   Duration:         ${theme.primary.bold((stats.durationMs / 1000).toFixed(1) + "s")}`] : []),
+      `   Files:          ${theme.primary.bold(String(graph.files.size))}`,
+      `   Dependencies:   ${theme.primary.bold(String(graph.edges.filter(e => !e.isExternal).length))}`,
+      `   Packages:       ${theme.primary.bold(String(graph.externalPackages.size))}`,
+      `   Circular deps:  ${graph.circularDependencies.length > 0
+        ? theme.warning.bold(String(graph.circularDependencies.length))
+        : theme.success.bold("0")}`,
       "",
-      `   Storage: ${theme.muted(path.relative(workspacePath, storagePath) + "/")}`,
-    ].join("\n"), "Index"));
-    console.log("");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.log("");
-    console.log(`  ${theme.icons.error}  ${theme.error.bold("Indexing failed")}`);
-    console.log(`  ${theme.muted(message)}`);
-    console.log("");
-    process.exit(1);
+      `   Output: ${theme.muted(path.relative(workspacePath, modelPath))}`,
+    ].join("\n"), "Graph"));
+
+    if (graph.circularDependencies.length > 0) {
+      console.log(`\n  ${theme.icons.warning}  ${theme.warning("Circular dependencies:")}`);
+      for (const cycle of graph.circularDependencies.slice(0, 5)) {
+        console.log(`    ${theme.muted(cycle.join(" → "))}`);
+      }
+      if (graph.circularDependencies.length > 5) {
+        console.log(`    ${theme.muted(`... and ${graph.circularDependencies.length - 5} more`)}`);
+      }
+    }
+
+    console.log(`\n  ${theme.muted("View with:")} archgraph serve --model ${path.relative(workspacePath, modelPath)}\n`);
   }
 }
 

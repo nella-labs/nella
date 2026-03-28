@@ -88,6 +88,9 @@ export {
   verifyResultHmac,
   signResponseHmac,
   verifyResponseHmac,
+  // Dependency graph
+  buildDependencyGraph,
+  dependencyGraphToArchgraphModel,
 } from "./indexing";
 
 export type {
@@ -118,6 +121,10 @@ export type {
   SignedResult,
   InjectionAssessment,
   ScoringFactor,
+  FileNode,
+  DependencyEdge,
+  DependencyGraph,
+  GraphOptions,
 } from "./indexing";
 
 // =============================================================================
