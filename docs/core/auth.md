@@ -1,5 +1,7 @@
 # Authentication
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 Nella Core provides a full authentication and authorization system for securing MCP servers and managing agent access. It includes API key management, agent identity, JWT tokens, audit logging, IP filtering, and request signing.
 
 ## Key Exports
@@ -8,14 +10,14 @@ Nella Core provides a full authentication and authorization system for securing 
 - `createAgentManager` / `AgentManager` — register and authenticate agents
 - `createAuthenticator` / `Authenticator` — high-level auth entry point
 - `createTokenManager` / `TokenManager` — issue and verify JWT tokens
-- `createAuditLogManager` / `AuditLogManager` — immutable audit trail
-- `createIPFilter` / `IPFilter` — IP-based allow/deny lists
-- `createRequestSigner` / `RequestSigner` — HMAC request signing
+- `createAuditLog` / `AuditLogManager` — immutable audit trail
+- `createIPFilterMiddleware` / `IPFilter` — IP-based allow/deny lists
+- `createSigningMiddleware` / `RequestSigner` — HMAC request signing
 
 ## API Key Management
 
 ```ts
-import { createKeyManager } from '@usenella/core';
+import { createKeyManager } from '@usenella/core/auth';
 
 const keys = createKeyManager('/path/to/.nella/keys');
 
@@ -48,7 +50,7 @@ const activeKeys = keys.list({ status: 'active' });
 ## Agent Management
 
 ```ts
-import { createAgentManager } from '@usenella/core';
+import { createAgentManager } from '@usenella/core/auth';
 
 const agents = createAgentManager('/path/to/.nella/agents');
 
@@ -71,7 +73,7 @@ const connected = agents.listConnected();
 ## JWT Tokens
 
 ```ts
-import { createTokenManager } from '@usenella/core';
+import { createTokenManager } from '@usenella/core/auth';
 
 const tokens = createTokenManager({
   secret: process.env.JWT_SECRET!,
@@ -93,9 +95,9 @@ console.log(payload.agentId, payload.permissions);
 ## Audit Logging
 
 ```ts
-import { createAuditLogManager } from '@usenella/core';
+import { createAuditLog } from '@usenella/core/auth';
 
-const audit = createAuditLogManager('/path/to/.nella/audit');
+const audit = createAuditLog({ storagePath: '/path/to/.nella/audit' });
 
 // Log an action
 audit.log({
@@ -116,10 +118,10 @@ const entries = audit.query({
 ## IP Filtering & Request Signing
 
 ```ts
-import { createIPFilter, createRequestSigner } from '@usenella/core';
+import { IPFilter, RequestSigner } from '@usenella/core/auth';
 
 // IP allow/deny lists
-const ipFilter = createIPFilter({
+const ipFilter = new IPFilter({
   allowList: ['10.0.0.0/8', '192.168.1.0/24'],
   denyList: ['192.168.1.100'],
 });
@@ -127,7 +129,7 @@ const ipFilter = createIPFilter({
 const allowed = ipFilter.check('10.0.1.50'); // true
 
 // HMAC request signing
-const signer = createRequestSigner({ secret: 'shared-secret' });
+const signer = new RequestSigner({ secret: 'shared-secret' });
 const signature = signer.sign({ method: 'POST', path: '/mcp', body: '...' });
 const valid = signer.verify({ method: 'POST', path: '/mcp', body: '...' }, signature);
 ```
@@ -137,7 +139,7 @@ const valid = signer.verify({ method: 'POST', path: '/mcp', body: '...' }, signa
 The `Authenticator` class ties together key validation, agent lookup, and token management into a single entry point used by the hosted MCP server:
 
 ```ts
-import { createAuthenticator } from '@usenella/core';
+import { createAuthenticator } from '@usenella/core/auth';
 
 const auth = createAuthenticator({
   keysPath: '/path/to/.nella/keys',

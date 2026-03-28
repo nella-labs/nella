@@ -1,5 +1,9 @@
 # Context Management
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
+> **Note:** The context module classes (`ContextManager`, `SessionStore`, `ChangeLedger`, `AssumptionTracker`, `DependencyTracker`) **are** exported from `@usenella/core`.
+
 Stateful session tracking for AI coding agents.
 
 ## Table of Contents
@@ -109,11 +113,9 @@ Record file changes from a run and optionally check assumption invalidations.
 ```typescript
 const result = manager.recordRunChanges(
   'run_123',
-  {
-    files: [
-      { path: 'src/users.ts', operation: 'modify', reason: 'Added pagination' }
-    ]
-  },
+  [
+    { file: 'src/users.ts', operation: 'modify', reason: 'Added pagination' }
+  ],
   true  // Check for invalidated assumptions
 );
 
@@ -209,12 +211,12 @@ Update the stored dependency snapshot.
 
 Get session duration in minutes.
 
-#### `getHotspotFiles(changes: ChangeRecord[]): HotspotFile[]`
+#### `getHotspotFiles(limit?: number): HotspotFile[]`
 
 Get files with most changes.
 
 ```typescript
-const hotspots = store.getHotspotFiles(changes);
+const hotspots = store.getHotspotFiles(5);
 // [{ file: 'src/users.ts', changeCount: 5 }, ...]
 ```
 
@@ -227,7 +229,7 @@ Tracks all file changes during a session.
 ### Constructor
 
 ```typescript
-const ledger = new ChangeLedger();
+const ledger = new ChangeLedger(sessionStore);
 ```
 
 ### Methods
@@ -303,7 +305,7 @@ Tracks and validates assumptions about the codebase.
 ### Constructor
 
 ```typescript
-const tracker = new AssumptionTracker();
+const tracker = new AssumptionTracker(sessionStore);
 ```
 
 ### Methods
@@ -623,11 +625,9 @@ if (preflight.conflicts.length > 0) {
 }
 
 // Record changes from a run
-ctx.recordRunChanges('run_123', {
-  files: [
-    { path: 'src/users.ts', operation: 'modify', reason: 'Added pagination' }
-  ]
-}, true);
+ctx.recordRunChanges('run_123', [
+  { file: 'src/users.ts', operation: 'modify', reason: 'Added pagination' }
+], true);
 
 // Get full context
 const context = ctx.getContext();
@@ -642,4 +642,4 @@ console.log(ctx.getSummary());
 ctx.save();
 ```
 
-> Looking for shared, cross-agent context? See the Context Sharing section in [Core Modules](./modules.md). The `ContextManager` documented on this page tracks a single agent's **session state** (assumptions, changes, dependencies). The `SharedContextManager` manages **cross-agent context** with channels, encryption, and multiple transports (local, Supabase).
+> Looking for shared, cross-agent context? See [Context Sharing](./context-sharing.md). The `ContextManager` documented on this page tracks a single agent's **session state** (assumptions, changes, dependencies). The context-sharing module's `ContextManager` manages **cross-agent context** with channels, encryption, and multiple transports (local, Supabase).

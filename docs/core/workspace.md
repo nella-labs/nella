@@ -1,5 +1,9 @@
 # Workspace Management
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
+> **Note:** The main classes (`WorkspaceRegistry`, `WorkspaceSwitcher`, `Workspace`) and their factory functions **are** exported from `@usenella/core`. The utility classes (`FileLock`, `RegistryBackupManager`, `RegistryMigrationManager`, `WorkspaceValidator`, `FileWatcher`, `LRUCache`) are only available via `@usenella/core/workspace`.
+
 Nella Core supports multi-workspace setups so agents can safely operate across multiple repos. The workspace module maintains a registry, switches active workspaces, provides file watching, backup/migration, validation, and concurrency control.
 
 ## Key Exports
@@ -92,7 +96,7 @@ workspace.unwatch();
 ## Backup & Migration
 
 ```ts
-import { RegistryBackupManager } from '@usenella/core';
+import { RegistryBackupManager } from '@usenella/core/workspace';
 
 const backup = new RegistryBackupManager(registry);
 
@@ -127,7 +131,7 @@ if (!validation.valid) {
 Use `FileLock` to prevent concurrent modifications:
 
 ```ts
-import { FileLock } from '@usenella/core';
+import { FileLock } from '@usenella/core/workspace';
 
 const lock = new FileLock('/repos/backend/src/users.ts');
 
