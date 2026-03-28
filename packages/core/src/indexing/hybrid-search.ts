@@ -293,20 +293,27 @@ export class HybridSearcher {
     let embeddingCost = 0;
     let embeddingTokens = 0;
 
-    // Semantic search
-    if (mode === "hybrid" || mode === "semantic") {
+    if (mode === "hybrid") {
+      // Run semantic and lexical search in parallel — they're independent
+      const fetchCount = limit * 5;
+      const [semanticOutput, lexicalOutput] = await Promise.all([
+        (async () => {
+          const { embedding, tokensUsed, cost } = await this.embedder.embedOne(query.query);
+          return { results: this.vectorStore.search(embedding, fetchCount), tokensUsed, cost };
+        })(),
+        Promise.resolve(this.lexicalIndex.search(query.query, fetchCount)),
+      ]);
+      semanticResults = semanticOutput.results;
+      embeddingTokens = semanticOutput.tokensUsed;
+      embeddingCost = semanticOutput.cost;
+      lexicalResults = lexicalOutput;
+    } else if (mode === "semantic") {
       const { embedding, tokensUsed, cost } = await this.embedder.embedOne(query.query);
       embeddingTokens = tokensUsed;
       embeddingCost = cost;
-
-      const fetchCount = mode === "hybrid" ? limit * 5 : limit;
-      semanticResults = this.vectorStore.search(embedding, fetchCount);
-    }
-
-    // Lexical search
-    if (mode === "hybrid" || mode === "lexical") {
-      const fetchCount = mode === "hybrid" ? limit * 5 : limit;
-      lexicalResults = this.lexicalIndex.search(query.query, fetchCount);
+      semanticResults = this.vectorStore.search(embedding, limit);
+    } else {
+      lexicalResults = this.lexicalIndex.search(query.query, limit);
     }
 
     // Combine results based on mode
