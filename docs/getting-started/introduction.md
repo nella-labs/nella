@@ -34,6 +34,7 @@ Install Nella, point it at your project, and configure it in your MCP client (Cl
 | `nella_add_assumption` | Records an assumption for later verification |
 | `nella_check_assumptions` | Verifies recorded assumptions still hold |
 | `nella_check_dependencies` | Detects if dependencies changed |
+| `nella_heartbeat` | Verifies trust-chain continuity between tool calls |
 
 ### Example
 
@@ -55,19 +56,24 @@ No manual steps. The agent calls Nella automatically during the conversation.
 # Install
 npm install -g @getnella/mcp
 
-# Add to Claude Desktop config
+# Automatic client setup
+nella connect --client claude
+```
+
+For a manual local stdio config, pass the workspace explicitly:
+
+```json
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": { "NELLA_REPO_PATH": "/path/to/your/project" }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
 ```
 
-That's it. Restart your MCP client and Nella's tools are available.
+For CLI indexing outside the MCP client, log in first with `nella auth login`, then run `nella index --force`.
 
 ## Next Steps
 

@@ -18,16 +18,13 @@ Create `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "."
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "."]
     }
   }
 }
 ```
 
-This ensures everyone on your team uses Nella when working in the project.
+This pins the local MCP server to the project directory. Direct stdio/local MCP requires `--workspace`.
 
 ### Option B: Global configuration
 
@@ -37,12 +34,15 @@ Open Cursor: **Settings** (Cmd/Ctrl + ,) → **Features** → **MCP** → **Add 
 {
   "nella": {
     "command": "npx",
-    "args": ["-y", "@getnella/mcp"],
-    "env": {
-      "NELLA_REPO_PATH": "${workspaceFolder}"
-    }
+    "args": ["-y", "@getnella/mcp", "--workspace", "/absolute/path/to/project"]
   }
 }
+```
+
+### Option C: Use the CLI
+
+```bash
+nella connect --client cursor
 ```
 
 ### Reload Cursor
@@ -92,5 +92,5 @@ I want to add pagination to the users endpoint. Please:
 |-------|----------|
 | Server not starting | Check Cursor's MCP panel for error messages |
 | "Command not found" | Ensure `npx` is in your PATH. Try using the full path to `npx` |
-| Workspace path issues | Use absolute paths instead of `${workspaceFolder}` if variables aren't resolving |
-| Tools not loading | Restart Cursor. Check that `npx @getnella/mcp mcp` works in your terminal |
+| Workspace path issues | Use an absolute path instead of `.` if Cursor is not launching the server from the project root |
+| Tools not loading | Restart Cursor. Check that `npx -y @getnella/mcp --workspace /path/to/project` works in your terminal |

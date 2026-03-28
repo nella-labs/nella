@@ -9,6 +9,14 @@ Set up Nella as an MCP server for Claude Desktop.
 
 ## Setup
 
+### Option A: Use the CLI
+
+```bash
+nella connect --client claude
+```
+
+Use `--mode hosted --api-key nella_...` if you want to skip prompts and write a hosted config directly.
+
 ### Step 1: Locate the configuration file
 
 **macOS:**
@@ -25,7 +33,7 @@ Set up Nella as an MCP server for Claude Desktop.
 
 If the file doesn't exist, create it.
 
-### Step 2: Add Nella
+### Step 2: Add Nella manually for local stdio
 
 Open the config file and add:
 
@@ -34,16 +42,13 @@ Open the config file and add:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "/path/to/your/project"
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
 ```
 
-Replace `/path/to/your/project` with the absolute path to your workspace.
+Replace `/path/to/your/project` with the absolute path to your workspace. Direct stdio/local MCP requires `--workspace`.
 
 ### Step 3: Restart Claude Desktop
 
@@ -59,17 +64,13 @@ Claude should list tools like `nella_search`, `nella_index`, `nella_get_context`
 
 ## Automatic Setup
 
-You can also use the `nella connect` command:
+You can also let the CLI write the config:
 
 ```bash
-nella connect
+nella connect --client claude
 ```
 
-This command:
-1. Authenticates with your Nella account (opens browser if needed)
-2. Creates an API key
-3. Writes the MCP configuration to Claude Desktop's config file
-4. Verifies the connection
+In hosted mode, `nella connect` can use `NELLA_API_KEY`, prompt for an existing key, or create one if you are already logged in with `nella auth login`.
 
 ## Multiple Workspaces
 
@@ -80,13 +81,11 @@ Configure multiple Nella instances for different projects:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": { "NELLA_REPO_PATH": "/projects/frontend" }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/projects/frontend"]
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": { "NELLA_REPO_PATH": "/projects/backend" }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/projects/backend"]
     }
   }
 }
@@ -118,15 +117,7 @@ Use nella_check_dependencies to see if any packages changed since we started.
 
 | Issue | Solution |
 |-------|----------|
-| Tools not appearing | Restart Claude Desktop. Check that `npx @getnella/mcp mcp` runs without errors in your terminal |
+| Tools not appearing | Restart Claude Desktop. Check that `npx -y @getnella/mcp --workspace /path/to/project` runs without errors in your terminal |
 | "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from the default shell |
-| Permission errors | Ensure `NELLA_REPO_PATH` points to a directory you have read access to |
+| Workspace errors | Ensure the `--workspace` path exists and is readable |
 | Slow startup | First run downloads the package via npx. Subsequent starts are faster |
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NELLA_REPO_PATH` | Path to the project being validated | Current directory |
-| `NELLA_API_KEY` | API key for cloud features | None |
-| `NELLA_LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`, `error`) | `info` |

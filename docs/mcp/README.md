@@ -2,14 +2,16 @@
 
 The Nella MCP Server exposes Nella's capabilities to AI agents like Claude through the Model Context Protocol. It supports both local stdio mode and hosted HTTP mode.
 
+> Status: this folder is an engineering reference. For the maintained local CLI/MCP contract, prefer [`../../packages/nella/README.md`](../../packages/nella/README.md), [`../cli/commands.md`](../cli/commands.md), and the setup guides in [`../integrations/`](../integrations/).
+
 ## Overview
 
 The `@getnella/mcp` package provides a CLI and MCP server that allows AI agents to:
 
 - **Track context** across conversation sessions
 - **Search & index** codebases with hybrid semantic/lexical search
-- **Share context** across multiple agents via channels
 - **Monitor dependencies** for drift detection
+- **Verify trust-chain continuity** with challenge-response heartbeats
 
 ## Documentation
 
@@ -29,7 +31,7 @@ The `@getnella/mcp` package provides a CLI and MCP server that allows AI agents 
 ```bash
 npm install -g @getnella/mcp
 # or use npx without installing
-npx @getnella/mcp mcp --help
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
 ### 2. Configure Claude Desktop
@@ -41,7 +43,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -75,31 +77,25 @@ Indexing and search:
 - `nella_index` — Index a workspace directory
 - `nella_search` — Hybrid semantic + lexical codebase search
 
+### Trust Chain
+- `nella_heartbeat` — Continue the trust chain between tool calls
+
 ## Features
 
 ### Input Validation
 All tool calls are validated against JSON Schema before execution. Invalid arguments return structured error messages with field-level details.
 
-### Caching
-Read-only tool results are cached using an LRU cache with per-tool TTL. Mutating tools (`nella_index`, `nella_set_context`) automatically invalidate dependent caches.
+### Session Persistence
+Workspace context is persisted under `.nella/`, so assumptions and dependency snapshots survive across conversations.
 
-### Retry with Backoff
-Retryable tools (search, index) automatically retry on transient failures with exponential backoff and jitter. Max retries and backoff parameters are configurable per tool.
+### Hosted Auth and Rate Limiting
+`nella serve` uses Supabase-backed API key validation and Redis-backed or in-memory rate limiting for hosted deployments.
 
-### Tool Timeouts
-Each tool has a configurable timeout. Long-running tools like `nella_index` (60s) have longer timeouts than quick lookups.
+### Usage Logging
+Both local and hosted servers record tool usage opportunistically when a valid hosted session is available.
 
-### Streaming (Progress Notifications)
-Long-running tools like `nella_index` emit progress notifications via MCP SDK's `progressToken` mechanism, allowing clients to display real-time progress.
-
-### OpenTelemetry
-Optional tracing and metrics via OpenTelemetry SDK. Install `@opentelemetry/sdk-node` and related packages to enable. Degrades gracefully if packages are not available.
-
-### Tool Versioning
-All tools are versioned (currently `1.0.0`) and managed through a `ToolRegistry`. Supports multiple versions of the same tool, deprecation, and version-based lookup (`nella_search@1.0.0`).
-
-### Tool Metadata
-Each tool includes category, tags, examples, timeout, and retry configuration in its schema — enabling rich tool discovery and documentation generation.
+### Trust Chain Protection
+`nella_get_context` issues a challenge and `nella_heartbeat` continues the chain, helping clients confirm they are still interacting with the same trusted session.
 
 ## Architecture
 
@@ -112,10 +108,10 @@ Each tool includes category, tags, examples, timeout, and retry configuration in
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │                     @getnella/mcp                          │
-│  ┌─────────────┐  ┌────────────┐                           │
-│  │   Search    │  │  Context   │                           │
-│  │  (2 tools)  │  │ (4 tools)  │                           │
-│  └─────────────┘  └────────────┘                           │
+│  ┌─────────────┐  ┌────────────┐  ┌────────────┐           │
+│  │   Search    │  │  Context   │  │ Trust Chain│           │
+│  │  (2 tools)  │  │ (4 tools)  │  │  (1 tool)  │           │
+│  └─────────────┘  └────────────┘  └────────────┘           │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐

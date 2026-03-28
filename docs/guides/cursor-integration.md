@@ -28,7 +28,7 @@ Add Nella to your MCP servers configuration:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -115,7 +115,7 @@ You can create a project-specific MCP configuration by adding a `.cursor/mcp.jso
 3. Try running the MCP server manually:
 
    ```bash
-   npx @getnella/mcp mcp -w /path/to/project
+   npx -y @getnella/mcp --workspace /path/to/project
    ```
 
 > **Note:** Cursor frequently updates its MCP support. Check Cursor's release notes for the latest configuration options.

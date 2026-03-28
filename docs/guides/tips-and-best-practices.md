@@ -72,7 +72,7 @@ Create a `.windsurfrules` file in your project root with the same content as the
 
 ## Choosing the Right Tool
 
-Nella exposes 6 MCP tools:
+The current local MCP server exposes 7 MCP tools:
 
 | Scenario | Tool | Why |
 |----------|------|-----|
@@ -81,6 +81,7 @@ Nella exposes 6 MCP tools:
 | Document an assumption | `nella_add_assumption` | Records assumptions the agent is making (can be checked for conflicts later) |
 | Verify assumptions | `nella_check_assumptions` | Check that recorded assumptions still hold |
 | Detect dependency changes | `nella_check_dependencies` | Detect if a dependency changed under you |
+| Continue the trust chain | `nella_heartbeat` | Confirm the latest challenge from `nella_get_context` or a previous heartbeat |
 | Index the codebase | `nella_index` | Build search index for fast hybrid search |
 
 ### Decision Flowchart
@@ -93,6 +94,8 @@ Starting a task?
   ├─ Need session context? → nella_get_context
   │
   ├─ Making assumptions? → nella_add_assumption
+  │
+  ├─ Need to continue the trust chain? → nella_heartbeat
   │
   ├─ After making changes:
   │   ├─ Verify assumptions → nella_check_assumptions
@@ -237,7 +240,7 @@ This is the default loop with always-on Nella:
 2. Each team member's agent uses the same constraint files
 3. Add Nella to your CI pipeline as a gate
 
-See the [CI/CD Integration guide](../user-guide/ci-cd-integration.md) for full examples.
+Use [Task Authoring](../configuration/task-authoring.md) and [Constraints](../configuration/constraints.md) to keep those shared checks explicit and reviewable.
 
 ### Multi-Workspace — Route to the Right Project
 
@@ -248,13 +251,11 @@ If you work across multiple repos, configure Nella with per-project workspaces:
   "mcpServers": {
     "nella-frontend": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": { "NELLA_REPO_PATH": "/path/to/frontend" }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/frontend"]
     },
     "nella-backend": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": { "NELLA_REPO_PATH": "/path/to/backend" }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/backend"]
     }
   }
 }
@@ -283,7 +284,7 @@ Context persists across sessions via `.nella/context/` in your project directory
 | Problem | Quick Fix |
 |---------|-----------|
 | MCP tools not appearing in agent | Restart the MCP client; verify config path is correct |
-| "Workspace not found" error | Set `NELLA_REPO_PATH` env var or pass `--workspace` flag with absolute path |
+| "Workspace not found" error | Pass `--workspace` with an absolute path in the MCP config or CLI command |
 | Context not persisting | Check that `.nella/` directory is writable; don't gitignore `.nella/context/` |
 | Search returning no results | Run `nella_index` first to build the search index |
 
@@ -292,8 +293,7 @@ For full troubleshooting, see the [Troubleshooting guide](../troubleshooting.md)
 ## Next Steps
 
 - [MCP Tools Reference](../mcp/tools.md) — Full reference for all tools
-- [Task Authoring](../user-guide/task-authoring.md) — Write effective task definitions
+- [Task Authoring](../configuration/task-authoring.md) — Write effective task definitions
 - [Constraints](../configuration/constraints.md) — Deep dive into constraint configuration
-- [CI/CD Integration](../user-guide/ci-cd-integration.md) — Add Nella to your pipeline
 - [Claude Desktop Setup](../integrations/claude-desktop.md) — Detailed Claude Desktop configuration
 - [Cursor Setup](../integrations/cursor.md) — Detailed Cursor configuration

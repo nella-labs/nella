@@ -10,24 +10,32 @@ npm install -g @getnella/mcp
 
 ## Step 2: Configure your MCP client
 
-Add Nella to your AI coding agent's MCP configuration.
+### Option A: Use the CLI
+
+```bash
+nella connect --client claude
+nella connect --client cursor
+nella connect --client vscode
+```
+
+For Claude Code, use the one-shot shortcut:
+
+```bash
+nella setup
+```
+
+### Option B: Manual local stdio config
+
+Direct stdio/local MCP configs must include `--workspace`.
 
 ### Claude Desktop
-
-Edit `claude_desktop_config.json`:
-
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "/path/to/your/project"
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -42,10 +50,7 @@ Add to `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "."
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "."]
     }
   }
 }
@@ -59,13 +64,18 @@ Ask your AI agent:
 
 > "What Nella tools are available?"
 
-It should list tools like `nella_search`, `nella_index`, `nella_get_context`, etc.
+It should list tools like `nella_search`, `nella_index`, `nella_get_context`, and `nella_heartbeat`.
 
 ## Step 4: Index your codebase
 
+If you want to build or refresh the local index from the CLI, authenticate first:
+
 ```bash
+nella auth login
 nella index --force
 ```
+
+`nella index` needs a Nella login or Azure embedding environment variables.
 
 ## Step 5: Use Nella in a conversation
 

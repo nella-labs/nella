@@ -12,18 +12,13 @@ The Playground module provides an interactive web-based UI for testing Nella MCP
 import { createPlaygroundServer } from '@usenella/core';
 
 const server = createPlaygroundServer({
+  workspacePath: '/path/to/project',
+  storagePath: '/path/to/project/.nella',
   port: 4000,
-  workspace: '/path/to/project',
 });
 
 await server.start();
 console.log('Playground running at http://localhost:4000');
-```
-
-Or via CLI:
-
-```bash
-nella playground --port 4000 --workspace ./my-project
 ```
 
 ## Features
@@ -59,11 +54,12 @@ ws.send(JSON.stringify({
 ## Configuration
 
 ```ts
-interface PlaygroundOptions {
-  port?: number;             // Default: 4000
+interface PlaygroundServerConfig {
+  workspacePath: string;
+  storagePath: string;
+  port?: number;             // Default: 3847
   host?: string;             // Default: 'localhost'
-  workspace?: string;        // Workspace path
-  open?: boolean;            // Auto-open browser (default: true)
+  authEnabled?: boolean;     // Default: false
 }
 ```
 
@@ -89,6 +85,5 @@ interface PlaygroundMessage {
 
 ## Related Docs
 
-- [CLI Commands](../cli/commands.md) — `nella playground` command
 - [Agent Runner](agents.md) — Running agents programmatically
 - [MCP Tools](../mcp/tools.md) — All available tools

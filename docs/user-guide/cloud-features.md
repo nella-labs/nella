@@ -1,6 +1,6 @@
 # Cloud Features
 
-Nella includes optional cloud features for teams: authentication, cloud sync, and the real-time playground. All cloud features require a Nella account at [app.getnella.dev](https://app.getnella.dev).
+Nella includes optional cloud features for teams: authentication, cloud sync, and hosted MCP infrastructure. Account-backed flows use [app.getnella.dev](https://app.getnella.dev).
 
 ## Authentication
 
@@ -98,17 +98,9 @@ await syncManager.syncIndex(workspaceId);
 - **Offline queue** — Queues operations when disconnected, syncs when reconnected
 - **Conflict resolution** — Last-writer-wins (default), merge, manual, or server-wins strategies
 
-## Playground
+## Playground Server
 
-The Nella Playground provides a real-time web dashboard for monitoring agent sessions.
-
-### Start the Playground
-
-```bash
-nella playground --port 4000
-```
-
-Then open `http://localhost:4000` in your browser.
+Nella Core also includes a playground server for real-time session monitoring. The current public CLI does not expose a `nella playground` subcommand, so start it programmatically through `@usenella/core`.
 
 ### Features
 
@@ -124,9 +116,9 @@ The playground shows:
 import { PlaygroundServer } from '@usenella/core';
 
 const server = new PlaygroundServer({
+  workspacePath: myWorkspace,
+  storagePath: `${myWorkspace}/.nella`,
   port: 4000,
-  workspace: myWorkspace,
-  contextManager: contextManager,
 });
 
 await server.start();
@@ -153,11 +145,11 @@ This provides:
 
 | Environment Variable | Description | Default |
 |---------------------|-------------|---------|
-| `NELLA_PORT` | Server port | `3001` |
-| `NELLA_SUPABASE_URL` | Supabase project URL | Required |
-| `NELLA_SUPABASE_ANON_KEY` | Supabase anon key | Required |
-| `NELLA_RATE_LIMIT_RPM` | Requests per minute per agent | `60` |
-| `NELLA_RATE_LIMIT_RPH` | Requests per hour per agent | `1000` |
+| `PORT` | Server port | `3000` |
+| `SUPABASE_URL` | Supabase project URL | Required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key | Required |
+| `REDIS_URL` | Redis connection string for shared rate limiting | Optional |
+| `NELLA_LOG_LEVEL` | Server log level | `info` |
 
 ## Related Docs
 

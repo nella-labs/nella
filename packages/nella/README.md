@@ -1,186 +1,109 @@
 # @getnella/mcp
 
-> Unified CLI and MCP Server for AI agent reliability
+CLI and MCP server package for Nella.
 
-[![npm version](https://img.shields.io/npm/v/@getnella/mcp.svg)](https://www.npmjs.com/package/@getnella/mcp)
-[![License](https://img.shields.io/badge/License-Proprietary-blue.svg)](https://getnella.dev)
-
-Nella provides codebase indexing, hybrid search, and context tracking for AI coding agents via MCP (Model Context Protocol).
-
-## Installation
+## Install
 
 ```bash
-# Global installation
 npm install -g @getnella/mcp
-
-# Or use with npx
-npx @getnella/mcp --help
-
-# As a dev dependency
-npm install -D @getnella/mcp
 ```
+
+The package installs:
+
+- `nella` for the CLI
+- `mcp` as the direct stdio MCP entrypoint used by `npx -y @getnella/mcp --workspace /path/to/project`
 
 ## Quick Start
 
-### MCP Server (for Claude Desktop)
-
 ```bash
-# Start MCP server
-nella mcp --workspace /path/to/project
+# Show CLI help
+nella help
+
+# Configure a supported client
+nella connect --client claude
+
+# Claude Code shortcut
+nella setup
+
+# Start the local stdio MCP server directly
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
-### Index Your Codebase
+If you want to build or refresh the local index yourself:
 
 ```bash
-# Index for search
+nella auth login
 nella index --force
 ```
 
-### Playground Server
-
-```bash
-# Start playground with real-time dashboard
-nella playground --workspace /path/to/project
-
-# With custom port
-nella playground --workspace /path/to/project --port 4000
-```
-
-Open `http://localhost:3847` to view the dashboard with:
-- Real-time tool call monitoring
-- Chain of thought visualization
-- Cost tracking (tokens + estimated $)
-- Session management
+`nella index` requires either a Nella login or Azure embedding environment variables.
 
 ## Commands
 
-### `nella index`
+| Command | Purpose |
+|---------|---------|
+| `nella index [--workspace <path>] [--force] [--graph]` | Index a workspace or build a dependency graph from an existing index |
+| `nella mcp --workspace <path>` | Start the local stdio MCP server |
+| `nella serve [--port <number>] [--host <host>]` | Start the hosted HTTP MCP server |
+| `nella connect [--mode <local\|hosted>] [--client <name>]` | Write MCP client config for supported agents |
+| `nella auth <login\|logout\|status>` | Manage CLI authentication |
+| `nella setup` | Alias for `nella connect --client claude-code --mode local -y` |
+| `nella help` | Show top-level help |
 
-Index workspace for semantic and lexical search.
+Direct stdio/local launches must include `--workspace`, for example `npx -y @getnella/mcp --workspace /path/to/project`.
 
-```bash
-nella index [--force]
-```
+## MCP Tools
 
-### `nella mcp`
+| Tool | Description |
+|------|-------------|
+| `nella_index` | Index or re-index a workspace |
+| `nella_search` | Search indexed code with hybrid, semantic, or lexical mode |
+| `nella_get_context` | Read the current session context |
+| `nella_add_assumption` | Record an assumption about the codebase |
+| `nella_check_assumptions` | Review assumption status |
+| `nella_check_dependencies` | Check dependency drift |
+| `nella_heartbeat` | Verify trust-chain continuity between tool calls |
 
-Start an MCP server for AI agent integration.
+## Manual Client Config
 
-```bash
-nella mcp [--workspace <path>]
-```
-
-### `nella playground`
-
-Start the playground server with a real-time dashboard.
-
-```bash
-nella playground [--workspace <path>] [--port <number>] [--host <host>]
-```
-
-### `nella connect`
-
-Configure MCP clients.
-
-```bash
-nella connect --client claude|vscode|cursor|all [--server-url <url>] [--api-key <key>]
-```
-
-### `nella auth`
-
-Authentication management.
-
-```bash
-nella auth login|logout|status
-```
-
-## MCP Integration
-
-### Claude Desktop Setup
-
-Add to your Claude Desktop config:
-
-**macOS/Linux** (`~/.config/Claude/claude_desktop_config.json`):
+Local stdio example:
 
 ```json
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
+      "args": ["-y", "@getnella/mcp", "--workspace", "/absolute/path/to/project"]
     }
   }
 }
 ```
 
-### Available MCP Tools
+Hosted example:
 
-| Tool | Description |
-|------|-------------|
-| `nella_index` | Index workspace for semantic and lexical search |
-| `nella_search` | Hybrid search (semantic + BM25) across indexed codebase |
-| `nella_get_context` | Get current session context |
-| `nella_add_assumption` | Record an assumption about the codebase |
-| `nella_check_assumptions` | Get status of recorded assumptions |
-| `nella_check_dependencies` | Check for dependency drift |
-
-## CLI Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--workspace <path>` | `-w` | Path to workspace (for `mcp`/`playground`) |
-| `--port <number>` | `-p` | Port for playground server (default: 3847) |
-| `--host <host>` | | Host for playground server (default: localhost) |
-| `--force` | `-f` | Force full reindex |
-| `--json` | | Output as JSON |
-| `--help` | `-h` | Show help |
-
-## Programmatic Usage
-
-```typescript
-import {
-  ContextManager,
-  createIndexManager,
-  IndexManager,
-} from '@getnella/mcp';
-
-// MCP server
-import { startMcpServer } from '@getnella/mcp/mcp';
+```json
+{
+  "mcpServers": {
+    "nella": {
+      "url": "https://mcp.getnella.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer nella_your_key_here"
+      }
+    }
+  }
+}
 ```
 
-## Core Modules (Re-exported)
+## Notes
 
-`@getnella/mcp` re-exports key modules from `@usenella/core`:
+- `nella connect` supports `claude`, `claude-code`, `vscode`, `cursor`, `windsurf`, `cline`, and `roo-code`.
+- The local `nella serve` implementation requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and uses `REDIS_URL` when available.
 
-- Indexing & search (RAG)
-- Context tracking (assumptions, dependencies)
-- Workspace management
-- Auth + rate limiting
-- Cloud sync (GCS)
-- Playground server
+## Docs
 
-See the [Core Modules guide](../../docs/core/modules.md) for examples.
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | Failure |
-
-## Related Packages
-
-- [`@usenella/core`](https://www.npmjs.com/package/@usenella/core) - Core library
-- [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) - Benchmarking tools
-
-## Documentation
-
-Full documentation available at:
-- [CLI Commands](../../docs/cli/commands.md)
-- [MCP Integration](../../docs/mcp/integration.md)
-- [Core API Reference](../../docs/core/api-reference.md)
-- [Core Modules](../../docs/core/modules.md)
-
-## License
-
-MIT © [Nella Labs](https://github.com/usenella)
+- [CLI Reference](../../docs/cli/commands.md)
+- [Installation](../../docs/getting-started/installation.md)
+- [Quick Start](../../docs/getting-started/quick-start.md)
+- [Claude Desktop](../../docs/integrations/claude-desktop.md)
+- [Cursor](../../docs/integrations/cursor.md)
+- [VS Code](../../docs/integrations/vscode.md)
