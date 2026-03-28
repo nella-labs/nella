@@ -18,6 +18,7 @@ import { workspacesRouter } from "./routes/workspaces";
 import { searchRouter } from "./routes/search";
 import { contextRouter } from "./routes/context";
 import { authRouter } from "./routes/auth";
+import { benchmarksRouter } from "./routes/benchmarks";
 import { apiKeyAuth } from "./middleware/auth";
 import { createRateLimitMiddleware } from "./middleware/rate-limit";
 
@@ -86,6 +87,7 @@ export function createApp(): express.Application {
   protectedRouter.use("/api/v1/search", searchRouter());
   protectedRouter.use("/api/v1/context", contextRouter());
   protectedRouter.use("/api/v1/auth", authRouter());
+  protectedRouter.use("/api/v1/benchmarks", benchmarksRouter());
 
   app.use(protectedRouter);
 
