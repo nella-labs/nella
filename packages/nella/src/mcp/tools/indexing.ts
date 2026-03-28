@@ -155,8 +155,8 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
     },
     embedder: embedderConfig,
     search: {
-      vectorWeight: 0.7,
-      lexicalWeight: 0.3,
+      vectorWeight: 0.4,
+      lexicalWeight: 0.6,
       rerankEnabled: true,
       topK: 10,
     },
