@@ -1,22 +1,24 @@
 # Sync
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 The Sync module synchronizes Nella state (runs, context, workspace config) between local storage and cloud backends. It supports tiered sync, delta compression, encryption at rest, and conflict resolution.
 
 > **Warning:** The Sync module is under active development. Some features (notably compression and encryption) are experimental and may change in future releases.
 
 ## Key Exports
 
-- `createSyncManager` / `SyncManager` — orchestrate sync operations
+- `initSync` / `SyncManager` — orchestrate sync operations
 - `SyncAdapter` — interface for sync backends
-- Built-in adapters: `SupabaseSyncAdapter`, `GCPSyncAdapter`, `FileSyncAdapter`
+- Built-in adapters: `LocalSyncAdapter`, `SupabaseSyncAdapter`, `GCPSyncAdapter`
 - `WorkspaceCloudSyncManager` — per-workspace cloud sync with delta tracking
 
 ## Quick Start
 
 ```ts
-import { createSyncManager, SupabaseSyncAdapter } from '@usenella/core';
+import { initSync, SupabaseSyncAdapter } from '@usenella/core/sync';
 
-const sync = createSyncManager({
+const sync = initSync({
   adapter: new SupabaseSyncAdapter({
     url: process.env.SUPABASE_URL!,
     key: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -43,7 +45,7 @@ await sync.sync({ strategy: 'last-write-wins' });
 | `full` | + Run records, metrics, indices | Full backup/restore |
 
 ```ts
-const sync = createSyncManager({
+const sync = initSync({
   adapter: new SupabaseSyncAdapter({ ... }),
   tier: 'context',  // Only sync metadata + context
 });
@@ -54,7 +56,7 @@ const sync = createSyncManager({
 ### Supabase Adapter
 
 ```ts
-import { SupabaseSyncAdapter } from '@usenella/core';
+import { SupabaseSyncAdapter } from '@usenella/core/sync';
 
 const adapter = new SupabaseSyncAdapter({
   url: process.env.SUPABASE_URL!,
@@ -66,7 +68,7 @@ const adapter = new SupabaseSyncAdapter({
 ### GCP Adapter
 
 ```ts
-import { GCPSyncAdapter } from '@usenella/core';
+import { GCPSyncAdapter } from '@usenella/core/sync';
 
 const adapter = new GCPSyncAdapter({
   projectId: 'my-project',
@@ -75,14 +77,17 @@ const adapter = new GCPSyncAdapter({
 });
 ```
 
-### File Adapter (Local)
+### Local Adapter
 
 ```ts
-import { FileSyncAdapter } from '@usenella/core';
+import { LocalSyncAdapter, createLocalAdapter } from '@usenella/core/sync';
 
-const adapter = new FileSyncAdapter({
+const adapter = new LocalSyncAdapter({
   syncDir: '/shared/nella-sync',  // Shared network drive or local path
 });
+
+// Or use the factory:
+const adapter2 = createLocalAdapter({ syncDir: '/shared/nella-sync' });
 ```
 
 ## Cloud Sync Features
@@ -98,7 +103,7 @@ The `WorkspaceCloudSyncManager` provides advanced sync features per workspace:
 | Offline queue | Queue changes while offline, sync when back |
 
 ```ts
-import { WorkspaceCloudSyncManager } from '@usenella/core';
+import { WorkspaceCloudSyncManager } from '@usenella/core/sync';
 
 const cloudSync = new WorkspaceCloudSyncManager({
   workspaceId: 'repo-1',

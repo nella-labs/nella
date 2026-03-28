@@ -1,12 +1,16 @@
 # Indexing & Search
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 Nella Core includes an indexing stack for hybrid search (vector + lexical) and code verification. This module powers RAG workflows by chunking code, embedding it, and blending semantic + lexical rankings.
 
 ## Key Exports
 
+The main barrel (`@usenella/core`) exports `IndexManager`, `createIndexManager`, `DEFAULT_INDEX_CONFIG`, and high-level search/verification components. Lower-level building blocks (`Chunker`, `Embedder`, `VectorStore`, `LexicalIndex`) are re-exported from the indexing module but are primarily used internally.
+
 - `createIndexManager` / `IndexManager` — orchestrates indexing, search, and verification
 - `DEFAULT_INDEX_CONFIG` — base configuration for embedder, chunking, and search weights
-- `createChunker`, `createEmbedder`, `createVectorStore`, `createLexicalIndex` — lower-level building blocks
+- `Chunker`, `Embedder`, `VectorStore`, `LexicalIndex` — internal building blocks (available via `@usenella/core/indexing`)
 
 ## Quick Start
 
@@ -54,12 +58,12 @@ The indexer parses source files, extracts code symbols (functions, classes, inte
 The chunker splits source files into meaningful code chunks based on AST structure:
 
 ```ts
-import { createChunker } from '@usenella/core';
+import { createChunker } from '@usenella/core/indexing';
 
 const chunker = createChunker({
-  maxChunkSize: 1500,     // Max tokens per chunk
-  overlapSize: 200,       // Token overlap between chunks
-  respectBoundaries: true, // Don't split mid-function
+  maxTokens: 1500,        // Max tokens per chunk
+  overlap: 200,           // Token overlap between chunks
+  strategy: 'ast',        // 'ast' | other strategies
 });
 
 const chunks = chunker.chunk(sourceCode, 'typescript');
@@ -76,16 +80,19 @@ const chunks = chunker.chunk(sourceCode, 'typescript');
 ### Embeddings
 
 ```ts
-import { createEmbedder } from '@usenella/core';
+import { createEmbedder } from '@usenella/core/indexing';
 
 const embedder = createEmbedder({
-  provider: 'voyage',           // 'voyage' | 'openai' | 'cohere'
-  model: 'voyage-code-3',       // Model name
-  dimensions: 1024,             // Embedding dimensions
-  batchSize: 32,                // Batch size for API calls
+  provider: 'azure',            // 'azure' | 'nella'
+  model: 'text-embedding-3-small',
+  dimensions: 1536,             // Embedding dimensions
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+  deployment: 'my-embedding-deployment',
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
 });
 
-const embeddings = await embedder.embed(['function hello() {}', 'class User {}']);
+const result = await embedder.embed({ texts: ['function hello() {}', 'class User {}'] });
+// result: { embeddings, tokensUsed, cost }
 ```
 
 ## Search
@@ -174,21 +181,22 @@ The index stores data in the `storagePath` directory:
 ```ts
 const DEFAULT_INDEX_CONFIG = {
   embedder: {
-    provider: 'voyage',
-    model: 'voyage-code-3',
-    dimensions: 1024,
+    provider: 'azure',
+    model: 'text-embedding-3-small',
+    dimensions: 1536,
   },
-  chunker: {
-    maxChunkSize: 1500,
-    overlapSize: 200,
-    respectBoundaries: true,
+  chunking: {
+    maxTokens: 1024,
+    overlap: 50,
+    strategy: 'ast',
   },
   search: {
-    defaultTopK: 10,
-    mode: 'hybrid',
-    weights: { semantic: 0.6, lexical: 0.4 },
+    vectorWeight: 0.4,
+    lexicalWeight: 0.6,
+    rerankEnabled: true,
+    topK: 10,
   },
-  include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+  include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.py', '**/*.java', '**/*.go', '**/*.rs'],
   exclude: ['node_modules/**', 'dist/**', '.git/**'],
 };
 ```
@@ -197,4 +205,4 @@ const DEFAULT_INDEX_CONFIG = {
 
 - [Core Modules Guide](modules.md) — All modules overview
 - [Core API Reference](api-reference.md) — Full API surface
-- [MCP Tools](../mcp/tools.md) — `nella_search`, `nella_verify`, `nella_index` tools
+- [MCP Tools](../mcp/tools.md) — `nella_search`, `nella_index` tools

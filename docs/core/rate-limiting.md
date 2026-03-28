@@ -1,5 +1,7 @@
 # Rate Limiting
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 The Rate Limiting module provides per-key request rate limiting for the hosted MCP server. It supports multiple algorithms, backends, priority handling, and dynamic limit adjustment.
 
 ## Key Exports
@@ -11,7 +13,7 @@ The Rate Limiting module provides per-key request rate limiting for the hosted M
 ## Quick Start
 
 ```ts
-import { createRateLimiter } from '@usenella/core';
+import { createRateLimiter } from '@usenella/core/rate-limit';
 
 const limiter = createRateLimiter({
   backend: 'memory',
@@ -92,7 +94,7 @@ const slidingWindow = createRateLimiter({
 Assign priority levels to API keys for differentiated rate limiting:
 
 ```ts
-import { PriorityHandler } from '@usenella/core';
+import { PriorityHandler } from '@usenella/core/rate-limit';
 
 const priority = new PriorityHandler(limiter, {
   levels: {
@@ -112,7 +114,7 @@ const result = priority.check('nella_abc123', 'high');
 Automatically adjust rate limits based on server load:
 
 ```ts
-import { DynamicLimitAdjuster } from '@usenella/core';
+import { DynamicLimitAdjuster } from '@usenella/core/rate-limit';
 
 const adjuster = new DynamicLimitAdjuster(limiter, {
   cpuThreshold: 0.8,          // Reduce limits when CPU > 80%

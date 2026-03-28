@@ -1,24 +1,29 @@
 # Agent Runner
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 The Agent Runner module enables Nella to orchestrate AI coding agents. It supports multi-turn tool-use loops, model cost estimation, and adapter-based architecture for different LLM providers.
 
 ## Key Exports
 
-- `createAgentRunner` / `AgentRunner` — run multi-turn agent conversations
-- `MODEL_PRICING` — cost-per-token map for supported models
-- Agent adapters: `ClaudeAdapter`, `OpenAIAdapter`, `CohereAdapter`
+- `AgentRunner` — run multi-turn agent conversations
+- `createAgentAdapter` — factory for creating provider-specific adapters
+- `MODEL_PRICING` / `estimateAgentCost` — cost-per-token map and estimation
+- Agent adapters: `AnthropicAdapter`, `OpenAIAdapter`
 
 ## Quick Start
 
 ```ts
-import { createAgentRunner } from '@usenella/core';
+import { AgentRunner, createAgentAdapter } from '@usenella/core/agents';
 
-const runner = createAgentRunner({
-  adapter: {
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-  },
+const adapter = createAgentAdapter({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+const runner = new AgentRunner({
+  adapter,
   tools: mcpTools,           // MCP tool definitions
   maxTurns: 10,              // Max conversation turns
   systemPrompt: 'You are a backend developer...',
@@ -56,7 +61,7 @@ for (const turn of result.history) {
 ## Cost Estimation
 
 ```ts
-import { MODEL_PRICING } from '@usenella/core';
+import { MODEL_PRICING } from '@usenella/core/agents';
 
 // Get pricing for a model
 const pricing = MODEL_PRICING['claude-sonnet-4-20250514'];
@@ -73,48 +78,48 @@ console.log(`Estimated cost: $${estimate.totalUsd.toFixed(4)}`);
 
 ## Supported Models
 
-| Provider | Model | Input $/1K | Output $/1K |
+| Provider | Model | Input $/1M | Output $/1M |
 |----------|-------|-----------|-------------|
-| Anthropic | `claude-sonnet-4-20250514` | $0.003 | $0.015 |
-| Anthropic | `claude-haiku-3.5` | $0.00025 | $0.00125 |
-| OpenAI | `gpt-4o` | $0.005 | $0.015 |
-| OpenAI | `gpt-4o-mini` | $0.00015 | $0.0006 |
-| Cohere | `command-r-plus` | $0.003 | $0.015 |
+| Anthropic | `claude-sonnet-4-20250514` | $3.00 | $15.00 |
+| Anthropic | `claude-opus-4-20250514` | $15.00 | $75.00 |
+| Anthropic | `claude-3-5-sonnet-20241022` | $3.00 | $15.00 |
+| OpenAI | `gpt-4-turbo` | $10.00 | $30.00 |
+| OpenAI | `gpt-4o` | $2.50 | $10.00 |
+| OpenAI | `gpt-4o-mini` | $0.15 | $0.60 |
 
 ## Adapter Configuration
 
 ```ts
-// Anthropic adapter
-const anthropicRunner = createAgentRunner({
-  adapter: {
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-20250514',
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-    maxTokens: 4096,
-  },
-  // ...
+import { AnthropicAdapter, OpenAIAdapter, createAgentAdapter } from '@usenella/core/agents';
+
+// Using the factory (recommended)
+const adapter = createAgentAdapter({
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  maxTokens: 4096,
 });
 
-// OpenAI adapter
-const openaiRunner = createAgentRunner({
-  adapter: {
-    provider: 'openai',
-    model: 'gpt-4o',
-    apiKey: process.env.OPENAI_API_KEY!,
-  },
-  // ...
-});
+// Or construct directly
+const anthropicAdapter = new AnthropicAdapter(
+  process.env.ANTHROPIC_API_KEY!,
+  'claude-sonnet-4-20250514'
+);
+
+const openaiAdapter = new OpenAIAdapter(
+  process.env.OPENAI_API_KEY!,
+  'gpt-4o'
+);
 ```
 
 ## Types
 
 ```ts
-interface AgentAdapterConfig {
-  provider: 'anthropic' | 'openai' | 'cohere';
+interface AgentConfig {
+  provider: 'anthropic' | 'openai';
   model: string;
   apiKey: string;
   maxTokens?: number;
-  temperature?: number;
 }
 
 interface AgentRunResult {

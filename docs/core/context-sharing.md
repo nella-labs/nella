@@ -1,22 +1,24 @@
 # Context Sharing
 
+> **Internal Module** — This documentation covers internal nella infrastructure. These modules are not exported from the public `@usenella/core` package and are intended for nella platform developers only.
+
 Context sharing lets multiple agents store and retrieve shared knowledge (decisions, snippets, dependencies) with visibility controls, channels, and conflict detection.
 
-> **Note:** This is different from the single-session `ContextManager` — `SharedContextManager` enables **cross-agent** context persistence.
+> **Note:** This is different from the single-session `ContextManager` in the context module — the context-sharing `ContextManager` enables **cross-agent** context persistence.
 
 ## Key Exports
 
-- `createSharedContextManager` / `SharedContextManager` — store and query shared context
+- `createContextManager` / `ContextManager` — store and query shared context
 - `DEFAULT_CONTEXT_TTL` — default TTL in seconds
-- `ContextType` — enum of 10 context types
-- `ContextVisibility` — `'public' | 'team' | 'private'`
+- `ContextType` — type union of context value types
+- `ContextVisibility` — `'private' | 'workspace' | 'shared'`
 
 ## Create & Store Context
 
 ```ts
-import { createSharedContextManager } from '@usenella/core';
+import { createContextManager } from '@usenella/core/context-sharing';
 
-const manager = createSharedContextManager('/path/to/.nella/shared-context');
+const manager = createContextManager({ storagePath: '/path/to/.nella/shared-context' });
 
 manager.set({
   key: 'auth-migration-plan',
@@ -24,7 +26,7 @@ manager.set({
   sourceAgentId: 'architect-agent',
   workspaceId: 'repo-1',
   type: 'decision',
-  visibility: 'team',
+  visibility: 'workspace',
   tags: ['auth', 'migration'],
   channel: 'backend-team',
 });
@@ -39,7 +41,7 @@ const entry = manager.get('auth-migration-plan', 'repo-1', 'viewer-agent');
 // Query by type and visibility
 const results = manager.query('repo-1', {
   types: ['decision', 'architecture'],
-  visibility: 'team',
+  visibility: 'workspace',
   channel: 'backend-team',
   limit: 10,
 });
@@ -64,7 +66,7 @@ manager.set({
   workspaceId: 'repo-1',
   type: 'progress',
   channel: 'database-team',
-  visibility: 'team',
+  visibility: 'workspace',
 });
 
 // Query only a specific channel
@@ -76,28 +78,28 @@ const dbChanges = manager.query('repo-1', {
 
 ## Context Types
 
-The `ContextType` enum defines 10 categories:
+`ContextType` is a union of value type hints:
 
 | Type | Description |
 |------|-------------|
+| `string` | Plain text value |
+| `number` | Numeric value |
+| `boolean` | Boolean value |
+| `object` | Structured object |
+| `array` | Array value |
+| `code` | Code block |
+| `snippet` | Code snippet |
 | `decision` | Architectural or implementation decision |
-| `assumption` | Recorded belief about the codebase |
-| `constraint` | Hard rule or limitation |
 | `dependency` | Package or service dependency |
-| `architecture` | Structural design decision |
-| `risk` | Identified risk or concern |
-| `progress` | Work-in-progress update |
-| `blocker` | Blocking issue |
-| `insight` | Observation or discovery |
-| `todo` | Pending task |
+| `preference` | Agent or user preference |
 
 ## Visibility
 
 | Level | Description |
 |-------|-------------|
-| `public` | Visible to all agents on all channels |
-| `team` | Visible to agents on the same channel |
-| `private` | Visible only to the author agent |
+| `private` | Visible only to the source agent |
+| `workspace` | Visible to all agents in the workspace |
+| `shared` | Accessible across workspaces |
 
 ## Versioning & Conflict Detection
 
@@ -123,14 +125,15 @@ Context can be shared via different transports:
 
 | Transport | Use Case |
 |-----------|----------|
-| `file` (default) | Local file-based storage in `.nella/shared-context/` |
-| `redis` | Distributed context via Redis pub/sub |
-| `supabase` | Cloud-synced context via Supabase Realtime |
+| `LocalTransport` (default) | Local file-based storage in `.nella/shared-context/` |
+| `SupabaseTransport` | Cloud-synced context via Supabase Realtime |
 
 ```ts
-const manager = createSharedContextManager('/path/to/.nella/shared-context', {
-  transport: 'redis',
-  redisUrl: 'redis://localhost:6379',
+import { createContextManager, SupabaseTransport } from '@usenella/core/context-sharing';
+
+const manager = createContextManager({
+  storagePath: '/path/to/.nella/shared-context',
+  transport: new SupabaseTransport({ url: '...', key: '...' }),
 });
 ```
 
