@@ -19,6 +19,7 @@ import { BenchmarkRunner } from "./runner/benchmark-runner";
 import { loadAllTasks } from "./scenarios";
 import { BenchmarkConfig, AgentConfig } from "./types";
 import { writeDashboard } from "./reports";
+import { runInjectionBenchmark } from "./injection";
 
 interface CliArgs {
   tasksDir: string;
@@ -230,7 +231,91 @@ function buildAgentConfigs(agentNames: string[]): Record<string, AgentConfig> {
   return configs;
 }
 
+// =============================================================================
+// Injection Subcommand
+// =============================================================================
+
+interface InjectionArgs {
+  corpusDir: string;
+  outputDir: string;
+  threshold: number;
+  website: boolean;
+  verbose: boolean;
+}
+
+function parseInjectionArgs(argv: string[]): InjectionArgs {
+  const result: InjectionArgs = {
+    corpusDir: path.resolve(__dirname, "../corpus"),
+    outputDir: path.resolve(process.cwd(), "injection-results"),
+    threshold: 0.2,
+    website: false,
+    verbose: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case "--corpus":
+        result.corpusDir = path.resolve(argv[++i]);
+        break;
+      case "--output":
+      case "-o":
+        result.outputDir = path.resolve(argv[++i]);
+        break;
+      case "--threshold":
+        result.threshold = parseFloat(argv[++i]);
+        break;
+      case "--website":
+        result.website = true;
+        break;
+      case "--verbose":
+        result.verbose = true;
+        break;
+      case "--help":
+      case "-h":
+        console.log(`
+Nella Injection Benchmark
+
+Usage:
+  nella-benchmark injection [options]
+
+Options:
+  --corpus <path>      Corpus directory (default: ./corpus)
+  --output, -o <path>  Output directory (default: ./injection-results)
+  --threshold <n>      Detection threshold (default: 0.2)
+  --website            Generate website-ready stats.json
+  --verbose            Print per-sample results
+  --help, -h           Show help
+`);
+        process.exit(0);
+    }
+  }
+
+  return result;
+}
+
+async function runInjection(argv: string[]) {
+  const args = parseInjectionArgs(argv);
+  await runInjectionBenchmark({
+    corpusDir: args.corpusDir,
+    outputDir: args.outputDir,
+    threshold: args.threshold,
+    verbose: args.verbose,
+    formats: { website: args.website },
+  });
+}
+
+// =============================================================================
+// Main
+// =============================================================================
+
 async function main() {
+  // Route to injection subcommand if first arg is "injection"
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs[0] === "injection") {
+    await runInjection(rawArgs.slice(1));
+    return;
+  }
+
   const args = parseArgs();
 
   // Dashboard-only mode

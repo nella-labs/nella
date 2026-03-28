@@ -116,6 +116,9 @@ importers:
 
   packages/benchmark:
     dependencies:
+      '@usenella/core':
+        specifier: workspace:*
+        version: link:../core
       dotenv:
         specifier: ^16.3.1
         version: 16.6.1
