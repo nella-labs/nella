@@ -21,11 +21,13 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as https from "https";
-import { ContextManager } from "@usenella/core";
+import { ContextManager, deriveHmacKey } from "@usenella/core";
 import { parseWorkspaceArg } from "./utils/args";
 import { getValidSession } from "../auth";
 import { registerContextTools, handleContextTool } from "./tools/context";
 import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
+import { registerHeartbeatTool, handleHeartbeat, createChallengeState } from "./tools/heartbeat";
+import type { ChallengeState } from "./tools/heartbeat";
 
 // =============================================================================
 // Usage Logging (fire-and-forget to nella API)
@@ -74,6 +76,10 @@ export interface ServerContext {
   contextManager: ContextManager;
   /** Per-session trust token for prompt injection defense (L4) */
   sessionToken?: string;
+  /** HMAC signing key derived from session token (L4+) */
+  hmacKey?: Buffer;
+  /** Challenge-response state for trust chain verification (L4+) */
+  challengeState?: ChallengeState;
 }
 
 // =============================================================================
@@ -113,11 +119,15 @@ Example:
 
   // Generate per-session trust token for prompt injection defense (L4)
   const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
+  const hmacKey = deriveHmacKey(sessionToken);
+  const challengeState = createChallengeState();
 
   const serverContext: ServerContext = {
     workspacePath,
     contextManager,
     sessionToken,
+    hmacKey,
+    challengeState,
   };
 
   // Create MCP server
@@ -137,6 +147,7 @@ Example:
   const allTools: Tool[] = [
     ...registerContextTools(),
     ...registerIndexingTools(),
+    registerHeartbeatTool(),
   ];
 
   // Handle tool listing
@@ -162,6 +173,14 @@ Example:
         if (indexingResult !== null) {
           logUsage(name, Date.now() - start, !indexingResult.isError, indexingResult as CallToolResult, toolArgs);
           return indexingResult as CallToolResult;
+        }
+
+        // Heartbeat tool (challenge-response)
+        if (name === "nella_heartbeat" && serverContext.challengeState) {
+          const { result: hbResult, newState } = handleHeartbeat(toolArgs || {}, serverContext.challengeState);
+          serverContext.challengeState = newState;
+          logUsage(name, Date.now() - start, true, hbResult as CallToolResult, toolArgs);
+          return hbResult as CallToolResult;
         }
 
         // Unknown tool

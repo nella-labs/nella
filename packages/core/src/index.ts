@@ -80,6 +80,12 @@ export {
   // Content scanning (prompt injection defense)
   scanContent,
   formatInjectionWarning,
+  // HMAC signing (prompt injection defense L4)
+  deriveHmacKey,
+  signResultHmac,
+  verifyResultHmac,
+  signResponseHmac,
+  verifyResponseHmac,
 } from "./indexing";
 
 export type {
@@ -106,6 +112,8 @@ export type {
   DetectedPattern,
   InjectionPatternType,
   PatternSeverity,
+  HmacSignature,
+  SignedResult,
 } from "./indexing";
 
 // =============================================================================

@@ -39,7 +39,8 @@ import {
   type Tool,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ContextManager } from "@usenella/core";
+import { ContextManager, deriveHmacKey } from "@usenella/core";
+import { createChallengeState } from "./tools/heartbeat";
 import { WebSocketServer, WebSocket } from "ws";
 import Redis from "ioredis";
 
@@ -630,10 +631,14 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
           const contextManager = new ContextManager(tmpDir);
           const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
+          const hmacKey = deriveHmacKey(sessionToken);
+          const challengeState = createChallengeState();
           const serverContext: ServerContext = {
             workspacePath: tmpDir,
             contextManager,
             sessionToken,
+            hmacKey,
+            challengeState,
           };
 
           // Try each tool category
@@ -1281,7 +1286,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
           const contextManager = new ContextManager(tmpDir);
           const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
-          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager, sessionToken };
+          const hmacKey = deriveHmacKey(sessionToken);
+          const challengeState = createChallengeState();
+          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager, sessionToken, hmacKey, challengeState };
 
           const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
           if (contextResult !== null) { result = contextResult; success = true; }

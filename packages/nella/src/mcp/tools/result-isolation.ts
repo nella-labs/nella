@@ -9,9 +9,16 @@
  * - L1: Boundary delimiters with per-request nonce
  * - L2: Inline injection warnings (via content-scanner)
  * - L4: Session token stripping from result content
+ * - L4+: HMAC content integrity signatures
  */
 
 import * as crypto from "crypto";
+import {
+  deriveHmacKey,
+  signResultHmac,
+  signResponseHmac,
+} from "@usenella/core";
+import type { HmacSignature } from "@usenella/core";
 
 // =============================================================================
 // Constants
@@ -34,6 +41,8 @@ export interface ResultIsolationOptions {
   sessionToken?: string;
   /** Total number of results (for "RESULT x/N" labeling) */
   totalResults?: number;
+  /** HMAC signing key (derived from session token via HKDF) */
+  hmacKey?: Buffer;
 }
 
 export interface WrappedResult {
@@ -43,6 +52,8 @@ export interface WrappedResult {
   nonce: string;
   /** Whether any injection warnings were added */
   hasWarnings: boolean;
+  /** HMAC signature for this result (if hmacKey provided) */
+  hmac?: HmacSignature;
 }
 
 // =============================================================================
@@ -70,6 +81,8 @@ export function stripToken(content: string, token: string): string {
 
 /**
  * Wrap a single search result with boundary markers.
+ * If hmacKey is provided, computes an HMAC signature over the content
+ * and embeds it in the boundary marker for integrity verification.
  */
 export function wrapSearchResult(
   resultContent: string,
@@ -82,15 +95,24 @@ export function wrapSearchResult(
     injectionWarning?: string;
   },
   nonce: string,
+  hmacKey?: Buffer,
 ): WrappedResult {
   const trust = metadata.trustLevel || "workspace";
   const label = `${metadata.filePath}:${metadata.lines[0]}-${metadata.lines[1]}`;
   const resultNum = metadata.resultIndex + 1;
 
+  // Compute HMAC if key is available
+  let hmac: HmacSignature | undefined;
+  let hmacFragment = "";
+  if (hmacKey) {
+    hmac = signResultHmac(resultContent, hmacKey, nonce);
+    hmacFragment = `|hmac:${hmac.tag}`;
+  }
+
   const lines: string[] = [];
 
   lines.push(
-    `——— RESULT ${resultNum}/${metadata.totalResults} (${label}, trust: ${trust}) [nonce:${nonce}] ———`,
+    `——— RESULT ${resultNum}/${metadata.totalResults} (${label}, trust: ${trust}) [nonce:${nonce}${hmacFragment}] ———`,
   );
 
   if (metadata.injectionWarning) {
@@ -105,11 +127,13 @@ export function wrapSearchResult(
     content: lines.join("\n"),
     nonce,
     hasWarnings: !!metadata.injectionWarning,
+    hmac,
   };
 }
 
 /**
  * Wrap the full search response with preamble, results, and epilogue.
+ * Applies L4 token stripping and optional outer HMAC signature.
  */
 export function wrapSearchResponse(
   header: string,
@@ -135,6 +159,18 @@ export function wrapSearchResponse(
   // L4: Strip session token from the entire response
   if (options?.sessionToken) {
     output = stripToken(output, options.sessionToken);
+  }
+
+  // L4+: Append outer HMAC signature for full response integrity
+  if (options?.hmacKey) {
+    // Use a fixed nonce derived from the response content for the outer envelope
+    const outerNonce = crypto
+      .createHash("sha256")
+      .update(output)
+      .digest("hex")
+      .slice(0, 8);
+    const responseTag = signResponseHmac(output, options.hmacKey, outerNonce);
+    output += `\n[NELLA INTEGRITY: ${outerNonce}:${responseTag}]`;
   }
 
   return output;

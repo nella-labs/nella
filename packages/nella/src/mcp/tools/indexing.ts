@@ -315,6 +315,7 @@ async function handleSearch(
           injectionWarning,
         },
         nonce,
+        context.hmacKey,
       );
 
       wrappedResults.push(wrapped.content);
@@ -322,6 +323,7 @@ async function handleSearch(
 
     const output = wrapSearchResponse(header, wrappedResults, {
       sessionToken: context.sessionToken,
+      hmacKey: context.hmacKey,
     });
 
     return {
