@@ -67,7 +67,7 @@ export class SearchService {
       search: {
         vectorWeight: 0.7,
         lexicalWeight: 0.3,
-        rerankEnabled: false,
+        rerankEnabled: true,
         topK: 10,
       },
       include: ["**/*.ts", "**/*.js", "**/*.py", "**/*.java"],

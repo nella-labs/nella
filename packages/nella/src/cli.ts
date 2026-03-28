@@ -383,7 +383,7 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
     search: {
       vectorWeight: 0.7,
       lexicalWeight: 0.3,
-      rerankEnabled: false,
+      rerankEnabled: true,
       topK: 10,
     },
     include: DEFAULT_INDEX_CONFIG.include,

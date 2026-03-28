@@ -157,7 +157,7 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
     search: {
       vectorWeight: 0.7,
       lexicalWeight: 0.3,
-      rerankEnabled: false,
+      rerankEnabled: true,
       topK: 10,
     },
     include: DEFAULT_INDEX_CONFIG.include,
