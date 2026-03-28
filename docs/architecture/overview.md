@@ -16,11 +16,8 @@ graph TB
     end
 
     subgraph core_pkg["@usenella/core v0.0.0"]
-        RunEngine["Run Engine<br/>runTask() | check() | validate()"]
-        Validators["Validators"]
-        Safety["Safety"]
-        Indexing["Indexing / RAG"]
-        Context["Context Management"]
+        Indexing["Indexing / RAG<br/>IndexManager → search, verify"]
+        Context["Context Management<br/>ContextManager → tracking"]
         Workspace["Workspace Management"]
         Auth["Auth & Rate Limiting"]
         Sync["Cloud Sync"]
@@ -42,18 +39,17 @@ graph TB
     subgraph external["External Services"]
         Supabase["Supabase<br/>(PostgreSQL + pgvector)"]
         GCP["Google Cloud<br/>(Cloud SQL + Storage)"]
-        EmbeddingAPIs["Embedding APIs<br/>(Voyage, OpenAI)"]
-        Cohere["Cohere<br/>(Reranking)"]
+        EmbeddingAPIs["Embedding APIs<br/>(Azure OpenAI, Nella)"]
+        Cohere["Cohere Reranker<br/>(via Azure)"]
         LLMAPIs["LLM APIs<br/>(Anthropic, OpenAI)"]
     end
 
     Agent -->|"stdio (MCP protocol)"| MCP
     Agent -->|"direct"| CLI
-    MCP --> RunEngine
-    CLI --> RunEngine
-    RunEngine --> Validators
-    RunEngine --> Safety
-    RunEngine --> Context
+    MCP --> Indexing
+    MCP --> Context
+    CLI --> Indexing
+    CLI --> Context
     Indexing --> EmbeddingAPIs
     Indexing --> Cohere
     Sync --> Supabase
@@ -86,7 +82,7 @@ graph LR
 
     subgraph P3["3. Prompt Injection"]
         P3_Problem["Malicious prompts<br/>bypass safety"]
-        P3_Solution["RefusalDetector<br/>+ Risk Pattern Matching<br/>+ Constraint Enforcement"]
+        P3_Solution["Content Scanner<br/>+ Risk Pattern Matching<br/>+ Injection Scoring"]
     end
 
     subgraph P4["4. Contradictions"]
@@ -113,8 +109,8 @@ graph LR
 |---------|--------|--------------|
 | **Hallucinated Code** | Indexing + CodeVerifier | Indexes your codebase, then verifies AI-generated imports, symbols, and API calls against real exports |
 | **Lost Context** | ContextManager | Persists sessions, change history, assumptions, and dependency snapshots across agent turns |
-| **Prompt Injection** | Safety / RefusalDetector | 26 regex-based risk patterns detect credential exposure, destructive operations, security bypasses, and backdoors |
-| **Contradictions** | AssumptionTracker + ScopeChecker | Detects when planned changes conflict with prior assumptions; measures scope creep ratio |
+| **Prompt Injection** | Content Scanner / Injection Scorer | Risk pattern detection, content trust classification, and injection heuristic scoring |
+| **Contradictions** | AssumptionTracker | Detects when planned changes conflict with prior assumptions; automatic invalidation on file changes |
 
 ## Monorepo Structure
 
@@ -142,7 +138,7 @@ graph LR
 
 | Package | Description | Key Exports |
 |---------|-------------|-------------|
-| `@usenella/core` | Core engine — validators, safety, indexing, context, workspace, auth, sync | `runTask()`, `check()`, `validate()`, `shouldRefuse()`, `ContextManager`, `IndexManager` |
+| `@usenella/core` | Core engine — indexing, context, workspace, auth, sync | `createIndexManager()`, `ContextManager`, `IndexManager`, `WorkspaceRegistry` |
 | `@getnella/mcp` | CLI + MCP server. Re-exports all of core | `startMcpServer()`, CLI commands, MCP tool handlers |
 | `@usenella/benchmark` | Benchmark runner for evaluating agent performance | `BenchmarkRunner`, agent adapters, metrics calculator |
 | `@usenella/api` | REST API server (Express) for hosted deployments | Health, workspace, search, validate, context, auth endpoints |
@@ -169,7 +165,7 @@ graph LR
 
 ## Related Architecture Pages
 
-- [Core Modules](./core-modules.md) — Deep dive into the run engine, validators, context, and workspace modules
+- [Core Modules](./core-modules.md) — Deep dive into the indexing, context, and workspace modules
 - [MCP Server](./mcp-server.md) — MCP protocol implementation, tool routing, and hosted server
 - [Indexing & RAG](./indexing-rag.md) — Code chunking, embedding, hybrid search, and code verification
 - [Security & Auth](./security-auth.md) — Safety detection, authentication, rate limiting, and cloud sync
