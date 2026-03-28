@@ -1,135 +1,71 @@
 # Documentation Sync
 
-This folder contains scripts for syncing documentation from `nella/docs` to the website at `nella-website/apps/docs`.
+The scripts in this folder keep the public docs in `../nella-website` aligned with the source docs in this repo.
 
-## How It Works
+## Source and Target
 
-```
-nella/docs/               nella-website/apps/docs/src/content/docs/
-├── mcp/tools.md    ──►   ├── api-reference/tools-reference.mdx
-├── core/api.md     ──►   ├── api-reference/core-api.mdx
-├── cli/commands.md ──►   ├── cli/commands.mdx
-└── ...                   └── ...
-```
+Source docs live in `nella/docs/**`.
 
-The sync script:
-1. Reads markdown files from `nella/docs`
-2. Transforms them to MDX format with proper frontmatter
-3. Converts callouts to Astro components
-4. Fixes relative links
-5. Writes to the website docs folder
+Public website docs live in:
 
-## Local Usage
+- `../nella-website/apps/docs/src/content/docs/**`
+
+The sync script transforms Markdown source files into MDX, adds website frontmatter, imports the shared Astro callout component, and rewrites links so they point at the website routes instead of repo-relative files.
+
+## Commands
 
 ```bash
-# Preview what would be synced (no changes)
+# Preview which files would change
 pnpm sync-docs:dry
 
-# Sync docs now
+# Write the synced MDX files into ../nella-website
 pnpm sync-docs
 
-# Watch for changes and sync automatically
+# Re-run sync when docs change locally
 pnpm sync-docs:watch
 ```
 
-## Automatic Sync (GitHub Actions)
+## Current Mapped Pages
 
-Documentation is automatically synced when changes are pushed to `docs/**` on the `main` branch.
+The sync currently covers the public docs routes that are meant to be sourced from `nella/docs`:
 
-### Setup Instructions
+- `getting-started/*`
+- `api-reference/overview`
+- `mcp-tools/overview`
+- `mcp-tools/context-tools`
+- `mcp-tools/nella-index`
+- `mcp-tools/nella-search`
+- `mcp-tools/nella-get-context`
+- `mcp-tools/nella-add-assumption`
+- `mcp-tools/nella-check-assumptions`
+- `mcp-tools/nella-check-dependencies`
+- `mcp-tools/nella-heartbeat`
+- `configuration/overview`
+- `configuration/constraints`
+- `configuration/validation`
+- `configuration/task-authoring`
+- `integrations/claude-desktop`
+- `integrations/cursor`
+- `integrations/vscode`
+- `integrations/custom-client`
+- `cli/commands`
+- `features/prompt-injection-defense`
+- `guides/tips-and-best-practices`
+- `guides/securing-agents-against-injection`
+- `troubleshooting`
 
-#### 1. Create a Personal Access Token (PAT)
+Not every docs page in `nella-website` is synced from here. Some pages are still website-local and should be edited in the website repo directly.
 
-1. Go to [GitHub Token Settings](https://github.com/settings/tokens)
-2. Click **"Generate new token (classic)"**
-3. Configure the token:
-   - **Name:** `Docs Sync Token`
-   - **Expiration:** 90 days (or your preference)
-   - **Scopes:** Check `repo` (Full control of private repositories)
-4. Click **"Generate token"**
-5. **Copy the token** (you won't see it again!)
+## Workflow
 
-#### 2. Add the Secret to the Repository
+1. Edit the source Markdown in `nella/docs/**`.
+2. Run `pnpm sync-docs`.
+3. Review the generated MDX changes in `../nella-website`.
+4. Commit the source-doc changes in `nella`.
+5. Commit the generated/public-doc updates in `nella-website`.
 
-1. Go to [nella repo secrets](https://github.com/nella-labs/nella/settings/secrets/actions)
-2. Click **"New repository secret"**
-3. Configure:
-   - **Name:** `DOCS_SYNC_TOKEN`
-   - **Value:** Paste the PAT you copied
-4. Click **"Add secret"**
+## Guardrails
 
-#### 3. Verify Permissions
-
-The PAT owner must have **write access** to `nella-labs/nella-website` for the PR creation to work.
-
-### How the Workflow Works
-
-```
-Push to docs/** on main
-        │
-        ▼
-┌───────────────────┐
-│  Checkout both    │
-│  repositories     │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  Run sync script  │
-│  (transform docs) │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  Create PR in     │
-│  nella-website    │
-└───────────────────┘
-```
-
-### Manual Trigger
-
-You can manually trigger the workflow:
-
-1. Go to [Actions tab](https://github.com/nella-labs/nella/actions)
-2. Select **"Sync Documentation"** workflow
-3. Click **"Run workflow"**
-4. Optionally enable **"Dry run"** to preview without creating a PR
-
-## Files Synced
-
-| Source (`nella/docs`) | Target (`nella-website`) |
-|----------------------|--------------------------|
-| `mcp/tools.md` | `api-reference/tools-reference.mdx` |
-| `mcp/integration.md` | `guides/mcp-integration.mdx` |
-| `mcp/README.md` | `api-reference/mcp-overview.mdx` |
-| `core/api-reference.md` | `api-reference/core-api.mdx` |
-| `core/configuration.md` | `configuration/core-config.mdx` |
-| `core/modules.md` | `guides/modules.mdx` |
-| `core/context.md` | `guides/context-management.mdx` |
-| `core/types.md` | `api-reference/types.mdx` |
-| `core/examples.md` | `examples/core-examples.mdx` |
-| `cli/commands.md` | `cli/commands.mdx` |
-| `how-to-use.md` | `getting-started/usage-guide.mdx` |
-| `spec.md` | `guides/specification.mdx` |
-
-## Troubleshooting
-
-### "Resource not accessible by integration"
-
-The PAT doesn't have write access to `nella-website`. Ensure:
-- The token has `repo` scope
-- The token owner has write access to `nella-labs/nella-website`
-
-### "Secret not found: DOCS_SYNC_TOKEN"
-
-The secret hasn't been added. Follow step 2 in the setup instructions.
-
-### Sync runs but no PR is created
-
-Check if there were actual changes:
-- The workflow only creates a PR if files differ
-- Run `pnpm sync-docs:dry` locally to preview changes
-
-### MDX syntax errors after sync
-
-Some markdown patterns may not convert cleanly. Edit the sync script's transform functions in `scripts/sync-docs.ts`.
+- Do not hand-edit generated files in `../nella-website/apps/docs/src/content/docs/**` when the source page is mapped here.
+- Keep private website documentation outside `apps/docs/src/content/docs/**`; anything under that content tree is public.
+- If a public docs route changes, update both `scripts/sync-docs.ts` and any hard-coded website navigation or footer links in `../nella-website`.
