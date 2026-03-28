@@ -21,8 +21,9 @@ import type {
   WorkspaceRegistry as IWorkspaceRegistry,
   RegistrySettings,
   WorkspaceEvent,
+} from "./types";
+import {
   DEFAULT_WORKSPACE_CONFIG,
-  DEFAULT_REGISTRY_SETTINGS,
 } from "./types";
 import { FileLock, withFileLock } from "./file-lock";
 import { RegistryBackupManager, type BackupInfo } from "./backup";
@@ -681,36 +682,7 @@ export class WorkspaceRegistry {
   }
 
   private getDefaultConfig(): WorkspaceConfig {
-    return {
-      autoIndex: true,
-      indexOnChange: true,
-      include: [
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.js",
-        "**/*.jsx",
-        "**/*.py",
-        "**/*.md",
-        "**/*.json",
-      ],
-      exclude: [
-        "**/node_modules/**",
-        "**/dist/**",
-        "**/build/**",
-        "**/.git/**",
-      ],
-      embedder: {
-        provider: "azure",
-        model: "text-embedding-3-small",
-        dimensions: 1536,
-      },
-      search: {
-        vectorWeight: 0.4,
-        lexicalWeight: 0.6,
-        rerankEnabled: true,
-        topK: 10,
-      },
-    };
+    return { ...DEFAULT_WORKSPACE_CONFIG };
   }
 
   private generateWorkspaceId(workspacePath: string): string {

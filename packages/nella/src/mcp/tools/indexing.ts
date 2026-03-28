@@ -9,6 +9,8 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import {
   createIndexManager,
   DEFAULT_INDEX_CONFIG,
+  DEFAULT_EMBEDDING_MODEL,
+  MODEL_DIMENSIONS,
   scanContent,
   formatInjectionWarning,
 } from "@usenella/core";
@@ -126,16 +128,16 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   if (session) {
     embedderConfig = {
       provider: "nella",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       apiKey: session.access_token,
       apiBase: "https://app.getnella.dev/api",
     };
   } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
     embedderConfig = {
       provider: "azure",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
     };
   } else {
     throw new Error(

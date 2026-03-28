@@ -5,7 +5,7 @@
  * Provides the bridge between REST API endpoints and the RAG system.
  */
 
-import { IndexManager, type IndexManagerConfig } from "../indexing";
+import { IndexManager, DEFAULT_EMBEDDING_MODEL, MODEL_DIMENSIONS, type IndexManagerConfig } from "../indexing";
 import type {
   SearchQuery,
   SearchResponse,
@@ -61,8 +61,8 @@ export class SearchService {
       },
       embedder: {
         provider: "azure",
-        model: "text-embedding-3-small",
-        dimensions: 1536,
+        model: DEFAULT_EMBEDDING_MODEL,
+        dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       },
       search: {
         vectorWeight: 0.4,
