@@ -1102,7 +1102,7 @@ const result = await handler.handle('nella_search', { query: 'user auth' });
 | `nella_set_context` | Set shared context entries |
 | `nella_status` | Get server/workspace status |
 
-These are the core-level tools. The `@getnella/mcp` package exposes an additional 12 tools (validation, safety, context) — see the [MCP Tools Reference](../mcp/tools.md).
+These are the core-level tools exposed by the generic MCP handler. The current `@getnella/mcp` package ships a different 7-tool surface focused on indexing, session context, dependency tracking, and heartbeat continuity. See the [MCP Tools Reference](../mcp/tools.md).
 
 ---
 

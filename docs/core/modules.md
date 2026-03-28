@@ -678,7 +678,7 @@ const response = await handler.handleToolCall({
 | `nella_set_context` | Set shared context entries |
 | `nella_status` | Get server/workspace status |
 
-The `@getnella/mcp` package adds 12 additional tools for validation, safety, and context tracking. See the [MCP Tools Reference](../mcp/tools.md).
+These are the core-level tools exposed by `createMcpToolHandler()`. The current `@getnella/mcp` package ships a different 7-tool surface focused on indexing, session context, dependency tracking, and heartbeat continuity. See the [MCP Tools Reference](../mcp/tools.md).
 
 ---
 
