@@ -158,6 +158,14 @@ export class IndexManager {
       ? paths.map((p) => path.resolve(workspacePath, p))
       : this.getFilesToIndex(workspacePath);
 
+    // Force reindex: wipe all state for a clean rebuild
+    if (force) {
+      this.chunks.clear();
+      this.vectorStore.clear();
+      this.lexicalIndex.clear();
+      this.fileHashes.clear();
+    }
+
     this.emit({
       type: "index:start",
       workspaceId: this.config.workspaceId,

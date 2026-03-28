@@ -35,6 +35,7 @@ interface VectorEntry {
 interface VectorEntrySlim {
   id: string;
   chunkId: string;
+  numericId?: number; // v2.1: preserve backend key across save/load
 }
 
 interface VectorStoreData {
@@ -588,10 +589,11 @@ export class VectorStore {
     // Save HNSW index (backend stores the raw vectors)
     this.backend.save(this.persistPath);
 
-    // Save metadata — v2: exclude vector arrays (they live in the backend file)
+    // Save metadata — v2.1: exclude vector arrays, preserve numeric IDs
     const slimEntries: VectorEntrySlim[] = Array.from(this.entries.values()).map(e => ({
       id: e.id,
       chunkId: e.chunkId,
+      numericId: this.idToNumericId.get(e.id),
     }));
 
     const metadata: VectorStoreData = {
@@ -622,21 +624,21 @@ export class VectorStore {
         this.idToNumericId.clear();
         this.numericIdToId.clear();
 
-        // Rebuild mappings
-        let maxNumericId = 0;
+        // Rebuild mappings — use stored numericId (v2.1) or fall back to sequential
+        let maxNumericId = -1;
         for (let i = 0; i < data.entries.length; i++) {
-          const entry = data.entries[i];
-          // v2 format: entries may not have vectors (stored in backend)
+          const entry = data.entries[i] as VectorEntrySlim;
+          const numericId = entry.numericId ?? i; // v2.1 stores it; v2 falls back to sequential
           const fullEntry: VectorEntry = {
             id: entry.id,
             chunkId: entry.chunkId,
-            vector: (entry as VectorEntry).vector || [],
+            vector: (entry as unknown as VectorEntry).vector || [],
           };
           this.entries.set(entry.id, fullEntry);
           this.chunkIdToVectorId.set(entry.chunkId, entry.id);
-          this.idToNumericId.set(entry.id, i);
-          this.numericIdToId.set(i, entry.id);
-          maxNumericId = Math.max(maxNumericId, i);
+          this.idToNumericId.set(entry.id, numericId);
+          this.numericIdToId.set(numericId, entry.id);
+          maxNumericId = Math.max(maxNumericId, numericId);
         }
         this.nextNumericId = maxNumericId + 1;
       } catch (error) {
