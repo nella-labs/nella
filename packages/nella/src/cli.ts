@@ -145,6 +145,7 @@ interface CliArgs {
   serverUrl?: string;
   client?: string;
   mode?: string;
+  yes?: boolean;
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
   // Help flag (per-command)
@@ -221,6 +222,8 @@ function parseArgs(args: string[]): CliArgs {
       result.mode = args[++i];
     } else if (arg.startsWith("--mode=")) {
       result.mode = arg.slice("--mode=".length);
+    } else if (arg === "--yes" || arg === "-y") {
+      result.yes = true;
     }
 
     i++;
@@ -477,6 +480,7 @@ function showHelp(): void {
     [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for hosted mode"],
     [theme.accent("--mode"), theme.muted("<mode>"), "hosted or local (default: auto)"],
     [theme.accent("--client"), theme.muted("<name>"), "Agent name or all (default: all detected)"],
+    [theme.accent("-y, --yes"), "", "Skip confirmation prompts"],
     [theme.accent("--force, -f"), "", "Force full reindex"],
     [theme.accent("--json"), "", "Output as JSON"],
     [theme.accent("--help, -h"), "", "Show help"],
@@ -536,14 +540,14 @@ async function main(): Promise<void> {
       break;
     case "connect":
       await runConnectCommand(
-        { client: args.client, mode: args.mode, apiKey: args.apiKey, serverUrl: args.serverUrl, showHelp: args.showHelp },
+        { client: args.client, mode: args.mode, apiKey: args.apiKey, serverUrl: args.serverUrl, showHelp: args.showHelp, yes: args.yes },
         logo, tagline,
       );
       break;
     case "setup":
       // Backward-compatible alias: setup → connect --client claude-code --mode local
       await runConnectCommand(
-        { client: "claude-code", mode: "local" },
+        { client: "claude-code", mode: "local", yes: true },
         logo, tagline,
       );
       break;
