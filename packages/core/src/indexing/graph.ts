@@ -464,25 +464,9 @@ export function dependencyGraphToArchgraphModel(
     });
   }
 
-  // Create groups from directories
-  for (const [dir, fileIds] of dirFiles) {
-    const groupId = `group-${sanitizeId(dir)}`;
-    groups.push({
-      id: groupId,
-      name: dir === "." ? projectName : dir,
-      objectIds: fileIds,
-    });
-  }
-
-  // External packages group
-  if (graph.externalPackages.size > 0) {
-    const extIds = [...graph.externalPackages].map((pkg) => `pkg-${sanitizeId(pkg)}`);
-    groups.push({
-      id: "group-external",
-      name: "External Packages",
-      objectIds: extIds,
-    });
-  }
+  // No groups — keeps layouts flat so ELK can spread nodes
+  // horizontally instead of stacking 90+ directory containers vertically.
+  // Directory structure is represented by the Directory Overview diagram instead.
 
   // Create connections from edges
   for (const edge of graph.edges) {
