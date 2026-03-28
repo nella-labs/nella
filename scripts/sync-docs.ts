@@ -274,6 +274,10 @@ function extractDescription(content: string): string {
   return "Nella documentation";
 }
 
+function formatMdxImports(imports: string[]): string {
+  return `${imports.join("\n")}\n\n`;
+}
+
 function transformGeneric(content: string, filename: string, target: string): string {
   const title = extractTitle(content);
   const description = extractDescription(content);
@@ -283,10 +287,9 @@ function transformGeneric(content: string, filename: string, target: string): st
   let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
   // Add imports for MDX components
-  const imports = [
+  const imports = formatMdxImports([
     `import Callout from '${prefix}components/mdx/Callout.astro';`,
-    "",
-  ].join("\n");
+  ]);
 
   // Convert markdown callouts to MDX Callout components
   transformed = convertCallouts(transformed);
@@ -304,11 +307,10 @@ function transformToolsReference(content: string, filename: string, target: stri
 
   let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
-  const imports = [
+  const imports = formatMdxImports([
     `import Callout from '${prefix}components/mdx/Callout.astro';`,
     `import APITable from '${prefix}components/mdx/APITable.astro';`,
-    "",
-  ].join("\n");
+  ]);
 
   transformed = convertCallouts(transformed);
   transformed = fixRelativeLinks(transformed);
@@ -323,10 +325,9 @@ function transformCliCommands(content: string, filename: string, target: string)
 
   let transformed = content.replace(/^#\s+.+\r?\n+/, "");
 
-  const imports = [
+  const imports = formatMdxImports([
     `import Callout from '${prefix}components/mdx/Callout.astro';`,
-    "",
-  ].join("\n");
+  ]);
 
   transformed = convertCallouts(transformed);
   transformed = fixRelativeLinks(transformed);
