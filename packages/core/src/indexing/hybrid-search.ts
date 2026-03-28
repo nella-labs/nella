@@ -64,7 +64,7 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
   minScore: 0.0,
   rerankEnabled: true,
   rerankTopK: 20,
-  rerankModel: "rerank-english-v3.0",
+  rerankModel: "Cohere-rerank-v4.0-pro",
 };
 
 // =============================================================================
@@ -89,7 +89,7 @@ class CohereReranker {
   async rerank(
     query: string,
     documents: { id: string; text: string }[],
-    _model?: string,
+    model?: string,
     topN?: number
   ): Promise<{ id: string; score: number }[]> {
     if (!this.available || !this.apiKey || !this.endpoint) {
@@ -97,7 +97,7 @@ class CohereReranker {
     }
 
     const request: CohereRerankRequest = {
-      model: "Cohere-rerank-v4.0-pro",
+      model: model || "Cohere-rerank-v4.0-pro",
       query,
       documents: documents.map((d) => d.text),
       top_n: topN ?? documents.length,
