@@ -53,6 +53,40 @@ interface CohereRerankResponse {
 }
 
 // =============================================================================
+// Language → file extension mapping
+// =============================================================================
+
+const LANGUAGE_EXTENSIONS: Record<string, string[]> = {
+  typescript: ["ts", "tsx"],
+  javascript: ["js", "jsx", "mjs", "cjs"],
+  python: ["py"],
+  java: ["java"],
+  go: ["go"],
+  rust: ["rs"],
+  markdown: ["md"],
+  json: ["json"],
+  yaml: ["yaml", "yml"],
+};
+
+/**
+ * Resolve a filter value to file extensions.
+ * Accepts both language names ("typescript") and raw extensions ("ts").
+ */
+function resolveFileExtensions(filters: string[]): string[] {
+  const resolved = new Set<string>();
+  for (const f of filters) {
+    const lower = f.toLowerCase();
+    const exts = LANGUAGE_EXTENSIONS[lower];
+    if (exts) {
+      for (const ext of exts) resolved.add(ext);
+    } else {
+      resolved.add(lower);
+    }
+  }
+  return Array.from(resolved);
+}
+
+// =============================================================================
 // Default Configuration
 // =============================================================================
 
@@ -426,10 +460,11 @@ export class HybridSearcher {
       const chunk = this.chunks.get(r.chunkId);
       if (!chunk) return false;
 
-      // File type filter
+      // File type filter (accepts both language names and extensions)
       if (filter.fileTypes && filter.fileTypes.length > 0) {
         const ext = chunk.filePath.split(".").pop()?.toLowerCase();
-        if (!ext || !filter.fileTypes.includes(ext)) {
+        const allowedExts = resolveFileExtensions(filter.fileTypes);
+        if (!ext || !allowedExts.includes(ext)) {
           return false;
         }
       }
