@@ -106,18 +106,9 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
 // =============================================================================
 
 class CohereReranker {
-  private apiKey: string | null = null;
-  private endpoint: string | null = null;
-  private available: boolean = false;
-
-  constructor() {
-    this.apiKey = process.env.AZURE_RERANK_API_KEY || null;
-    this.endpoint = process.env.AZURE_RERANK_ENDPOINT || null;
-    this.available = !!(this.apiKey && this.endpoint);
-  }
-
+  /** Check env vars fresh each time (credentials may rotate mid-session). */
   isAvailable(): boolean {
-    return this.available;
+    return !!(process.env.AZURE_RERANK_API_KEY && process.env.AZURE_RERANK_ENDPOINT);
   }
 
   async rerank(
@@ -126,7 +117,9 @@ class CohereReranker {
     model?: string,
     topN?: number
   ): Promise<{ id: string; score: number }[]> {
-    if (!this.available || !this.apiKey || !this.endpoint) {
+    const apiKey = process.env.AZURE_RERANK_API_KEY;
+    const endpoint = process.env.AZURE_RERANK_ENDPOINT;
+    if (!apiKey || !endpoint) {
       throw new Error("Azure rerank not configured — set AZURE_RERANK_API_KEY and AZURE_RERANK_ENDPOINT");
     }
 
@@ -138,14 +131,15 @@ class CohereReranker {
       return_documents: false,
     };
 
-    const response = await fetch(this.endpoint, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "X-Client-Name": "nella-core",
       },
       body: JSON.stringify(request),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -557,7 +551,10 @@ export class HybridSearcher {
 
       return [...toRerank, ...rest];
     } catch (error) {
-      console.warn("Reranking failed, using RRF scores:", error);
+      const reason = error instanceof Error && error.name === "TimeoutError"
+        ? "Cohere reranking timed out (10s)"
+        : "Reranking failed";
+      console.warn(`${reason}, falling back to RRF scores:`, error);
       return results;
     }
   }
