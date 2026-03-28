@@ -27,7 +27,7 @@ interface SyncMapping {
   transform?: (content: string, filename: string, target: string) => string;
 }
 
-// Define how source docs map to target locations — MCP-focused only
+// Define how source docs map to target locations.
 const SYNC_MAPPINGS: SyncMapping[] = [
   // =========================================================================
   // Getting Started
@@ -57,33 +57,8 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     transform: transformToolsReference,
   },
   {
-    source: "api-reference/tools/nella-check.md",
-    target: "mcp-tools/nella-check.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-validate.md",
-    target: "mcp-tools/nella-validate.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-run.md",
-    target: "mcp-tools/nella-run.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-detect-risks.md",
-    target: "mcp-tools/nella-detect-risks.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-should-refuse.md",
-    target: "mcp-tools/nella-should-refuse.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-check-prerequisites.md",
-    target: "mcp-tools/nella-check-prerequisites.mdx",
+    source: "api-reference/overview.md",
+    target: "api-reference/overview.mdx",
     transform: transformGeneric,
   },
   {
@@ -91,13 +66,48 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     target: "mcp-tools/context-tools.mdx",
     transform: transformGeneric,
   },
+  {
+    source: "api-reference/tools/nella-index.md",
+    target: "mcp-tools/nella-index.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-search.md",
+    target: "mcp-tools/nella-search.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-get-context.md",
+    target: "mcp-tools/nella-get-context.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-add-assumption.md",
+    target: "mcp-tools/nella-add-assumption.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-check-assumptions.md",
+    target: "mcp-tools/nella-check-assumptions.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-check-dependencies.md",
+    target: "mcp-tools/nella-check-dependencies.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "api-reference/tools/nella-heartbeat.md",
+    target: "mcp-tools/nella-heartbeat.mdx",
+    transform: transformGeneric,
+  },
 
   // =========================================================================
   // Configuration
   // =========================================================================
   {
-    source: "user-guide/task-authoring.md",
-    target: "configuration/task-authoring.mdx",
+    source: "configuration/overview.md",
+    target: "configuration/overview.mdx",
     transform: transformGeneric,
   },
   {
@@ -108,6 +118,11 @@ const SYNC_MAPPINGS: SyncMapping[] = [
   {
     source: "configuration/validation.md",
     target: "configuration/validation.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "user-guide/task-authoring.md",
+    target: "configuration/task-authoring.mdx",
     transform: transformGeneric,
   },
 
@@ -145,11 +160,11 @@ const SYNC_MAPPINGS: SyncMapping[] = [
   },
 
   // =========================================================================
-  // Architecture
+  // Features
   // =========================================================================
   {
     source: "architecture/prompt-injection-defense.md",
-    target: "architecture/prompt-injection-defense.mdx",
+    target: "features/prompt-injection-defense.mdx",
     transform: transformGeneric,
   },
 
@@ -346,15 +361,24 @@ function convertCallouts(content: string): string {
 }
 
 function fixRelativeLinks(content: string): string {
-  // Fix links to other docs sections
-  content = content.replace(/\]\(\.\.\/mcp\//g, "](/api-reference/tools/");
-  content = content.replace(/\]\(\.\.\/core\//g, "](/api-reference/");
+  // Fix links to other docs sections and current website routes.
+  content = content.replace(/\]\(\.\.\/mcp\/tools(?:\.md)?\)/g, "](/mcp-tools/overview)");
+  content = content.replace(/\]\(\.\.\/mcp\/tools(?:\.md)?#/g, "](/mcp-tools/overview#");
+  content = content.replace(/\]\(\.\.\/mcp\//g, "](/mcp/");
+  content = content.replace(/\]\(\.\.\/core\//g, "](/core/");
+  content = content.replace(/\]\(\.\.\/architecture\/prompt-injection-defense(?:\.md)?\)/g, "](/features/prompt-injection-defense)");
+  content = content.replace(/\]\(\.\.\/architecture\/prompt-injection-defense(?:\.md)?#/g, "](/features/prompt-injection-defense#");
   content = content.replace(/\]\(\.\.\/architecture\//g, "](/architecture/");
   content = content.replace(/\]\(\.\.\/getting-started\//g, "](/getting-started/");
-  content = content.replace(/\]\(\.\.\/user-guide\//g, "](/user-guide/");
+  content = content.replace(/\]\(\.\.\/user-guide\//g, "](/configuration/");
   content = content.replace(/\]\(\.\.\/configuration\//g, "](/configuration/");
+  content = content.replace(/\]\(\.\.\/api-reference\/overview(?:\.md)?\)/g, "](/api-reference/overview)");
+  content = content.replace(/\]\(\.\.\/api-reference\/overview(?:\.md)?#/g, "](/api-reference/overview#");
+  content = content.replace(/\]\(\.\.\/api-reference\/tools\//g, "](/mcp-tools/");
   content = content.replace(/\]\(\.\.\/api-reference\//g, "](/api-reference/");
+  content = content.replace(/\]\(\.\/tools\//g, "](/mcp-tools/");
   content = content.replace(/\]\(\.\.\/guides\//g, "](/guides/");
+  content = content.replace(/\]\(\.\.\/integrations\//g, "](/integrations/");
   content = content.replace(/\]\(\.\.\/examples\//g, "](/examples/");
   content = content.replace(/\]\(\.\.\/benchmark\//g, "](/benchmark/");
   content = content.replace(/\]\(\.\//g, "](");
