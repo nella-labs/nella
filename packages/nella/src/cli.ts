@@ -34,6 +34,7 @@ import {
   getValidSession,
   createApiKey,
 } from "./auth";
+import { runConnectCommand } from "./connect";
 
 // =============================================================================
 // Theme & Styling
@@ -142,7 +143,8 @@ interface CliArgs {
   // Connect-specific args
   apiKey?: string;
   serverUrl?: string;
-  client?: "claude" | "vscode" | "cursor" | "all";
+  client?: string;
+  mode?: string;
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
   // Help flag (per-command)
@@ -212,9 +214,13 @@ function parseArgs(args: string[]): CliArgs {
     } else if (arg.startsWith("--server-url=")) {
       result.serverUrl = arg.slice("--server-url=".length);
     } else if (arg === "--client") {
-      result.client = args[++i] as "claude" | "vscode" | "cursor" | "all";
+      result.client = args[++i];
     } else if (arg.startsWith("--client=")) {
-      result.client = arg.slice("--client=".length) as "claude" | "vscode" | "cursor" | "all";
+      result.client = arg.slice("--client=".length);
+    } else if (arg === "--mode") {
+      result.mode = args[++i];
+    } else if (arg.startsWith("--mode=")) {
+      result.mode = arg.slice("--mode=".length);
     }
 
     i++;
@@ -223,126 +229,6 @@ function parseArgs(args: string[]): CliArgs {
   return result;
 }
 
-// =============================================================================
-// Connect Command
-// =============================================================================
-
-interface McpClientConfig {
-  url: string;
-  headers: { Authorization: string };
-}
-
-function getClaudeDesktopConfigPath(): string {
-  const platform = process.platform;
-  if (platform === "win32") {
-    return path.join(process.env.APPDATA || "", "Claude", "claude_desktop_config.json");
-  } else if (platform === "darwin") {
-    return path.join(process.env.HOME || "", "Library", "Application Support", "Claude", "claude_desktop_config.json");
-  } else {
-    return path.join(process.env.HOME || "", ".config", "claude", "claude_desktop_config.json");
-  }
-}
-
-function getVsCodeMcpConfigPath(): string {
-  // Write to .vscode/mcp.json in the current working directory
-  return path.join(process.cwd(), ".vscode", "mcp.json");
-}
-
-function getCursorMcpConfigPath(): string {
-  // Write to ~/.cursor/mcp.json (global Cursor MCP config)
-  const home = process.platform === "win32" ? process.env.USERPROFILE || "" : process.env.HOME || "";
-  return path.join(home, ".cursor", "mcp.json");
-}
-
-function configureClaudeDesktop(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
-  const configPath = getClaudeDesktopConfigPath();
-
-  try {
-    let config: Record<string, unknown> = {};
-
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    } else {
-      // Ensure directory exists
-      const dir = path.dirname(configPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    }
-
-    // Add or update nella MCP server
-    const mcpServers = (config.mcpServers as Record<string, unknown>) || {};
-    mcpServers.nella = {
-      url: serverUrl,
-      headers: { Authorization: `Bearer ${apiKey}` },
-    } as McpClientConfig;
-    config.mcpServers = mcpServers;
-
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    return { success: true, path: configPath };
-  } catch (err) {
-    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-function configureVsCode(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
-  const configPath = getVsCodeMcpConfigPath();
-
-  try {
-    let config: Record<string, unknown> = {};
-
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    } else {
-      const dir = path.dirname(configPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    }
-
-    const servers = (config.servers as Record<string, unknown>) || {};
-    servers.nella = {
-      url: serverUrl,
-      headers: { Authorization: `Bearer ${apiKey}` },
-    } as McpClientConfig;
-    config.servers = servers;
-
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    return { success: true, path: configPath };
-  } catch (err) {
-    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-function configureCursor(serverUrl: string, apiKey: string): { success: boolean; path: string; error?: string } {
-  const configPath = getCursorMcpConfigPath();
-
-  try {
-    let config: Record<string, unknown> = {};
-
-    if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    } else {
-      const dir = path.dirname(configPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    }
-
-    // Cursor uses "mcpServers" (same as Claude Desktop)
-    const mcpServers = (config.mcpServers as Record<string, unknown>) || {};
-    mcpServers.nella = {
-      url: serverUrl,
-      headers: { Authorization: `Bearer ${apiKey}` },
-    } as McpClientConfig;
-    config.mcpServers = mcpServers;
-
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
-    return { success: true, path: configPath };
-  } catch (err) {
-    return { success: false, path: configPath, error: err instanceof Error ? err.message : String(err) };
-  }
-}
 
 // =============================================================================
 // Auth Command
@@ -403,196 +289,6 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
   }
 }
 
-async function runConnectCommand(args: CliArgs): Promise<void> {
-  console.log(logo);
-  console.log(tagline);
-
-  if (args.showHelp) {
-    console.log(`  ${theme.primary.bold("nella connect")} — Configure MCP clients to use Nella\n`);
-    console.log(`  ${theme.primary.bold("Usage:")}\n`);
-    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect")}`);
-    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --api-key nella_your_key")}`);
-    console.log(`    ${theme.muted("$")} ${theme.primary("nella connect --client claude")}\n`);
-    console.log(`  ${theme.primary.bold("Options:")}\n`);
-    console.log(`    ${theme.accent("--api-key, -k")} ${theme.muted("<key>")}       API key (auto-created if logged in)`);
-    console.log(`    ${theme.accent("--server-url, -u")} ${theme.muted("<url>")}    Server URL (default: production)`);
-    console.log(`    ${theme.accent("--client")} ${theme.muted("<name>")}            Target client: claude, vscode, cursor, or all (default: all)`);
-    console.log("");
-    return;
-  }
-
-  const serverUrl = args.serverUrl || "https://mcp.getnella.dev/mcp";
-  let apiKey = args.apiKey || process.env.NELLA_API_KEY;
-  const client = args.client || "all";
-
-  // If no API key provided, try to auto-create one using stored session
-  if (!apiKey) {
-    const session = await getValidSession();
-    if (session) {
-      console.log(`  ${theme.icons.info}  Logged in as ${theme.secondary(session.user.email)}`);
-      console.log(`  ${theme.muted("   Creating API key automatically...")}\n`);
-
-      const keyName = `cli-${os.hostname()}-${new Date().toISOString().slice(0, 10)}`;
-      const { apiKey: newKey, error } = await createApiKey(session, keyName);
-
-      if (newKey) {
-        apiKey = newKey;
-        console.log(`  ${theme.icons.success}  API key created: ${theme.dim(newKey.substring(0, 15) + "...")}\n`);
-      } else {
-        console.log(`  ${theme.icons.error}  Failed to create key: ${error}`);
-        console.log(`  ${theme.muted("   Pass one manually with --api-key")}\n`);
-        process.exit(1);
-      }
-    } else {
-      console.log(box([
-        `${theme.icons.error}  ${theme.error.bold("No API key provided")}`,
-        "",
-        `  Either log in first, or pass a key directly:`,
-        "",
-        `  ${theme.muted("$")} ${theme.secondary("nella auth login")}`,
-        `  ${theme.muted("$")} ${theme.secondary("nella connect")}`,
-        "",
-        `  ${theme.muted("— or —")}`,
-        "",
-        `  ${theme.muted("$")} ${theme.secondary("nella connect --api-key nella_your_key_here")}`,
-        "",
-        `  Get your API key at ${theme.secondary("https://app.getnella.dev/dashboard/api-keys")}`,
-      ].join("\n"), "Setup"), "\n");
-      process.exit(1);
-    }
-  }
-
-  if (!apiKey.startsWith("nella_")) {
-    console.log(`  ${theme.icons.error}  API key must start with ${theme.accent("nella_")}\n`);
-    process.exit(1);
-  }
-
-  console.log(`  ${theme.icons.info}  ${theme.bold("Connecting to Nella MCP Server")}\n`);
-  console.log(`  ${theme.muted("Server:")}  ${theme.secondary(serverUrl)}`);
-  console.log(`  ${theme.muted("Key:")}     ${theme.dim(apiKey.substring(0, 15) + "..." + apiKey.slice(-4))}`);
-  console.log("");
-
-  // Verify the server is reachable
-  try {
-    const http = require("http");
-    const https = require("https");
-    const healthUrl = serverUrl.replace(/\/mcp$/, "/health");
-    const mod = healthUrl.startsWith("https") ? https : http;
-
-    const healthCheck = await new Promise<{ ok: boolean; version?: string }>((resolve) => {
-      const req = mod.get(healthUrl, (res: { statusCode?: number; on: Function }) => {
-        let data = "";
-        res.on("data", (chunk: string) => { data += chunk; });
-        res.on("end", () => {
-          try {
-            const json = JSON.parse(data);
-            resolve({ ok: res.statusCode === 200, version: json.version });
-          } catch {
-            resolve({ ok: false });
-          }
-        });
-      });
-      req.on("error", () => resolve({ ok: false }));
-      req.setTimeout(5000, () => { req.destroy(); resolve({ ok: false }); });
-    });
-
-    if (healthCheck.ok) {
-      console.log(`  ${theme.icons.success}  Server reachable ${theme.muted(`(v${healthCheck.version})`)}`);
-    } else {
-      console.log(`  ${theme.icons.warning}  Server unreachable — config will be written anyway`);
-    }
-  } catch {
-    console.log(`  ${theme.icons.warning}  Could not verify server — config will be written anyway`);
-  }
-
-  console.log("");
-
-  const results: { name: string; success: boolean; path: string; error?: string }[] = [];
-
-  if (client === "claude" || client === "all") {
-    const r = configureClaudeDesktop(serverUrl, apiKey);
-    results.push({ name: "Claude Desktop", ...r });
-  }
-
-  if (client === "vscode" || client === "all") {
-    const r = configureVsCode(serverUrl, apiKey);
-    results.push({ name: "VS Code (Copilot)", ...r });
-  }
-
-  if (client === "cursor" || client === "all") {
-    const r = configureCursor(serverUrl, apiKey);
-    results.push({ name: "Cursor", ...r });
-  }
-
-  for (const r of results) {
-    if (r.success) {
-      console.log(`  ${theme.icons.success}  ${theme.success(r.name)} configured`);
-      console.log(`     ${theme.muted(r.path)}`);
-    } else {
-      console.log(`  ${theme.icons.error}  ${theme.error(r.name)} failed: ${r.error}`);
-      console.log(`     ${theme.muted(r.path)}`);
-    }
-  }
-
-  console.log("");
-  console.log(divider());
-
-  const allSuccess = results.every((r) => r.success);
-  if (allSuccess) {
-    console.log(`\n  ${theme.icons.star}  ${theme.success.bold("All set!")} ${theme.muted("Restart your clients to connect.")}\n`);
-  } else {
-    console.log(`\n  ${theme.icons.warning}  ${theme.warning("Some clients failed to configure. Check paths above.")}\n`);
-  }
-}
-
-// =============================================================================
-// Setup Command — install Claude Code plugin
-// =============================================================================
-
-function runSetupCommand(): void {
-  const commandSrc = path.join(__dirname, "..", "claude-plugin", "commands", "nella.md");
-  const claudeDir = path.join(os.homedir(), ".claude");
-  const commandsDir = path.join(claudeDir, "commands");
-  const commandDest = path.join(commandsDir, "nella.md");
-
-  if (!fs.existsSync(commandSrc)) {
-    console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Command source not found.")} ${theme.muted("Try reinstalling @getnella/mcp.")}\n`);
-    process.exit(1);
-  }
-
-  // Install slash command to ~/.claude/commands/nella.md
-  fs.mkdirSync(commandsDir, { recursive: true });
-  const isUpdate = fs.existsSync(commandDest);
-  fs.copyFileSync(commandSrc, commandDest);
-
-  // Clean up legacy marketplace plugin (pre-v0.1.6)
-  const legacyMarketplace = path.join(claudeDir, "plugins", "marketplaces", "nella");
-  if (fs.existsSync(legacyMarketplace)) {
-    fs.rmSync(legacyMarketplace, { recursive: true, force: true });
-  }
-  const legacyDest = path.join(claudeDir, "plugins", "nella");
-  if (fs.existsSync(legacyDest) && fs.statSync(legacyDest).isDirectory()) {
-    fs.rmSync(legacyDest, { recursive: true, force: true });
-  }
-  // Remove nella from known_marketplaces
-  const knownMarketplacesPath = path.join(claudeDir, "plugins", "known_marketplaces.json");
-  try {
-    const km = JSON.parse(fs.readFileSync(knownMarketplacesPath, "utf-8"));
-    if (km["nella"]) {
-      delete km["nella"];
-      fs.writeFileSync(knownMarketplacesPath, JSON.stringify(km, null, 2) + "\n");
-    }
-  } catch {}
-
-  console.log(logo);
-  console.log(tagline);
-  if (isUpdate) {
-    console.log(`  ${theme.icons.success}  ${theme.success.bold("/nella command updated")} ${theme.muted("→")} ${theme.primary(commandDest)}`);
-  } else {
-    console.log(`  ${theme.icons.success}  ${theme.success.bold("/nella command installed")} ${theme.muted("→")} ${theme.primary(commandDest)}`);
-  }
-  console.log(`\n  ${theme.icons.arrow}  Restart Claude Code, then use ${theme.primary.bold("/nella")} to get started.\n`);
-}
 
 // =============================================================================
 // Index Command — index workspace for search & code verification
@@ -762,9 +458,9 @@ function showHelp(): void {
   console.log(sectionHeader("Setup"));
   const setupTable = new Table({ chars: tableChars, style: tableStyle });
   setupTable.push(
-    [theme.primary("setup"), theme.muted("Install /nella slash command in Claude Code")],
+    [theme.primary("connect"), theme.muted("Configure coding agents to use Nella")],
     [theme.primary("auth"), theme.muted("Login, logout, or check status")],
-    [theme.primary("connect"), theme.muted("Configure Claude, VS Code & Cursor")],
+    [theme.primary("setup"), theme.muted("Alias for connect --client claude-code")],
     [theme.primary("help"), theme.muted("Show this help message")],
   );
   console.log(setupTable.toString());
@@ -777,9 +473,10 @@ function showHelp(): void {
     [theme.accent("--workspace, -w"), theme.muted("<path>"), "Workspace path (mcp)"],
     [theme.accent("--port, -p"), theme.muted("<num>"), "Server port (default: 3847)"],
     [theme.accent("--host"), theme.muted("<host>"), "Server host (default: localhost)"],
-    [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for connect"],
-    [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for connect"],
-    [theme.accent("--client"), theme.muted("<name>"), "claude, vscode, cursor, or all"],
+    [theme.accent("--api-key, -k"), theme.muted("<key>"), "API key for hosted mode"],
+    [theme.accent("--server-url, -u"), theme.muted("<url>"), "Server URL for hosted mode"],
+    [theme.accent("--mode"), theme.muted("<mode>"), "hosted or local (default: auto)"],
+    [theme.accent("--client"), theme.muted("<name>"), "Agent name or all (default: all detected)"],
     [theme.accent("--force, -f"), "", "Force full reindex"],
     [theme.accent("--json"), "", "Output as JSON"],
     [theme.accent("--help, -h"), "", "Show help"],
@@ -838,10 +535,17 @@ async function main(): Promise<void> {
       await runAuthCommand(args);
       break;
     case "connect":
-      await runConnectCommand(args);
+      await runConnectCommand(
+        { client: args.client, mode: args.mode, apiKey: args.apiKey, serverUrl: args.serverUrl, showHelp: args.showHelp },
+        logo, tagline,
+      );
       break;
     case "setup":
-      runSetupCommand();
+      // Backward-compatible alias: setup → connect --client claude-code --mode local
+      await runConnectCommand(
+        { client: "claude-code", mode: "local" },
+        logo, tagline,
+      );
       break;
 case "help":
     default:
