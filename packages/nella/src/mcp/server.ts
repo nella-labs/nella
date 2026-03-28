@@ -32,38 +32,56 @@ import type { ChallengeState } from "./tools/heartbeat";
 // Usage Logging (fire-and-forget to nella API)
 // =============================================================================
 
+// Cached session — validated once on startup, reused for all tool calls
+let cachedSession: { access_token: string } | null = null;
+
+async function initSession(): Promise<{ access_token: string } | null> {
+  const session = await getValidSession();
+  if (session) {
+    cachedSession = session;
+    return session;
+  }
+  return null;
+}
+
 function logUsage(toolName: string, durationMs: number, success: boolean, result?: CallToolResult, args?: Record<string, unknown>): void {
-  getValidSession().then((session) => {
-    if (!session) return;
-    const inputText = JSON.stringify(args || {});
-    const outputText = result?.content?.map((c: any) => c.text || "").join("") || "";
-    const tokensUsed = Math.ceil(inputText.length / 4) + Math.ceil(outputText.length / 4);
-    const body = JSON.stringify({
-      tool_name: toolName,
-      duration_ms: durationMs,
-      success,
-      tokens_used: Math.max(tokensUsed, 1),
-    });
-    const url = new URL("https://app.getnella.dev/api/usage/log");
-    const req = https.request(
-      {
-        hostname: url.hostname,
-        port: 443,
-        path: url.pathname,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Length": Buffer.byteLength(body),
-        },
+  const session = cachedSession;
+  if (!session) return; // should never happen — startup validates auth
+
+  const inputText = JSON.stringify(args || {});
+  const outputText = result?.content?.map((c: any) => c.text || "").join("") || "";
+  const tokensUsed = Math.ceil(inputText.length / 4) + Math.ceil(outputText.length / 4);
+  const body = JSON.stringify({
+    tool_name: toolName,
+    duration_ms: durationMs,
+    success,
+    tokens_used: Math.max(tokensUsed, 1),
+  });
+  const url = new URL("https://app.getnella.dev/api/usage/log");
+  const req = https.request(
+    {
+      hostname: url.hostname,
+      port: 443,
+      path: url.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Length": Buffer.byteLength(body),
       },
-      () => {} // ignore response
-    );
-    req.on("error", () => {}); // swallow errors — don't break tool calls
-    req.setTimeout(5000, () => req.destroy());
-    req.write(body);
-    req.end();
-  }).catch(() => {}); // swallow — usage logging must never fail tool calls
+    },
+    (res) => {
+      if (res.statusCode && res.statusCode >= 400) {
+        console.error(`[nella] Usage log failed: HTTP ${res.statusCode} for ${toolName}`);
+      }
+    }
+  );
+  req.on("error", (err) => {
+    console.error(`[nella] Usage log network error for ${toolName}:`, err.message);
+  });
+  req.setTimeout(10000, () => req.destroy());
+  req.write(body);
+  req.end();
 }
 
 // =============================================================================
@@ -112,6 +130,16 @@ Example:
   }
 
   const workspacePath = args.workspace!;
+
+  // Validate authentication — require login for usage tracking
+  const session = await initSession();
+  if (!session) {
+    console.error("[nella] Not authenticated. Run 'nella login' first.");
+    console.error("[nella] Authentication is required for usage tracking and quota enforcement.");
+    // Continue running but warn — tools will work but usage won't be tracked
+    // This allows graceful degradation while making the issue visible
+    console.error("[nella] WARNING: Tool calls will NOT be tracked. Usage data will be missing from your dashboard.");
+  }
 
   // Initialize context manager for stateful tracking
   const contextManager = new ContextManager(workspacePath);
