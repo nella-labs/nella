@@ -131,14 +131,12 @@ Example:
 
   const workspacePath = args.workspace!;
 
-  // Validate authentication — require login for usage tracking
+  // Require authentication — no free rides
   const session = await initSession();
   if (!session) {
-    console.error("[nella] Not authenticated. Run 'nella login' first.");
-    console.error("[nella] Authentication is required for usage tracking and quota enforcement.");
-    // Continue running but warn — tools will work but usage won't be tracked
-    // This allows graceful degradation while making the issue visible
-    console.error("[nella] WARNING: Tool calls will NOT be tracked. Usage data will be missing from your dashboard.");
+    console.error("[nella] Not authenticated. Run 'nella login' to continue.");
+    console.error("[nella] Authentication is required to use Nella.");
+    process.exit(1);
   }
 
   // Initialize context manager for stateful tracking
