@@ -271,12 +271,19 @@ async function handleSearch(
       return {
         content: [{
           type: "text",
-          text: `No results found for "${query}".`,
+          text: `No results found for "${query}". Try broader terms, check spelling, or run nella_index if the workspace hasn't been indexed recently.`,
         }],
       };
     }
 
-    const header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms):`;
+    // Build header with confidence guidance
+    let header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms, confidence: ${(response.confidence * 100).toFixed(0)}%):`;
+
+    if (response.suggestion === "low_confidence") {
+      header += `\n> Low confidence results. Consider: (1) reindex with nella_index if files changed, (2) use more specific terms, (3) try mode: "lexical" for exact symbol matches.`;
+    } else if (response.suggestion === "query_unclear") {
+      header += `\n> Query may be too broad. Try searching for specific function names, class names, or file paths.`
+    }
     const nonce = generateNonce();
     const totalResults = response.results.length;
 
