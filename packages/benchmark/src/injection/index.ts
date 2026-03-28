@@ -33,3 +33,4 @@ export { computeHeadlineMetrics, computeCategoryMetrics, computeDifficultyMetric
 export { runInjectionBenchmark } from "./runner";
 export type { InjectionBenchmarkOptions } from "./runner";
 export { generateWebsiteStats, generateMarkdownReport, generateCsvReport, writeReports } from "./reporter";
+export { uploadResults } from "./uploader";
