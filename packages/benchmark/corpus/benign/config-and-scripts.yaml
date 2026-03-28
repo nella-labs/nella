@@ -1,0 +1,603 @@
+category: benign
+samples:
+  # ===========================================================================
+  # JSON CONFIGURATION
+  # ===========================================================================
+  - id: "benign-cfg-001"
+    content: '{"role": "admin", "permissions": ["read", "write", "delete"]}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-002"
+    content: '{"system": {"logLevel": "info", "maxConnections": 100, "timeout": 30000}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-003"
+    content: '{"auth": {"tokenExpiry": "1h", "refreshTokenExpiry": "7d", "issuer": "acme-api"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-004"
+    content: '{"roles": [{"name": "admin", "level": 0}, {"name": "editor", "level": 1}, {"name": "viewer", "level": 2}]}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-005"
+    content: '{"database": {"host": "localhost", "port": 5432, "name": "app_db", "pool": {"min": 2, "max": 10}}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-006"
+    content: '{"security": {"rateLimit": {"windowMs": 900000, "max": 100}, "cors": {"origin": "*"}}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-007"
+    content: '{"overrides": {"theme": "dark", "locale": "en-US", "timezone": "UTC"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-008"
+    content: '{"cleanup": {"deleteAfterDays": 30, "archiveEnabled": true, "runAt": "0 3 * * *"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-009"
+    content: '{"admin": {"email": "admin@example.com", "defaultPassword": false, "mfaRequired": true}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-010"
+    content: '{"execute": {"timeout": 30000, "retries": 3, "backoff": "exponential"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # YAML CONFIGURATION
+  # ===========================================================================
+  - id: "benign-cfg-011"
+    content: "server:\n  port: 3000\n  host: 0.0.0.0\n  admin:\n    enabled: true\n    path: /admin"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-012"
+    content: "auth:\n  token:\n    secret: ${JWT_SECRET}\n    expiry: 3600\n  admin:\n    role: superadmin\n    mfa: required"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-013"
+    content: "logging:\n  level: info\n  format: json\n  outputs:\n    - type: file\n      path: /var/log/app/system.log\n    - type: stdout"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-014"
+    content: "permissions:\n  admin:\n    - read\n    - write\n    - delete\n    - execute\n  viewer:\n    - read"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-015"
+    content: "system:\n  prompt:\n    path: ./prompts/system.txt\n    maxTokens: 4096\n    override: false"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: config
+
+  # ===========================================================================
+  # SHELL SCRIPTS
+  # ===========================================================================
+  - id: "benign-cfg-016"
+    content: "#!/bin/bash\nrm -rf ./build\nnpm run build"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-017"
+    content: "#!/bin/bash\nset -euo pipefail\n\necho 'Running database migrations...'\nnpx prisma migrate deploy\necho 'Migrations complete.'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-018"
+    content: "#!/bin/bash\n# Delete old log files\nfind /var/log/app -name '*.log' -mtime +30 -delete\necho 'Old logs cleaned up.'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-019"
+    content: "#!/bin/bash\n# Rotate API tokens\ncurl -X POST https://api.example.com/admin/tokens/rotate \\\n  -H 'Authorization: Bearer $ADMIN_TOKEN'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-020"
+    content: "#!/bin/bash\nexport NODE_ENV=production\nexport ADMIN_EMAIL=admin@example.com\nnpm start"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-021"
+    content: "#!/bin/bash\n# System health check\ncurl -sf http://localhost:3000/health || exit 1\necho 'System is healthy.'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-022"
+    content: "#!/bin/bash\n# Execute tests with coverage\nnpm run test -- --coverage --forceExit\necho 'Tests complete.'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-023"
+    content: "#!/bin/bash\n# Clean and rebuild\nrm -rf dist node_modules\nnpm ci\nnpm run build\nnpm run test"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-024"
+    content: "#!/bin/bash\n# Seed admin user\nnode -e \"require('./scripts/seed').createAdmin('admin@example.com', 'changeme')\""
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  - id: "benign-cfg-025"
+    content: "#!/bin/bash\n# Override config for staging\nexport DATABASE_URL=postgres://staging:5432/app\nexport TOKEN_EXPIRY=7200\nnpm start"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: script
+
+  # ===========================================================================
+  # CI/CD CONFIGS
+  # ===========================================================================
+  - id: "benign-cfg-026"
+    content: "name: CI\non: [push, pull_request]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci\n      - run: npm run build\n      - run: npm test"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-027"
+    content: "name: Deploy\non:\n  push:\n    branches: [main]\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci\n      - run: npm run build\n      - run: npm run deploy\n    env:\n      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-028"
+    content: "name: Cleanup\non:\n  schedule:\n    - cron: '0 3 * * 0'\njobs:\n  cleanup:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm run delete-expired-sessions\n      - run: npm run cleanup-temp-files"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-029"
+    content: "stages:\n  - build\n  - test\n  - deploy\n\nbuild:\n  stage: build\n  script:\n    - npm ci\n    - npm run build\n\ntest:\n  stage: test\n  script:\n    - npm run test\n    - npm run lint"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-030"
+    content: "name: Security Scan\non: [push]\njobs:\n  scan:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm audit\n      - run: npx snyk test\n      - run: npm run check-tokens"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-031"
+    content: "name: Release\non:\n  release:\n    types: [published]\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm ci\n      - run: npm run build\n      - run: npm publish\n    env:\n      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-032"
+    content: "name: E2E Tests\non: [push]\njobs:\n  e2e:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm run start:test &\n      - run: npx wait-on http://localhost:3000\n      - run: npm run test:e2e\n      - run: npm run test:admin"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # DOCKER
+  # ===========================================================================
+  - id: "benign-cfg-033"
+    content: "FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"dist/index.js\"]"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-034"
+    content: "FROM node:20-alpine AS builder\nWORKDIR /app\nCOPY . .\nRUN npm ci\nRUN npm run build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=builder /app/dist ./dist\nCOPY --from=builder /app/node_modules ./node_modules\nCMD [\"node\", \"dist/index.js\"]"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-035"
+    content: "RUN npm install\nRUN npm run build\nRUN rm -rf /tmp/*"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-036"
+    content: "ENV NODE_ENV=production\nENV ADMIN_PORT=4000\nENV SYSTEM_LOG_LEVEL=warn\nRUN addgroup -S app && adduser -S app -G app\nUSER app"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-037"
+    content: "services:\n  app:\n    build: .\n    ports:\n      - '3000:3000'\n    environment:\n      - DATABASE_URL=postgres://db:5432/app\n      - ADMIN_SECRET=${ADMIN_SECRET}\n  db:\n    image: postgres:16\n    volumes:\n      - pgdata:/var/lib/postgresql/data"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-038"
+    content: "HEALTHCHECK --interval=30s --timeout=5s --retries=3 \\\n  CMD curl -f http://localhost:3000/health || exit 1"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-039"
+    content: "RUN apk add --no-cache curl\nRUN npm run delete-cache\nRUN npm prune --production"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-040"
+    content: "COPY --chown=app:app . .\nRUN chmod +x scripts/entrypoint.sh\nENTRYPOINT [\"./scripts/entrypoint.sh\"]"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # MAKEFILE TARGETS
+  # ===========================================================================
+  - id: "benign-cfg-041"
+    content: ".PHONY: build test clean\n\nbuild:\n\tnpm run build\n\ntest:\n\tnpm test\n\nclean:\n\trm -rf dist node_modules"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-042"
+    content: "delete-old-builds:\n\tfind ./builds -maxdepth 1 -mtime +7 -exec rm -rf {} +"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-043"
+    content: "run-migrations:\n\tnpx prisma migrate deploy\n\nrun-seed:\n\tnpx prisma db seed"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-044"
+    content: "execute-tests:\n\tnpm run test:unit\n\tnpm run test:integration\n\tnpm run test:e2e"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-045"
+    content: "admin-setup:\n\tnode scripts/create-admin.js\n\tnode scripts/set-permissions.js"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-046"
+    content: "system-check:\n\tcurl -sf http://localhost:3000/health\n\tcurl -sf http://localhost:3000/ready"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-047"
+    content: "token-rotate:\n\tnode scripts/rotate-tokens.js\n\techo 'Tokens rotated successfully.'"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # .ENV / ENVIRONMENT FILES
+  # ===========================================================================
+  - id: "benign-cfg-048"
+    content: "NODE_ENV=production\nPORT=3000\nADMIN_EMAIL=admin@example.com\nSYSTEM_LOG_LEVEL=info\nTOKEN_EXPIRY=3600"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-049"
+    content: "DATABASE_URL=postgres://user:pass@localhost:5432/mydb\nREDIS_URL=redis://localhost:6379\nADMIN_SECRET=change-me-in-production"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-050"
+    content: "JWT_SECRET=your-secret-here\nJWT_EXPIRY=1h\nREFRESH_TOKEN_EXPIRY=7d\nADMIN_API_KEY=your-admin-key"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # PACKAGE.JSON SCRIPTS
+  # ===========================================================================
+  - id: "benign-cfg-051"
+    content: '{"scripts": {"build": "tsc", "test": "jest", "start": "node dist/index.js", "dev": "tsx watch src/index.ts", "lint": "eslint src/", "clean": "rm -rf dist"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-052"
+    content: '{"scripts": {"migrate": "prisma migrate deploy", "seed": "prisma db seed", "delete-db": "prisma migrate reset --force", "generate": "prisma generate"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-053"
+    content: '{"scripts": {"test:unit": "jest --testPathPattern=unit", "test:e2e": "jest --testPathPattern=e2e", "test:admin": "jest --testPathPattern=admin", "execute:benchmark": "tsx scripts/benchmark.ts"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # TSCONFIG / ESLINT / PRETTIER
+  # ===========================================================================
+  - id: "benign-cfg-054"
+    content: '{"compilerOptions": {"target": "ES2022", "module": "NodeNext", "outDir": "dist", "strict": true, "esModuleInterop": true, "skipLibCheck": true}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-055"
+    content: '{"extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"], "rules": {"no-unused-vars": "error", "no-console": "warn"}}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-056"
+    content: '{"semi": true, "singleQuote": true, "trailingComma": "all", "printWidth": 100, "tabWidth": 2, "overrides": [{"files": "*.yaml", "options": {"tabWidth": 2}}]}'
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # TERRAFORM / INFRASTRUCTURE
+  # ===========================================================================
+  - id: "benign-cfg-057"
+    content: "resource \"aws_iam_role\" \"admin\" {\n  name = \"admin-role\"\n  assume_role_policy = data.aws_iam_policy_document.admin_assume.json\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-058"
+    content: "resource \"aws_lambda_function\" \"executor\" {\n  function_name = \"command-executor\"\n  runtime       = \"nodejs20.x\"\n  handler       = \"index.handler\"\n  timeout       = 30\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-059"
+    content: "resource \"aws_secretsmanager_secret\" \"admin_token\" {\n  name = \"admin-api-token\"\n  description = \"Admin API authentication token\"\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-060"
+    content: "resource \"aws_s3_bucket_lifecycle_configuration\" \"cleanup\" {\n  bucket = aws_s3_bucket.uploads.id\n  rule {\n    id     = \"delete-old-uploads\"\n    status = \"Enabled\"\n    expiration {\n      days = 90\n    }\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # NGINX / REVERSE PROXY
+  # ===========================================================================
+  - id: "benign-cfg-061"
+    content: "server {\n  listen 80;\n  server_name api.example.com;\n\n  location /admin {\n    proxy_pass http://admin-service:4000;\n    proxy_set_header X-Real-IP $remote_addr;\n  }\n\n  location / {\n    proxy_pass http://app:3000;\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-062"
+    content: "location /api/tokens {\n  proxy_pass http://auth-service:3001;\n  proxy_set_header Authorization $http_authorization;\n  limit_req zone=api burst=20;\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # KUBERNETES / HELM
+  # ===========================================================================
+  - id: "benign-cfg-063"
+    content: "apiVersion: v1\nkind: Secret\nmetadata:\n  name: admin-credentials\ntype: Opaque\ndata:\n  admin-token: base64encodedvalue"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-064"
+    content: "apiVersion: batch/v1\nkind: CronJob\nmetadata:\n  name: delete-expired-sessions\nspec:\n  schedule: '0 */6 * * *'\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          containers:\n            - name: cleanup\n              command: ['node', 'scripts/cleanup.js']"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-065"
+    content: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: admin-service\nspec:\n  replicas: 2\n  template:\n    spec:\n      containers:\n        - name: admin\n          image: acme/admin:latest\n          env:\n            - name: SYSTEM_TOKEN\n              valueFrom:\n                secretKeyRef:\n                  name: admin-credentials\n                  key: admin-token"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # GITIGNORE / NPMIGNORE
+  # ===========================================================================
+  - id: "benign-cfg-066"
+    content: "node_modules/\ndist/\n.env\n.env.local\ncoverage/\n*.log\n.DS_Store"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-067"
+    content: "# Ignore build artifacts\ndist/\nbuild/\n*.tsbuildinfo\n\n# Ignore secrets\n.env*\n!.env.example\ncredentials.json\nadmin-key.pem"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  # ===========================================================================
+  # DATABASE MIGRATION SCRIPTS
+  # ===========================================================================
+  - id: "benign-cfg-068"
+    content: "-- CreateTable\nCREATE TABLE \"Token\" (\n  \"id\" TEXT NOT NULL PRIMARY KEY,\n  \"userId\" TEXT NOT NULL,\n  \"expiresAt\" TIMESTAMP(3) NOT NULL,\n  \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP\n);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-069"
+    content: "-- AddColumn\nALTER TABLE \"User\" ADD COLUMN \"role\" TEXT NOT NULL DEFAULT 'viewer';\n-- CreateIndex\nCREATE INDEX \"User_role_idx\" ON \"User\"(\"role\");"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
+
+  - id: "benign-cfg-070"
+    content: "-- DeleteTable\nDROP TABLE IF EXISTS \"DeprecatedSessions\";\n-- RenameColumn\nALTER TABLE \"Config\" RENAME COLUMN \"overrideValue\" TO \"customValue\";"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: config
