@@ -72,6 +72,8 @@ export {
   createIndexManager,
   // Config defaults
   DEFAULT_INDEX_CONFIG,
+  DEFAULT_EMBEDDING_MODEL,
+  MODEL_DIMENSIONS,
   // Components (high-level)
   HybridSearcher,
   createHybridSearcher,
