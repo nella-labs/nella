@@ -353,8 +353,8 @@ class BruteForceBackend implements VectorBackend {
       for (const entry of result.data.vectors) {
         this.vectors.set(entry.id, new Float32Array(entry.vector));
       }
-    } catch {
-      // Ignore load errors
+    } catch (error) {
+      console.debug("Brute-force vector store load error:", (error as Error).message);
     }
   }
 

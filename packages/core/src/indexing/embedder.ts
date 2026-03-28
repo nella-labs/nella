@@ -80,8 +80,9 @@ class SQLiteEmbeddingCache {
       `);
 
       this.useSQLite = true;
-    } catch {
-      // SQLite not available, will use JSON fallback
+    } catch (error) {
+      // SQLite not available (better-sqlite3 not installed), will use JSON fallback
+      console.debug("SQLite cache unavailable, using JSON fallback:", (error as Error).message);
       this.useSQLite = false;
     }
   }
@@ -100,8 +101,8 @@ class SQLiteEmbeddingCache {
         if (row) {
           return this.deserializeEmbedding(row.embedding);
         }
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("SQLite cache read error:", (error as Error).message);
       }
     }
 
@@ -118,8 +119,8 @@ class SQLiteEmbeddingCache {
           VALUES (?, ?, ?, ?)
         `);
         stmt.run(key, model, this.serializeEmbedding(embedding), new Date().toISOString());
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("SQLite cache write error:", (error as Error).message);
       }
     }
   }
@@ -162,8 +163,8 @@ class SQLiteEmbeddingCache {
       }
 
       this.db.exec("VACUUM");
-    } catch {
-      // Ignore cleanup errors
+    } catch (error) {
+      console.debug("Embedding cache cleanup error:", (error as Error).message);
     }
   }
 
@@ -213,8 +214,8 @@ class JSONEmbeddingCache {
       if (result) {
         return result.data;
       }
-    } catch {
-      // Ignore cache errors
+    } catch (error) {
+      console.debug("JSON embedding cache load error:", (error as Error).message);
     }
     return { entries: {}, version: "2.0.0" };
   }

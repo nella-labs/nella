@@ -528,8 +528,8 @@ export class IndexManager {
       try {
         const content = fs.readFileSync(metadataPath, "utf-8");
         this.metadata = JSON.parse(content);
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("Failed to load index metadata:", (error as Error).message);
       }
     }
 
@@ -556,8 +556,8 @@ export class IndexManager {
 
         // Rehydrate embeddings from vector store (stripped in v2 saves)
         this.rehydrateEmbeddings();
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("Failed to load chunks:", (error as Error).message);
       }
     }
   }
@@ -596,8 +596,8 @@ export class IndexManager {
         for (const [file, hash] of Object.entries(result.data)) {
           this.fileHashes.set(file, hash);
         }
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("Failed to load file hashes:", (error as Error).message);
       }
     }
   }
