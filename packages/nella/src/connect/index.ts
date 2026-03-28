@@ -1,5 +1,4 @@
 import * as os from "os";
-import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { agents, detectInstalledAgents, getAgent, getAllAgentNames } from "./agents";
 import { writeAgentConfig } from "./installer";
@@ -15,6 +14,35 @@ const pc = {
   bold: chalk.bold,
   muted: chalk.hex("#95A5A6"),
 };
+
+interface PromptsModule {
+  intro(message: string): void;
+  spinner(): {
+    start(message: string): void;
+    stop(message?: string): void;
+  };
+  log: {
+    error(message: string): void;
+    message(message: string): void;
+    info(message: string): void;
+    warn(message: string): void;
+  };
+  isCancel(value: unknown): boolean;
+  cancel(message: string): void;
+  multiselect(options: unknown): Promise<unknown>;
+  select(options: unknown): Promise<unknown>;
+  text(options: unknown): Promise<unknown>;
+  note(message: string, title?: string): void;
+  confirm(options: unknown): Promise<unknown>;
+  outro(message: string): void;
+}
+
+let promptsModulePromise: Promise<PromptsModule> | undefined;
+
+async function getPrompts(): Promise<PromptsModule> {
+  promptsModulePromise ??= import("@clack/prompts") as Promise<PromptsModule>;
+  return promptsModulePromise;
+}
 
 export interface ConnectArgs {
   client?: string;
@@ -86,14 +114,16 @@ async function verifyServer(serverUrl: string): Promise<{ ok: boolean; version?:
   }
 }
 
-function exitIfCancelled(value: unknown): void {
-  if (p.isCancel(value)) {
-    p.cancel("Connection cancelled");
+function exitIfCancelled(prompts: PromptsModule, value: unknown): void {
+  if (prompts.isCancel(value)) {
+    prompts.cancel("Connection cancelled");
     process.exit(0);
   }
 }
 
 export async function runConnectCommand(args: ConnectArgs, logo: string, _tagline: string): Promise<void> {
+  const p = await getPrompts();
+
   if (args.showHelp) {
     console.log(logo);
     showConnectHelp();
@@ -145,7 +175,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
       cursorAt: allNames[0],
     });
 
-    exitIfCancelled(selected);
+    exitIfCancelled(p, selected);
     targetAgents = selected as AgentType[];
   } else {
     targetAgents = detected;
@@ -179,7 +209,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
       ],
     });
 
-    exitIfCancelled(modeChoice);
+    exitIfCancelled(p, modeChoice);
     mode = modeChoice as ConnectMode;
   } else {
     mode = "local";
@@ -222,7 +252,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
         options: keyOptions,
       });
 
-      exitIfCancelled(keyChoice);
+      exitIfCancelled(p, keyChoice);
 
       if (keyChoice === "create" && session) {
         spin.start("Creating API key...");
@@ -241,14 +271,14 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
         const keyInput = await p.text({
           message: "Enter your API key",
           placeholder: "nella_your_key_here",
-          validate: (val) => {
-            if (!val.trim()) return "API key is required";
+          validate: (val: string | undefined) => {
+            if (!val?.trim()) return "API key is required";
             if (!val.startsWith("nella_")) return "API key must start with nella_";
             return undefined;
           },
         });
 
-        exitIfCancelled(keyInput);
+        exitIfCancelled(p, keyInput);
         apiKey = keyInput as string;
       } else {
         // Skip — switch to local
@@ -277,7 +307,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
     summaryLines.push(`  ${pc.bold("Server:")}  ${serverUrl}`);
     summaryLines.push(`  ${pc.bold("Key:")}     ${pc.dim(apiKey!.substring(0, 15) + "..." + apiKey!.slice(-4))}`);
   } else {
-    summaryLines.push(`  ${pc.bold("Server:")}  Local MCP via npx @getnella/mcp`);
+    summaryLines.push(`  ${pc.bold("Server:")}  Local MCP via npx -y @getnella/mcp --workspace <path>`);
   }
 
   const agentNames = targetAgents.map((a) => agents[a].displayName);
