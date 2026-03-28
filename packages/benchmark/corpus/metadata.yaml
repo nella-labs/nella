@@ -1,0 +1,13 @@
+version: "1.0.0"
+description: "Prompt injection benchmark corpus"
+total_expected_samples: 750
+categories:
+  - instruction_override
+  - role_assumption
+  - system_prompt_request
+  - token_extraction
+  - authority_claim
+  - action_directive
+  - context_manipulation
+  - encoded_payload
+last_updated: "2026-03-27"

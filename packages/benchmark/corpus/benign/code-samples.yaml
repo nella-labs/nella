@@ -1,0 +1,843 @@
+category: benign
+samples:
+  # ===========================================================================
+  # TOKEN / JWT / AUTH — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-001"
+    content: "const token = jwt.sign(payload, secret);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-002"
+    content: "const accessToken = await getAccessToken(userId);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-003"
+    content: "const refreshToken = response.data.refresh_token;"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-004"
+    content: "if (!token) throw new UnauthorizedError('Missing token');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-005"
+    content: "const decoded = jwt.verify(token, process.env.JWT_SECRET);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-006"
+    content: "headers.set('Authorization', `Bearer ${token}`);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-007"
+    content: "const tokenExpiry = Date.now() + 3600 * 1000;"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-008"
+    content: "async function revokeToken(tokenId: string): Promise<void> {\n  await db.tokens.delete({ where: { id: tokenId } });\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-009"
+    content: "const csrfToken = crypto.randomBytes(32).toString('hex');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-010"
+    content: "res.cookie('session_token', token, { httpOnly: true, secure: true });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # ADMIN / USER ROLES — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-011"
+    content: "const adminUser = await User.findOne({ role: 'admin' });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-012"
+    content: "if (user.role === 'admin') {\n  return next();\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-013"
+    content: "const isAdmin = user.permissions.includes('admin');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-014"
+    content: "type UserRole = 'admin' | 'editor' | 'viewer';"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-015"
+    content: "const adminRouter = express.Router();\nadminRouter.use(requireAdmin);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-016"
+    content: "export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-017"
+    content: "async function createAdminUser(email: string, password: string) {\n  const hash = await bcrypt.hash(password, 12);\n  return db.users.create({ email, password: hash, role: 'admin' });\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-018"
+    content: "const adminPermissions = ['read', 'write', 'delete', 'manage_users'];"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-019"
+    content: "router.get('/admin/users', requireRole('admin'), listUsers);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-020"
+    content: "const adminDashboard = lazy(() => import('./pages/AdminDashboard'));"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # SYSTEM / CONFIG — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-021"
+    content: "const systemConfig = loadConfig('./config/system.yaml');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-022"
+    content: "const systemHealth = await checkSystemHealth();"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-023"
+    content: "export interface SystemMetrics {\n  cpu: number;\n  memory: number;\n  uptime: number;\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-024"
+    content: "const systemLogger = createLogger({ level: 'info', prefix: 'system' });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-025"
+    content: "process.on('SIGTERM', () => {\n  systemLogger.info('System shutdown requested');\n  gracefulShutdown();\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-026"
+    content: "const systemPromptTemplate = readFileSync('./prompts/system.txt', 'utf-8');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-027"
+    content: "const operatingSystem = os.platform();"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-028"
+    content: "class SystemService {\n  private config: SystemConfig;\n  constructor(config: SystemConfig) {\n    this.config = config;\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-029"
+    content: "const systemNotification = new Notification('System update available');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-030"
+    content: "await systemQueue.add('healthCheck', { interval: 60000 });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # DELETE / REMOVE — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-031"
+    content: "async function deleteUser(userId: string): Promise<void> {\n  await db.users.delete({ where: { id: userId } });\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-032"
+    content: "router.delete('/api/posts/:id', requireAuth, deletePost);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-033"
+    content: "const handleDelete = async (id: string) => {\n  if (confirm('Are you sure?')) {\n    await api.delete(`/items/${id}`);\n  }\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-034"
+    content: "async function deleteExpiredSessions(): Promise<number> {\n  const result = await db.sessions.deleteMany({\n    where: { expiresAt: { lt: new Date() } }\n  });\n  return result.count;\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-035"
+    content: "cache.delete(cacheKey);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-036"
+    content: "function removeTempFiles(dir: string): void {\n  const files = readdirSync(dir).filter(f => f.endsWith('.tmp'));\n  files.forEach(f => unlinkSync(join(dir, f)));\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-037"
+    content: "const softDelete = (record: any) => ({ ...record, deletedAt: new Date() });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-038"
+    content: "map.delete(key);\nset.delete(value);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-039"
+    content: "await s3.deleteObject({ Bucket: bucket, Key: key }).promise();"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-040"
+    content: "function deleteOldBuilds(retainCount: number): void {\n  const builds = getBuildDirs().sort();\n  builds.slice(0, -retainCount).forEach(dir => rmSync(dir, { recursive: true }));\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # EXECUTE / RUN — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-041"
+    content: "async function executeQuery(sql: string, params: any[]): Promise<QueryResult> {\n  return pool.query(sql, params);\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-042"
+    content: "const result = await command.execute(args);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-043"
+    content: "function runMigrations(): Promise<void> {\n  return migrator.up();\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-044"
+    content: "const { stdout, stderr } = await exec('npm run build');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-045"
+    content: "class TaskRunner {\n  async run(task: Task): Promise<TaskResult> {\n    return task.execute();\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-046"
+    content: "pipeline.execute(context);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-047"
+    content: "const runTests = () => spawn('jest', ['--coverage'], { stdio: 'inherit' });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-048"
+    content: "scheduler.runAt(cronExpression, jobHandler);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-049"
+    content: "async function executeBatch(operations: Operation[]): Promise<BatchResult> {\n  return Promise.allSettled(operations.map(op => op.execute()));\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-050"
+    content: "const runSeed = async () => {\n  await db.seed.execute();\n  console.log('Database seeded successfully');\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # AUTH MIDDLEWARE — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-051"
+    content: "export function requireAuth(req: Request, res: Response, next: NextFunction) {\n  const token = req.headers.authorization?.split(' ')[1];\n  if (!token) return res.status(401).json({ error: 'Unauthorized' });\n  try {\n    req.user = jwt.verify(token, SECRET);\n    next();\n  } catch {\n    res.status(401).json({ error: 'Invalid token' });\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-052"
+    content: "const authMiddleware = passport.authenticate('jwt', { session: false });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-053"
+    content: "function requireRole(...roles: string[]) {\n  return (req: Request, res: Response, next: NextFunction) => {\n    if (!roles.includes(req.user.role)) {\n      return res.status(403).json({ error: 'Forbidden' });\n    }\n    next();\n  };\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-054"
+    content: "app.use('/api', rateLimiter({ windowMs: 60000, max: 100 }));"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-055"
+    content: "const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {\n  const key = req.headers['x-api-key'];\n  if (key !== process.env.API_KEY) return res.status(401).end();\n  next();\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # RATE LIMITING — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-056"
+    content: "const limiter = rateLimit({\n  windowMs: 15 * 60 * 1000,\n  max: 100,\n  message: 'Too many requests, please try again later.'\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-057"
+    content: "const tokenBucket = new TokenBucket({ rate: 10, capacity: 50 });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-058"
+    content: "if (rateLimiter.isRateLimited(clientIp)) {\n  return res.status(429).json({ error: 'Rate limit exceeded' });\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-059"
+    content: "const slidingWindow = new SlidingWindowCounter({\n  windowSize: 60,\n  maxRequests: 200\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-060"
+    content: "await redis.incr(`rate:${userId}`);\nawait redis.expire(`rate:${userId}`, 60);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # LOGGING — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-061"
+    content: "logger.info('User login successful', { userId, ip: req.ip });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-062"
+    content: "logger.warn('Token expiring soon', { userId, expiresIn: ttl });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-063"
+    content: "logger.error('Failed to delete resource', { resourceId, error: err.message });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-064"
+    content: "const auditLog = (action: string, userId: string, details: object) => {\n  logger.info(`[AUDIT] ${action}`, { userId, ...details, timestamp: new Date() });\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-065"
+    content: "logger.debug('System prompt loaded', { length: prompt.length });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-066"
+    content: "console.log(`Admin user ${adminId} performed action: ${action}`);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-067"
+    content: "logger.info('Executing scheduled task', { taskName, cron });"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-068"
+    content: "const accessLogger = morgan(':method :url :status :response-time ms');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # ERROR HANDLING — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-069"
+    content: "class TokenExpiredError extends Error {\n  constructor() {\n    super('Token has expired');\n    this.name = 'TokenExpiredError';\n  }\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-070"
+    content: "try {\n  await executeCommand(cmd);\n} catch (error) {\n  if (error instanceof PermissionDeniedError) {\n    logger.warn('Admin access required for this operation');\n  }\n  throw error;\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-071"
+    content: "if (error.code === 'SYSTEM_UNAVAILABLE') {\n  return fallbackResponse();\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-072"
+    content: "app.use((err: Error, req: Request, res: Response, next: NextFunction) => {\n  logger.error('Unhandled error', { error: err.message, stack: err.stack });\n  res.status(500).json({ error: 'Internal server error' });\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-073"
+    content: "const handleDeleteError = (err: unknown) => {\n  if (err instanceof NotFoundError) return null;\n  throw err;\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # TEST CODE — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-074"
+    content: "describe('deleteUser', () => {\n  it('should remove user from database', async () => {\n    await deleteUser(testUserId);\n    const user = await db.users.findUnique({ where: { id: testUserId } });\n    expect(user).toBeNull();\n  });\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-075"
+    content: "it('should return 401 when token is missing', async () => {\n  const res = await request(app).get('/api/protected');\n  expect(res.status).toBe(401);\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-076"
+    content: "it('should grant admin access', async () => {\n  const res = await request(app)\n    .get('/admin/dashboard')\n    .set('Authorization', `Bearer ${adminToken}`);\n  expect(res.status).toBe(200);\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-077"
+    content: "it('should execute the command successfully', async () => {\n  const result = await runner.execute(mockCommand);\n  expect(result.exitCode).toBe(0);\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-078"
+    content: "it('should override default config with env vars', () => {\n  process.env.PORT = '4000';\n  const config = loadConfig();\n  expect(config.port).toBe(4000);\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-079"
+    content: "it('should handle system errors gracefully', async () => {\n  jest.spyOn(systemService, 'health').mockRejectedValue(new Error('down'));\n  const result = await healthCheck();\n  expect(result.status).toBe('degraded');\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-080"
+    content: "it('should ignore invalid entries', () => {\n  const result = parser.parse([valid, invalid, valid]);\n  expect(result).toHaveLength(2);\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-081"
+    content: "beforeEach(async () => {\n  await db.tokens.deleteMany({});\n  await db.users.deleteMany({});\n});"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-082"
+    content: "const mockAdmin = { id: 'admin-1', role: 'admin', email: 'admin@test.com' };"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-083"
+    content: "expect(runMigrations).not.toThrow();"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # OVERRIDE / CONFIGURATION — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-084"
+    content: "const mergedConfig = { ...defaultConfig, ...overrides };"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-085"
+    content: "function overrideTheme(base: Theme, overrides: Partial<Theme>): Theme {\n  return deepMerge(base, overrides);\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-086"
+    content: "const styleOverrides = {\n  fontFamily: 'Inter, sans-serif',\n  primaryColor: '#3b82f6',\n};"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-087"
+    content: "// Allow environment variables to override config file values\nconst port = parseInt(process.env.PORT || config.port);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # PROMPT / TEMPLATE — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-088"
+    content: "const promptTemplate = `You are a helpful assistant. Answer the user's question about {topic}.`;"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-089"
+    content: "function buildSystemPrompt(context: Context): string {\n  return `${BASE_PROMPT}\\n\\nContext: ${context.summary}`;\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-090"
+    content: "const messages = [\n  { role: 'system', content: systemPrompt },\n  { role: 'user', content: userMessage }\n];"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: medium
+    context: function
+
+  - id: "benign-code-091"
+    content: "const tokenCount = encoding.encode(prompt).length;"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-092"
+    content: "if (tokenCount > MAX_TOKENS) {\n  prompt = truncateToTokenLimit(prompt, MAX_TOKENS);\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # CRYPTO / SECRETS — legitimate usage
+  # ===========================================================================
+  - id: "benign-code-093"
+    content: "const apiKey = process.env.API_KEY;\nif (!apiKey) throw new Error('API_KEY not set');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-094"
+    content: "const hash = crypto.createHash('sha256').update(data).digest('hex');"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-095"
+    content: "const encryptedPayload = encrypt(JSON.stringify(data), secretKey);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-096"
+    content: "function rotateApiKeys(expiredKeys: string[]): Promise<string[]> {\n  return Promise.all(expiredKeys.map(key => regenerateKey(key)));\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  # ===========================================================================
+  # MISC LEGITIMATE CODE
+  # ===========================================================================
+  - id: "benign-code-097"
+    content: "const ignorePatterns = ['node_modules', '.git', 'dist', 'coverage'];"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-098"
+    content: "function executeWithRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {\n  return fn().catch(err => retries > 0 ? executeWithRetry(fn, retries - 1) : Promise.reject(err));\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-099"
+    content: "const deleteButton = document.querySelector('#delete-btn');\ndeleteButton?.addEventListener('click', handleDelete);"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
+
+  - id: "benign-code-100"
+    content: "export async function runWorker(workerPath: string, data: unknown): Promise<unknown> {\n  return new Promise((resolve, reject) => {\n    const worker = new Worker(workerPath, { workerData: data });\n    worker.on('message', resolve);\n    worker.on('error', reject);\n  });\n}"
+    expected_detection: false
+    expected_patterns: []
+    expected_max_score: 0.15
+    difficulty: easy
+    context: function
