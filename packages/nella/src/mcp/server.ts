@@ -44,9 +44,12 @@ async function initSession(): Promise<{ access_token: string } | null> {
   return null;
 }
 
-function logUsage(toolName: string, durationMs: number, success: boolean, result?: CallToolResult, args?: Record<string, unknown>): void {
+async function logUsage(toolName: string, durationMs: number, success: boolean, result?: CallToolResult, args?: Record<string, unknown>): Promise<void> {
   const session = cachedSession;
-  if (!session) return; // should never happen — startup validates auth
+  if (!session) {
+    console.error(`[nella] Cannot log usage for ${toolName}: not authenticated`);
+    return;
+  }
 
   const inputText = JSON.stringify(args || {});
   const outputText = result?.content?.map((c: any) => c.text || "").join("") || "";
@@ -57,31 +60,52 @@ function logUsage(toolName: string, durationMs: number, success: boolean, result
     success,
     tokens_used: Math.max(tokensUsed, 1),
   });
-  const url = new URL("https://app.getnella.dev/api/usage/log");
-  const req = https.request(
-    {
-      hostname: url.hostname,
-      port: 443,
-      path: url.pathname,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Length": Buffer.byteLength(body),
-      },
-    },
-    (res) => {
-      if (res.statusCode && res.statusCode >= 400) {
-        console.error(`[nella] Usage log failed: HTTP ${res.statusCode} for ${toolName}`);
+
+  // Retry up to 2 times — usage MUST be tracked
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const url = new URL("https://app.getnella.dev/api/usage/log");
+        const req = https.request(
+          {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Length": Buffer.byteLength(body),
+            },
+          },
+          (res) => {
+            // Drain response
+            res.resume();
+            if (res.statusCode && res.statusCode >= 400) {
+              reject(new Error(`HTTP ${res.statusCode}`));
+            } else {
+              resolve();
+            }
+          }
+        );
+        req.on("error", reject);
+        req.setTimeout(10000, () => {
+          req.destroy();
+          reject(new Error("timeout"));
+        });
+        req.write(body);
+        req.end();
+      });
+      return; // success
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt < 2) {
+        console.error(`[nella] Usage log attempt ${attempt + 1} failed for ${toolName}: ${msg}, retrying...`);
+      } else {
+        console.error(`[nella] Usage log FAILED after 3 attempts for ${toolName}: ${msg}`);
       }
     }
-  );
-  req.on("error", (err) => {
-    console.error(`[nella] Usage log network error for ${toolName}:`, err.message);
-  });
-  req.setTimeout(10000, () => req.destroy());
-  req.write(body);
-  req.end();
+  }
 }
 
 // =============================================================================
@@ -190,13 +214,13 @@ Example:
         // Try each tool category
         const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
         if (contextResult !== null) {
-          logUsage(name, Date.now() - start, !contextResult.isError, contextResult as CallToolResult, toolArgs);
+          await logUsage(name, Date.now() - start, !contextResult.isError, contextResult as CallToolResult, toolArgs);
           return contextResult as CallToolResult;
         }
 
         const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);
         if (indexingResult !== null) {
-          logUsage(name, Date.now() - start, !indexingResult.isError, indexingResult as CallToolResult, toolArgs);
+          await logUsage(name, Date.now() - start, !indexingResult.isError, indexingResult as CallToolResult, toolArgs);
           return indexingResult as CallToolResult;
         }
 
@@ -204,7 +228,7 @@ Example:
         if (name === "nella_heartbeat" && serverContext.challengeState) {
           const { result: hbResult, newState } = handleHeartbeat(toolArgs || {}, serverContext.challengeState);
           serverContext.challengeState = newState;
-          logUsage(name, Date.now() - start, true, hbResult as CallToolResult, toolArgs);
+          await logUsage(name, Date.now() - start, true, hbResult as CallToolResult, toolArgs);
           return hbResult as CallToolResult;
         }
 
@@ -219,7 +243,7 @@ Example:
           isError: true,
         } as CallToolResult;
       } catch (error) {
-        logUsage(name, Date.now() - start, false);
+        await logUsage(name, Date.now() - start, false);
         const message = error instanceof Error ? error.message : String(error);
         return {
           content: [
