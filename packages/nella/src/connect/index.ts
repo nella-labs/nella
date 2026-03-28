@@ -134,7 +134,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
   } else if (interactive) {
     const allNames = getAllAgentNames();
     const selected = await p.multiselect({
-      message: "Which agents do you want to connect?",
+      message: `Which agents do you want to connect? ${pc.dim("(space to toggle)")}`,
       options: allNames.map((name) => ({
         value: name,
         label: agents[name].displayName,
@@ -142,6 +142,7 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
       })),
       initialValues: detected,
       required: true,
+      cursorAt: allNames[0],
     });
 
     exitIfCancelled(selected);
