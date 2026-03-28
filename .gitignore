@@ -23,7 +23,7 @@ benchmark-results/
 # OS files
 .DS_Store
 Thumbs.db
-
+tasks/
 # Logs
 *.log
 npm-debug.log*
