@@ -385,6 +385,13 @@ export class IndexManager {
   }
 
   /**
+   * Get all indexed chunks
+   */
+  getAllChunks(): CodeChunk[] {
+    return Array.from(this.chunks.values());
+  }
+
+  /**
    * Get index metadata
    */
   getMetadata(): IndexMetadata | null {
