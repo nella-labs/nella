@@ -6,25 +6,7 @@ Nella's context tracking system enables agents to remember what they changed, tr
 
 ## Enable Context Tracking
 
-### Via runTask Options
-
-```typescript
-import { runTask } from '@usenella/core';
-
-const result = await runTask(repoPath, task, changes, {
-  enableContextTracking: true,
-  checkDependencies: true,
-  checkAssumptionConflicts: true,
-});
-
-// Extended result fields:
-console.log(result.dependencyChanges); // What packages changed
-console.log(result.invalidatedAssumptions); // How many assumptions broke
-console.log(result.assumptionConflicts); // Conflicts with planned changes
-console.log(result.contextSummary); // Human-readable summary
-```
-
-### Direct ContextManager Usage
+### ContextManager Usage
 
 ```typescript
 import { ContextManager } from '@usenella/core';
@@ -206,16 +188,6 @@ nella_check_assumptions({});
 
 Returns all valid and invalidated assumptions.
 
-### Get File History
-
-```typescript
-nella_get_file_history({
-  filePath: 'src/auth.ts',
-});
-```
-
-Returns the change history for a specific file.
-
 ### Check Dependencies
 
 ```typescript
@@ -223,16 +195,6 @@ nella_check_dependencies({});
 ```
 
 Returns added, removed, and updated packages since last snapshot.
-
-### Record Changes
-
-```typescript
-nella_record_change({
-  files: ['src/user.ts', 'src/types.ts'],
-  operation: 'modify',
-  reason: 'Added email validation',
-});
-```
 
 ## Best Practices
 
@@ -276,7 +238,7 @@ console.log('Will affect:', impact.directDependents);
 ### 5. Persist After Each Run
 
 ```typescript
-// At end of runTask or in finally block
+// After finishing changes
 ctx.save();
 ```
 

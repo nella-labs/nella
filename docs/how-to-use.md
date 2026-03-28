@@ -47,6 +47,10 @@ Once connected, your AI agent has access to these tools:
 - **`nella_check_assumptions`** — Verify assumptions haven't been invalidated
 - **`nella_check_dependencies`** — Detect dependency drift (package.json/lockfile changes)
 
+### Trust chain
+
+- **`nella_heartbeat`** — Verify trust-chain continuity between tool calls
+
 ## 5) Explore advanced modules
 
 Nella Core includes advanced modules for larger agent systems:

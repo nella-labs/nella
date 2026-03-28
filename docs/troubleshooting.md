@@ -39,7 +39,7 @@ Messages like `usearch not available, falling back to brute-force` are normal. O
 |---------|---------|--------|
 | `usearch not available` | HNSW vector index unavailable | Vector search uses brute-force cosine similarity (slower at scale) |
 | `better-sqlite3 not available` | SQLite rate limiter unavailable | Rate limiting uses in-memory backend (resets on restart) |
-| `onnxruntime-node not available` | Local embeddings unavailable | Embedding requires API calls (OpenAI or Voyage) |
+| `onnxruntime-node not available` | Local embeddings unavailable | Embedding requires API calls (Azure or Nella cloud) |
 
 ## MCP Server Issues
 
@@ -99,7 +99,7 @@ Full indexing is I/O-bound by embedding API calls. Tips:
 
 | Solution | Impact |
 |----------|--------|
-| Use OpenAI embeddings (default) | Higher rate limits than Voyage free tier |
+| Use Nella cloud embeddings (`nella auth login`) | Higher rate limits than Azure free tier |
 | Incremental re-indexing | 20x faster for unchanged codebases |
 | Use include/exclude globs | Skip large generated files |
 | Install `usearch` for HNSW | Faster vector search (not faster indexing) |

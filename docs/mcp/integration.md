@@ -521,24 +521,15 @@ Example tool call:
 
 ### Server Context
 
-The server maintains a context object:
+The stdio server maintains a context object:
 
 ```typescript
 interface ServerContext {
   workspacePath: string;          // Configured workspace path
   contextManager: ContextManager; // Session state manager
-}
-```
-
-For hosted/self-hosted servers, the context also includes:
-
-```typescript
-interface HostedServerContext extends ServerContext {
-  authenticator: Authenticator;       // API key validation
-  rateLimiter: RateLimiter;           // Per-key rate limiting
-  sharedContext: SharedContextManager; // Cross-agent context
-  indexManager: IndexManager;          // Workspace indexing
-  syncManager: SyncManager;           // Cloud sync
+  sessionToken?: string;          // Per-session trust token (prompt injection defense)
+  hmacKey?: Buffer;               // HMAC signing key derived from session token
+  challengeState?: ChallengeState; // Challenge-response state for trust chain verification
 }
 ```
 
@@ -553,13 +544,9 @@ The `nella auth` command manages authentication for hosted and self-hosted serve
 ```bash
 # Interactive login (opens browser for OAuth)
 nella auth login
-
-# Login with API key directly
-nella auth login --api-key nella_YOUR_KEY
-
-# Login to a self-hosted server
-nella auth login --server-url http://localhost:3001
 ```
+
+Login uses a browser-based flow: the CLI starts a temporary localhost server, opens `app.getnella.dev` for authentication, and receives session tokens via redirect.
 
 ### Check Session
 
