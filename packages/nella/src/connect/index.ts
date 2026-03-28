@@ -71,12 +71,10 @@ function showConnectHelp(): void {
   console.log(`\n  ${pc.green.bold("nella connect")} — Configure coding agents to use Nella\n`);
   console.log(`  ${pc.green.bold("Usage:")}\n`);
   console.log(`    ${pc.muted("$")} ${pc.green("nella connect")}`);
-  console.log(`    ${pc.muted("$")} ${pc.green("nella connect --mode local")}`);
-  console.log(`    ${pc.muted("$")} ${pc.green("nella connect --mode hosted --api-key nella_xxx")}`);
+  console.log(`    ${pc.muted("$")} ${pc.green("nella connect --api-key nella_xxx")}`);
   console.log(`    ${pc.muted("$")} ${pc.green("nella connect --client claude-code")}`);
-  console.log(`    ${pc.muted("$")} ${pc.green("nella connect --client cursor --mode local -y")}\n`);
+  console.log(`    ${pc.muted("$")} ${pc.green("nella connect --client cursor -y")}\n`);
   console.log(`  ${pc.green.bold("Options:")}\n`);
-  console.log(`    ${pc.yellow("--mode")} ${pc.muted("<mode>")}            ${pc.muted("hosted or local (default: interactive)")}`);
   console.log(`    ${pc.yellow("--client")} ${pc.muted("<name>")}          ${pc.muted("Target agent (skip agent selection)")}`);
   console.log(`    ${pc.yellow("--api-key, -k")} ${pc.muted("<key>")}     ${pc.muted("API key (skip key prompt)")}`);
   console.log(`    ${pc.yellow("--server-url, -u")} ${pc.muted("<url>")}  ${pc.muted("Server URL (default: production)")}`);
@@ -182,39 +180,9 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
     p.log.info(`Agents: ${detected.map((a) => pc.cyan(agents[a].displayName)).join(", ")}`);
   }
 
-  // ── Step 2: Select connection mode ──
+  // ── Step 2: Connection mode (always hosted) ──
 
-  let mode: ConnectMode;
-
-  if (args.mode === "hosted" || args.mode === "local") {
-    mode = args.mode;
-    p.log.info(`Mode: ${pc.cyan(mode)}`);
-  } else if (args.apiKey || process.env.NELLA_API_KEY) {
-    mode = "hosted";
-    p.log.info(`Mode: ${pc.cyan("hosted")} (API key provided)`);
-  } else if (interactive) {
-    const modeChoice = await p.select({
-      message: "Connection mode",
-      options: [
-        {
-          value: "local" as ConnectMode,
-          label: "Local",
-          hint: "Runs MCP server locally via npx (no API key needed)",
-        },
-        {
-          value: "hosted" as ConnectMode,
-          label: "Hosted",
-          hint: "Connects to Nella cloud (requires API key)",
-        },
-      ],
-    });
-
-    exitIfCancelled(p, modeChoice);
-    mode = modeChoice as ConnectMode;
-  } else {
-    mode = "local";
-    p.log.info(`Mode: ${pc.cyan("local")}`);
-  }
+  const mode: ConnectMode = "hosted";
 
   // ── Step 3: Resolve API key (hosted mode only) ──
 
@@ -242,11 +210,6 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
         });
       }
 
-      keyOptions.push({
-        value: "skip",
-        label: "Skip — switch to local mode instead",
-      });
-
       const keyChoice = await p.select({
         message: "API Key",
         options: keyOptions,
@@ -264,8 +227,8 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
           spin.stop(`API key created: ${pc.dim(newKey.substring(0, 15) + "...")}`);
         } else {
           spin.stop(`Failed to create key: ${error}`);
-          p.log.warn("Falling back to local mode");
-          mode = "local";
+          p.cancel("Could not create API key");
+          process.exit(1);
         }
       } else if (keyChoice === "existing") {
         const keyInput = await p.text({
@@ -280,15 +243,12 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
 
         exitIfCancelled(p, keyInput);
         apiKey = keyInput as string;
-      } else {
-        // Skip — switch to local
-        mode = "local";
-        p.log.info(`Switched to ${pc.cyan("local")} mode`);
       }
     } else {
       // Non-interactive, no key available
-      p.log.warn("No API key available — switching to local mode");
-      mode = "local";
+      p.log.error("No API key provided. Use --api-key or run interactively.");
+      p.cancel("Missing API key");
+      process.exit(1);
     }
 
     if (mode === "hosted" && apiKey && !apiKey.startsWith("nella_")) {
