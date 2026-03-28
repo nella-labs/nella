@@ -628,4 +628,6 @@ export { scanContent, formatInjectionWarning } from "./content-scanner";
 export type { ScanResult, DetectedPattern, InjectionPatternType, PatternSeverity } from "./content-scanner";
 export { scoreInjectionRisk } from "./injection-scorer";
 export type { InjectionAssessment, ScoringFactor } from "./injection-scorer";
+export { deriveHmacKey, signResultHmac, verifyResultHmac, signResponseHmac, verifyResponseHmac } from "./hmac";
+export type { HmacSignature, SignedResult } from "./hmac";
 export * from "./types";
