@@ -1,23 +1,17 @@
 # Core Modules
 
-The `@usenella/core` package contains all of Nella's validation, safety, and tracking logic. This page covers the run engine, validators, context management, workspace management, and the event system.
+The `@usenella/core` package contains Nella's indexing, context tracking, workspace management, and safety logic. This page covers the indexing/RAG system, context management, workspace management, and the event system.
 
 ## Module Architecture
 
 ```mermaid
 graph TB
-    subgraph orchestration["Orchestration"]
-        run["run.ts<br/>runTask() | check() | validate()"]
-    end
-
-    subgraph validators["Validators"]
-        constraint["constraint-checker.ts<br/>checkConstraints()"]
-        scope["scope-checker.ts<br/>checkScope()"]
-        cmdRunner["command-runner.ts<br/>runValidation()"]
-    end
-
-    subgraph safety["Safety"]
-        refusal["refusal-detector.ts<br/>shouldRefuse() | detectRiskPatterns()"]
+    subgraph indexing["Indexing & RAG"]
+        indexMgr["IndexManager<br/>index() | search() | verify()"]
+        chunker["chunker.ts"]
+        embedder["embedder.ts"]
+        hybridSearch["hybrid-search.ts"]
+        verifier["verifier.ts"]
     end
 
     subgraph context["Context"]
@@ -38,109 +32,34 @@ graph TB
         migration["migration.ts"]
     end
 
-    run --> constraint
-    run --> scope
-    run --> cmdRunner
-    run --> refusal
-    run --> ctxManager
+    subgraph safety["Safety"]
+        contentScanner["content-scanner.ts"]
+        injectionScorer["injection-scorer.ts"]
+    end
+
+    indexMgr --> chunker
+    indexMgr --> embedder
+    indexMgr --> hybridSearch
+    indexMgr --> verifier
     ctxManager --> sessionStore
     ctxManager --> changeLedger
     ctxManager --> assumptionTracker
     ctxManager --> depTracker
 
-    style orchestration fill:#6366f1,color:#fff
-    style validators fill:#8b5cf6,color:#fff
-    style safety fill:#ef4444,color:#fff
+    style indexing fill:#6366f1,color:#fff
     style context fill:#10b981,color:#fff
     style workspace fill:#f59e0b,color:#fff
+    style safety fill:#ef4444,color:#fff
 ```
 
-## Task Execution Pipeline
+## Core Flow
 
-Every `runTask()` call follows this sequence — from receiving the task to returning validated results:
+The MCP server and CLI route tool calls into two main subsystems:
 
-```mermaid
-sequenceDiagram
-    participant C as Client (CLI/MCP)
-    participant R as runTask()
-    participant RF as RefusalDetector
-    participant CTX as ContextManager
-    participant TW as TempWorkspace
-    participant CC as ConstraintChecker
-    participant SC as ScopeChecker
-    participant CR as CommandRunner
-    participant A as ArtifactWriter
+- **IndexManager** — Indexes the codebase (AST chunking, embedding, hybrid search) and verifies generated code against the index.
+- **ContextManager** — Tracks session state, assumptions, change history, and dependency drift across agent turns.
 
-    C->>R: runTask(repoPath, task, changes, options)
-    R->>R: generateRunId(), createNellaDir()
-
-    opt Context Tracking Enabled
-        R->>CTX: new ContextManager(repoPath)
-        R->>CTX: checkDependencies(repoPath)
-        CTX-->>R: DependencyDiff | null
-        R->>CTX: getConflicts(plannedFiles)
-        CTX-->>R: AssumptionConflict[]
-    end
-
-    opt Refusal Check
-        R->>RF: shouldRefuse(task, repoPath)
-        RF-->>R: RefusalResult
-        alt Should Refuse
-            R->>R: calculateMetrics(refused=true)
-            R-->>C: RunResult {passed: false, refusal}
-        end
-    end
-
-    alt No Changes Provided
-        R->>R: calculateMetrics(check-only)
-        R-->>C: RunResult {passed: true}
-    end
-
-    R->>TW: createTempWorkspace(repoPath)
-    TW-->>R: tempDir
-    R->>TW: applyChanges(tempDir, files)
-    R->>TW: getDiff(tempDir)
-    TW-->>R: diff string
-
-    R->>CC: checkConstraints(modifiedFiles, diff, constraints)
-    CC-->>R: ConstraintResult[]
-
-    R->>SC: checkScope(modifiedFiles, expected)
-    SC-->>R: ScopeResult
-
-    opt Validation Not Skipped
-        R->>CR: runValidation(test/lint/compile, tempDir)
-        CR-->>R: ValidationResult
-    end
-
-    R->>R: passed = constraints OK && validation OK
-    R->>R: calculateMetrics(constraints, validation, scope)
-
-    opt Artifacts Enabled
-        R->>A: writeArtifacts(runDir, diff, metrics)
-    end
-
-    opt Context Tracking & Passed
-        R->>CTX: recordRunChanges(runId, changes)
-        CTX-->>R: invalidated assumptions count
-    end
-
-    R->>TW: cleanupTempWorkspace(tempDir)
-    R-->>C: RunResult | RunResultWithContext
-```
-
-### Pipeline Steps
-
-1. **Run ID generation** — Creates a unique identifier and the `.nella/` working directory
-2. **Context preflight** (optional) — Checks for dependency drift and assumption conflicts before proceeding
-3. **Refusal check** (optional) — Scans the task description for dangerous patterns; refuses if risk is detected
-4. **Workspace setup** — Clones the repo into a temp directory and applies the proposed changes
-5. **Diff generation** — Computes the unified diff between original and modified files
-6. **Constraint checking** — Validates against protected files, forbidden patterns, and custom constraints
-7. **Scope checking** — Compares modified files against expected files to detect scope creep
-8. **Validation** — Runs test/lint/compile commands in the temp workspace
-9. **Metrics** — Calculates pass/fail, violation rates, scope creep ratio, and timing
-10. **Context recording** (optional) — Persists changes and invalidates stale assumptions
+There is no centralized `runTask()` pipeline. Instead, each MCP tool (`nella_search`, `nella_index`, `nella_get_context`, etc.) calls into the relevant manager directly.
 
 ## Context Management
 

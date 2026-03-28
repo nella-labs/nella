@@ -523,11 +523,17 @@ interface CodeChunk {
   filePath: string;                // Source file path
   content: string;                 // Chunk content
   type: ChunkType;                 // Type of code element
-  name: string;                    // Symbol name (function, class, etc.)
-  startLine: number;               // Start line in source file
-  endLine: number;                 // End line in source file
+  lines: [number, number];         // [startLine, endLine]
+  language: string;                // Programming language
   symbols: CodeSymbol[];           // Symbols defined in chunk
+  imports?: string[];              // Import references
+  exports?: string[];              // Export references
+  hash: string;                    // Content hash for caching
+  tokens: number;                  // Token count
   embedding?: number[];            // Vector embedding (if computed)
+  source?: ContentSource;          // Trust classification (prompt injection defense)
+  createdAt: string;
+  updatedAt: string;
 }
 ```
 
@@ -537,14 +543,11 @@ interface CodeChunk {
 type ChunkType =
   | 'function'
   | 'class'
-  | 'method'
   | 'interface'
   | 'type'
-  | 'enum'
-  | 'variable'
-  | 'import'
-  | 'export'
   | 'module'
+  | 'doc'
+  | 'comment'
   | 'other';
 ```
 
@@ -553,10 +556,9 @@ type ChunkType =
 ```typescript
 interface CodeSymbol {
   name: string;                    // Symbol name
-  kind: string;                    // Symbol kind (function, class, etc.)
-  exported: boolean;               // Whether the symbol is exported
-  filePath: string;                // File where symbol is defined
-  line: number;                    // Line number
+  kind: 'function' | 'class' | 'interface' | 'type' | 'variable' | 'method' | 'property' | 'import' | 'export';
+  signature?: string;              // Type signature
+  exported?: boolean;              // Whether the symbol is exported
 }
 ```
 
@@ -567,7 +569,8 @@ interface SearchQuery {
   query: string;                   // Search text
   filter?: SearchFilter;           // Optional filter criteria
   limit?: number;                  // Max results (default: 10)
-  hybrid?: boolean;                // Use hybrid search (default: true)
+  mode?: 'hybrid' | 'semantic' | 'lexical';  // Search mode (default: hybrid)
+  includeEmbedding?: boolean;      // Include embedding vectors in results
 }
 ```
 
@@ -575,8 +578,9 @@ interface SearchQuery {
 
 ```typescript
 interface SearchFilter {
-  filePatterns?: string[];         // Glob patterns to include
-  excludePatterns?: string[];      // Glob patterns to exclude
+  fileTypes?: string[];            // File extensions to include
+  paths?: string[];                // Path prefixes to include
+  symbols?: string[];              // Symbol names to filter
   chunkTypes?: ChunkType[];        // Filter by chunk type
   minScore?: number;               // Minimum relevance score
 }
@@ -587,8 +591,13 @@ interface SearchFilter {
 ```typescript
 interface SearchResponse {
   results: SearchResult[];
-  totalCount: number;
-  queryTimeMs: number;
+  query: string;
+  totalMatches: number;
+  searchTime: number;
+  tokensUsed: number;
+  cost: number;
+  confidence: number;
+  suggestion: 'use_results' | 'query_unclear' | 'no_matches' | 'low_confidence';
 }
 ```
 
@@ -610,8 +619,8 @@ interface VerifyCodeRequest {
 interface VerifyCodeResult {
   valid: boolean;                  // Overall validity
   issues: VerifyIssue[];           // List of issues found
-  checkedImports: number;          // Number of imports checked
-  checkedSymbols: number;          // Number of symbols checked
+  suggestions: string[];           // Improvement suggestions
+  confidence: number;              // Confidence level (0-1)
 }
 ```
 
@@ -619,9 +628,10 @@ interface VerifyCodeResult {
 
 ```typescript
 interface VerifyIssue {
-  type: 'missing-import' | 'missing-symbol' | 'wrong-signature' | 'deprecated';
+  type: 'missing_import' | 'unknown_symbol' | 'invalid_api' | 'type_mismatch' | 'pattern_mismatch';
+  severity: 'error' | 'warning' | 'info';
   message: string;
-  line?: number;
+  location?: { line: number; column: number };
   suggestion?: string;
 }
 ```
@@ -630,12 +640,24 @@ interface VerifyIssue {
 
 ```typescript
 const DEFAULT_INDEX_CONFIG: IndexConfig = {
-  embedder: 'voyage-code-2',
-  dimensions: 1536,
-  chunkStrategy: 'ast',
-  hybridWeights: { vector: 0.4, lexical: 0.6 },
-  fusionK: 60,
-  reranker: 'cohere'
+  embedder: {
+    provider: 'azure',
+    model: 'text-embedding-3-small',
+    dimensions: 1536,
+  },
+  chunking: {
+    maxTokens: 1024,
+    overlap: 50,
+    strategy: 'ast',
+  },
+  search: {
+    vectorWeight: 0.4,
+    lexicalWeight: 0.6,
+    rerankEnabled: true,
+    topK: 10,
+  },
+  include: ['**/*.ts', '**/*.tsx', '**/*.js', /* ... */],
+  exclude: ['**/node_modules/**', '**/dist/**', /* ... */],
 };
 ```
 

@@ -63,7 +63,7 @@ console.log(verification.issues); // Missing imports, wrong signatures, etc.
 |-------|------|
 | `IndexManager` | Orchestrates incremental indexing and search |
 | `Chunker` | AST-based code chunking that respects function/class boundaries |
-| `Embedder` | Generates embeddings via Voyage-code-2, OpenAI, or local ONNX |
+| `Embedder` | Generates embeddings via Azure OpenAI or Nella cloud proxy |
 | `VectorStore` | In-memory vector store with JSON persistence |
 | `LexicalIndex` | BM25-based keyword search index |
 | `HybridSearcher` | RRF fusion (default: 0.4 vector / 0.6 lexical, k=60) |
@@ -73,12 +73,24 @@ console.log(verification.issues); // Missing imports, wrong signatures, etc.
 
 ```ts
 const DEFAULT_INDEX_CONFIG = {
-  embedder: 'voyage-code-2',     // 'voyage-code-2' | 'openai' | 'local'
-  dimensions: 1536,
-  chunkStrategy: 'ast',
-  hybridWeights: { vector: 0.4, lexical: 0.6 },
-  fusionK: 60,
-  reranker: 'cohere'
+  embedder: {
+    provider: 'azure',           // 'azure' | 'nella'
+    model: 'text-embedding-3-small',
+    dimensions: 1536,
+  },
+  chunking: {
+    maxTokens: 1024,
+    overlap: 50,
+    strategy: 'ast',
+  },
+  search: {
+    vectorWeight: 0.4,
+    lexicalWeight: 0.6,
+    rerankEnabled: true,
+    topK: 10,
+  },
+  include: ['**/*.ts', '**/*.tsx', '**/*.js', /* ... */],
+  exclude: ['**/node_modules/**', '**/dist/**', /* ... */],
 };
 ```
 
@@ -667,18 +679,21 @@ const response = await handler.handleToolCall({
 });
 ```
 
-### Core MCP Tools (6)
+### MCP Tools (7)
+
+The `@getnella/mcp` package exposes these tools to MCP clients:
 
 | Tool | Description |
 |------|-------------|
-| `nella_search` | Search indexed codebase (hybrid vector + lexical) |
-| `nella_verify` | Verify code against indexed codebase |
-| `nella_index` | Index or re-index the workspace |
-| `nella_get_context` | Get shared context entries |
-| `nella_set_context` | Set shared context entries |
-| `nella_status` | Get server/workspace status |
+| `nella_index` | Index or re-index the workspace for search |
+| `nella_search` | Hybrid search (semantic + BM25) across indexed codebase |
+| `nella_get_context` | Get current session context |
+| `nella_add_assumption` | Record an assumption about the codebase |
+| `nella_check_assumptions` | Get status of recorded assumptions |
+| `nella_check_dependencies` | Check for dependency drift |
+| `nella_heartbeat` | Verify trust-chain continuity between tool calls |
 
-These are the core-level tools exposed by `createMcpToolHandler()`. The current `@getnella/mcp` package ships a different 7-tool surface focused on indexing, session context, dependency tracking, and heartbeat continuity. See the [MCP Tools Reference](../mcp/tools.md).
+See the [MCP Tools Reference](../mcp/tools.md) for detailed descriptions and input schemas.
 
 ---
 

@@ -15,7 +15,7 @@ graph LR
     end
 
     subgraph embedding["Embedding"]
-        Embedder["Embedder<br/>(Voyage / OpenAI / Local)"]
+        Embedder["Embedder<br/>(Azure OpenAI / Nella)"]
     end
 
     subgraph storage["Storage"]
@@ -28,7 +28,7 @@ graph LR
     end
 
     subgraph rerank["Reranking"]
-        Reranker["Reranker<br/>(Cohere / Local fallback)"]
+        Reranker["Reranker<br/>(Cohere via Azure / Local fallback)"]
     end
 
     subgraph output["Output"]
@@ -70,13 +70,12 @@ The **AST-based chunker** parses source files using TypeScript's compiler API an
 
 Each chunk is embedded into a vector using a configurable embedding provider:
 
-| Provider | Model | Dimensions | Rate Limits |
-|----------|-------|------------|-------------|
-| **OpenAI** (default) | `text-embedding-3-small` | 1536 | High (generous) |
-| **Voyage** | `voyage-code-2` | 1536 | 3 RPM / 10K TPM (free tier) |
-| **Local** (ONNX) | Configurable | Varies | No limit |
+| Provider | Model | Dimensions | Notes |
+|----------|-------|------------|-------|
+| **Azure OpenAI** (default) | `text-embedding-3-small` | 1536 | Requires `AZURE_EMBEDDING_API_KEY` and `AZURE_ENDPOINT` |
+| **Nella** | `text-embedding-3-small` | 1536 | Authenticated via `nella auth login`; proxied through `app.getnella.dev/api` |
 
-An **embedding cache** (`embeddings.cache.json`) stores computed embeddings by content hash, preventing redundant API calls during incremental re-indexing.
+An **SQLite embedding cache** (with JSON fallback) stores computed embeddings by content hash, preventing redundant API calls during incremental re-indexing.
 
 ### 3. Storage
 
@@ -95,7 +94,7 @@ Where `k=60` (default) and `rank_i` is the document's rank in each retrieval sou
 
 ### 5. Reranking (Optional)
 
-When configured, Cohere's reranking API reorders hybrid results for improved relevance. Falls back to the raw RRF order when unavailable.
+When configured, a Cohere reranking model (`Cohere-rerank-v4.0-pro`) deployed via Azure reorders hybrid results for improved relevance. Requires `AZURE_RERANK_API_KEY` and `AZURE_RERANK_ENDPOINT`. Falls back to a local term-overlap reranker when unavailable.
 
 ## Code Verification
 
@@ -179,6 +178,6 @@ Based on benchmarks against a 302-file TypeScript monorepo:
 ## Related Architecture Pages
 
 - [Architecture Overview](./overview.md) — System topology and package structure
-- [Core Modules](./core-modules.md) — Run engine, validators, context, and workspace
+- [Core Modules](./core-modules.md) — Indexing, context, and workspace modules
 - [MCP Server](./mcp-server.md) — MCP protocol implementation and tool routing
 - [Security & Auth](./security-auth.md) — Safety detection, authentication, and rate limiting
