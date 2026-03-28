@@ -10,6 +10,7 @@ export * from "./runner";
 export * from "./validators";
 export * from "./metrics";
 export * from "./reports";
+export * from "./injection";
 
 import { allScenarios, initializeScenarios } from "./scenarios";
 import { Task, TaskCategory, TaskDifficulty } from "./types";
