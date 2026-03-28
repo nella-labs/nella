@@ -102,11 +102,22 @@ export interface IndexConfig {
   exclude: string[];
 }
 
+/**
+ * Known embedding model dimensions.
+ * Use this instead of hardcoding 1536 so a model change propagates everywhere.
+ */
+export const MODEL_DIMENSIONS: Record<string, number> = {
+  "text-embedding-3-small": 1536,
+  "text-embedding-3-large": 3072,
+};
+
+export const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+
 export const DEFAULT_INDEX_CONFIG: IndexConfig = {
   embedder: {
     provider: "azure",
-    model: "text-embedding-3-small",
-    dimensions: 1536,
+    model: DEFAULT_EMBEDDING_MODEL,
+    dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
   },
   chunking: {
     maxTokens: 1024,

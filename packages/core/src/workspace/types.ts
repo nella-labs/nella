@@ -59,6 +59,9 @@ export interface SearchConfig {
   topK?: number;
 }
 
+const _DEFAULT_MODEL = "text-embedding-3-small";
+const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, "text-embedding-3-large": 3072 };
+
 export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   autoIndex: true,
   indexOnChange: true,
@@ -79,8 +82,8 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   ],
   embedder: {
     provider: "azure",
-    model: "text-embedding-3-small",
-    dimensions: 1536,
+    model: _DEFAULT_MODEL,
+    dimensions: _DEFAULT_DIMS[_DEFAULT_MODEL],
   },
   search: {
     vectorWeight: 0.4,
