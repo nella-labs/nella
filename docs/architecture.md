@@ -11,7 +11,7 @@ graph TB
     Agent["AI Coding Agent<br/>(Claude, Copilot, Cursor, Cline)"]
 
     subgraph nella_pkg["@getnella/mcp v0.0.0"]
-        CLI["CLI<br/>nella index | mcp | serve | connect | auth | playground"]
+        CLI["CLI<br/>nella index | mcp | serve | connect | auth | setup"]
         MCP["MCP Server<br/>(stdio transport)"]
         HostedMCP["Hosted MCP Server<br/>(Streamable HTTP)"]
         AuthCLI["Auth CLI<br/>login | logout | status"]
@@ -1114,9 +1114,10 @@ graph TB
             RateLimit["Rate Limiting<br/>(Redis / In-Memory)"]
         end
         
-        subgraph Tools["MCP Tools (6)"]
+        subgraph Tools["MCP Tools (7)"]
             IndexTools["Indexing & Search<br/>index, search"]
             ContextTools["Context Tools<br/>get_context, add_assumption,<br/>check_assumptions, check_dependencies"]
+            HeartbeatTool["Trust Chain<br/>heartbeat"]
         end
     end
     

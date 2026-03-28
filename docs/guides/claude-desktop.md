@@ -40,7 +40,7 @@ Open the configuration file and add the Nella MCP server:
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["@getnella/mcp", "--workspace", "/path/to/project"]
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/project"]
     }
   }
 }
@@ -135,7 +135,7 @@ All assumptions are still valid! Here's a summary of what I changed.
 ### Connection errors
 
 1. Ensure Node.js is installed and in your PATH
-2. Try running `npx @getnella/mcp mcp -w /path/to/project` manually to check for errors
+2. Try running `npx -y @getnella/mcp --workspace /path/to/project` manually to check for errors
 3. Verify the workspace path exists
 
 ### Path issues on Windows

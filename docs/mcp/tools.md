@@ -1,142 +1,140 @@
 # MCP Tools Reference
 
-Complete reference for all tools exposed by the Nella MCP Server.
+Complete reference for the tools exposed by the local Nella MCP server.
+
+The server currently registers 7 tools:
+
+| Category | Tools |
+|----------|-------|
+| Context | [`nella_get_context`](../api-reference/tools/nella-get-context.md), [`nella_add_assumption`](../api-reference/tools/nella-add-assumption.md), [`nella_check_assumptions`](../api-reference/tools/nella-check-assumptions.md), [`nella_check_dependencies`](../api-reference/tools/nella-check-dependencies.md) |
+| Indexing | [`nella_index`](../api-reference/tools/nella-index.md), [`nella_search`](../api-reference/tools/nella-search.md) |
+| Trust Chain | [`nella_heartbeat`](../api-reference/tools/nella-heartbeat.md) |
 
 ## Table of Contents
 
 - [Context Tools](#context-tools)
-  - [nella_get_context](#nella_get_context)
-  - [nella_add_assumption](#nella_add_assumption)
-  - [nella_check_assumptions](#nella_check_assumptions)
-  - [nella_check_dependencies](#nella_check_dependencies)
 - [Indexing Tools](#indexing-tools)
-  - [nella_index](#nella_index)
-  - [nella_search](#nella_search)
-
----
+- [Trust Chain Tool](#trust-chain-tool)
 
 ## Context Tools
 
-Tools for managing session context, assumptions, and dependency tracking.
+### `nella_get_context`
 
-### nella_get_context
+Returns session state for the current workspace, including recent changes, assumption counts, dependency snapshot details, and the prompt-injection trust metadata issued for the session.
 
-Get the full session context including recent changes, assumptions, and dependencies.
-
-**Parameters:**
+**Parameters**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `changesLimit` | `number` | No | Maximum number of recent changes to return (default: 20) |
+| `changesLimit` | `number` | No | Maximum number of recent changes to include. Default: `20`. |
 
-**Example:**
-```typescript
-nella_get_context({ changesLimit: 10 })
-```
+**Behavior**
 
----
+- Includes session statistics, hotspot files, active assumptions, and recent invalidations when present.
+- Also returns the session trust token, HMAC integrity guidance, and the current heartbeat challenge.
 
-### nella_add_assumption
+See [`nella_get_context`](../api-reference/tools/nella-get-context.md) for the full per-tool reference.
 
-Record an assumption about the codebase that is automatically checked when related files change.
+### `nella_add_assumption`
 
-**Parameters:**
+Records an assumption about the codebase so later changes can invalidate it automatically.
+
+**Parameters**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `type` | `string` | Yes | Category: schema, interface, dependency, behavior, config, structure, other |
-| `description` | `string` | Yes | What is being assumed |
-| `relatedFiles` | `string[]` | No | Files this assumption relates to (supports globs) |
-| `confidence` | `number` | No | Confidence level 0-1 (default: 0.8) |
+| `type` | `string` | Yes | One of `schema`, `interface`, `dependency`, `behavior`, `config`, `structure`, `other`. |
+| `description` | `string` | Yes | Human-readable assumption text. |
+| `relatedFiles` | `string[]` | No | Files or glob patterns related to the assumption. Matching uses `minimatch` in the core assumption tracker. |
+| `confidence` | `number` | No | Confidence from `0` to `1`. Default: `0.8`. |
 
-**Example:**
-```typescript
-nella_add_assumption({
-  type: 'interface',
-  description: 'User model has id, name, and email string fields',
-  relatedFiles: ['src/types.ts', 'src/models/user.ts'],
-  confidence: 0.9,
-})
-```
+See [`nella_add_assumption`](../api-reference/tools/nella-add-assumption.md).
 
----
+### `nella_check_assumptions`
 
-### nella_check_assumptions
+Lists valid and recently invalidated assumptions and summarizes them by type.
 
-Get the status of all recorded assumptions, including any that have been invalidated.
+**Parameters**
 
-**Parameters:** None.
+None.
 
-**Example:**
-```typescript
-nella_check_assumptions({})
-```
+**Behavior**
 
----
+- Returns `isError: true` when any assumptions have been invalidated.
 
-### nella_check_dependencies
+See [`nella_check_assumptions`](../api-reference/tools/nella-check-assumptions.md).
 
-Check for dependency changes (package.json, lockfile) since the last snapshot.
+### `nella_check_dependencies`
 
-**Parameters:** None.
+Compares the current dependency state to the last recorded snapshot.
 
-**Example:**
-```typescript
-nella_check_dependencies({})
-```
+**Parameters**
 
----
+None.
+
+**Behavior**
+
+- Reports added, removed, and updated packages.
+- Returns `isError: true` when dependency drift is detected.
+
+See [`nella_check_dependencies`](../api-reference/tools/nella-check-dependencies.md).
 
 ## Indexing Tools
 
-Tools for indexing and searching the codebase.
+### `nella_index`
 
-### nella_index
+Builds or refreshes the workspace index used by `nella_search`.
 
-Index workspace codebase for semantic and lexical search.
-
-**Parameters:**
+**Parameters**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `force` | `boolean` | No | Force full reindex (default: false) |
-| `paths` | `string[]` | No | Specific paths to index (default: entire workspace) |
+| `force` | `boolean` | No | Rebuild the index and ignore cached embeddings. Default: `false`. |
+| `paths` | `string[]` | No | Files or directories to index. Each path is resolved relative to the workspace root before indexing. |
 
-**Example:**
-```typescript
-nella_index({ force: true })
-```
+**Behavior**
 
----
+- Requires either an authenticated Nella session or Azure embedding credentials (`AZURE_EMBEDDING_API_KEY` and `AZURE_ENDPOINT`).
+- Stores index data under `.nella/index` in the workspace.
 
-### nella_search
+See [`nella_index`](../api-reference/tools/nella-index.md).
 
-Search the indexed codebase using hybrid search (semantic + BM25 lexical).
+### `nella_search`
 
-**Parameters:**
+Searches the indexed workspace with `hybrid`, `semantic`, or `lexical` retrieval.
+
+**Parameters**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `query` | `string` | Yes | Search query |
-| `mode` | `string` | No | Search mode: hybrid, semantic, lexical (default: hybrid) |
-| `topK` | `number` | No | Number of results (default: 10) |
-| `language` | `string` | No | Filter by language |
-| `filePattern` | `string` | No | Filter by file glob pattern |
+| `query` | `string` | Yes | Search query text. |
+| `mode` | `string` | No | One of `hybrid`, `semantic`, `lexical`. Default: `hybrid`. |
+| `topK` | `number` | No | Maximum number of results. Default: `10`. |
+| `language` | `string` | No | File type filter. Accepts language names like `typescript` or raw extensions like `ts`. |
+| `filePattern` | `string` | No | Case-insensitive substring match against indexed file paths. This is not glob matching. |
 
-**Example:**
-```typescript
-nella_search({
-  query: 'user authentication middleware',
-  mode: 'hybrid',
-  topK: 5,
-})
-```
+**Behavior**
 
----
+- Requires a non-empty index; otherwise the tool returns an error telling you to run `nella_index`.
+- Returns wrapped code chunks with relative paths, line ranges, type/language metadata, symbol names when available, and injection warnings or HMAC integrity markers when present.
 
-## Tool Categories Summary
+See [`nella_search`](../api-reference/tools/nella-search.md).
 
-| Category | Tools | Purpose |
-|----------|-------|---------|
-| **Context** | `nella_get_context`, `nella_add_assumption`, `nella_check_assumptions`, `nella_check_dependencies` | Session state, assumptions, dependency tracking |
-| **Indexing** | `nella_index`, `nella_search` | Codebase indexing and hybrid search |
+## Trust Chain Tool
+
+### `nella_heartbeat`
+
+Verifies trust-chain continuity by checking the challenge issued from `nella_get_context` or the previous `nella_heartbeat` response.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `challenge_response` | `string` | Yes | The current challenge value returned by Nella. |
+
+**Behavior**
+
+- Returns an `OK` or `FAILED` status in the response body and always issues a new challenge.
+- Failure is communicated in the markdown response body rather than through `isError`.
+
+See [`nella_heartbeat`](../api-reference/tools/nella-heartbeat.md).

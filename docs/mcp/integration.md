@@ -2,6 +2,8 @@
 
 How to set up and configure the Nella MCP Server with various clients.
 
+> Status: this guide mixes current workflows with older reference material. For the maintained local setup docs, prefer [`../integrations/claude-desktop.md`](../integrations/claude-desktop.md), [`../integrations/cursor.md`](../integrations/cursor.md), and [`../cli/commands.md`](../cli/commands.md).
+
 ## Table of Contents
 
 - [Quick Start with CLI](#quick-start-with-cli)
@@ -242,8 +244,8 @@ The Nella MCP Server is included in the main `@getnella/mcp` package:
 # Global installation
 npm install -g @getnella/mcp
 
-# Or use npx (downloads on first use)
-npx @getnella/mcp mcp --help
+# Or use the direct stdio entrypoint (downloads on first use)
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
 ### Configuration File Location
@@ -614,7 +616,7 @@ The workspace should have:
 
 **Debug**: Run the server manually to see errors:
 ```bash
-npx @getnella/mcp mcp --workspace /path/to/project
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
 ### Permission Errors
@@ -662,7 +664,7 @@ To debug MCP messages, you can intercept stdio:
 # Create a debug wrapper script
 cat > debug-nella.sh << 'EOF'
 #!/bin/bash
-tee /tmp/nella-in.log | npx @getnella/mcp mcp "$@" | tee /tmp/nella-out.log
+tee /tmp/nella-in.log | npx -y @getnella/mcp "$@" | tee /tmp/nella-out.log
 EOF
 chmod +x debug-nella.sh
 ```

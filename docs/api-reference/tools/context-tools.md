@@ -1,182 +1,26 @@
 # Context Tools
 
-Tools for managing session context, assumptions, and change history.
+Context tools keep a local Nella session grounded in what has already changed, what assumptions are in play, and whether dependency drift or prompt-injection trust issues need attention.
 
-Nella provides several tools for managing session context. These tools help track changes, record assumptions, and maintain history throughout a coding session.
+## Tools
 
-## nella_get_context
-
-Get the full session context including recent changes, assumptions, and dependencies.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `changesLimit` | `number` | No | Maximum number of recent changes to return (default: 50) |
-
-### Example
-
-```typescript
-nella_get_context({
-  changesLimit: 20,
-});
-```
-
-### Response
-
-```
-## Session Context
-
-### Session Info
-- **Session ID**: sess_abc123
-- **Started**: 2026-01-16T10:30:00Z
-- **Duration**: 45 minutes
-- **Runs completed**: 3
-
-### Recent Changes (12 total)
-
-| File | Operation | Reason | Time |
-|------|-----------|--------|------|
-| src/auth.ts | modify | Auth refactoring | 10:35 |
-| src/user.ts | modify | Add email field | 10:42 |
-| src/types.ts | modify | Update interfaces | 10:45 |
-
-### Active Assumptions (2 valid)
-
-1. **[interface]** User model has id, name, email fields (confidence: 0.9)
-   - Files: src/types.ts, src/user.ts
-2. **[dependency]** Using TypeScript 5.0+ (confidence: 0.8)
-   - Files: tsconfig.json
-
-### Statistics
-- Total changes: 12
-- Valid assumptions: 2
-- Invalidated assumptions: 0
-- Hotspot files: src/auth.ts (4 changes), src/user.ts (3 changes)
-```
-
----
-
-## nella_add_assumption
-
-Record an assumption about the codebase that can be validated when changes are made.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `type` | `string` | Yes | Category: schema, interface, dependency, behavior, config, structure, other |
-| `description` | `string` | Yes | What is being assumed |
-| `relatedFiles` | `string[]` | Yes | Files this assumption relates to |
-| `confidence` | `number` | No | Confidence level 0–1 (default: 0.8) |
-
-### Example
-
-```typescript
-nella_add_assumption({
-  type: 'interface',
-  description: 'User model has id, name, and email string fields',
-  relatedFiles: ['src/types.ts', 'src/models/user.ts'],
-  confidence: 0.9,
-});
-```
-
-### Response
-
-```
-## Assumption Recorded
-
-✅ Successfully added assumption
-
-### Details
-- **ID**: asmp_xyz789
-- **Type**: interface
-- **Description**: User model has id, name, and email string fields
-- **Related Files**: src/types.ts, src/models/user.ts
-- **Confidence**: 0.9
-
-### Note
-This assumption will be automatically checked when related files are modified.
-If changes invalidate this assumption, you will be notified.
-```
-
----
-
-## nella_check_assumptions
-
-Get the status of all recorded assumptions, including any that have been invalidated.
-
-### Parameters
-
-None.
-
-### Example
-
-```typescript
-nella_check_assumptions({});
-```
-
-### Response
-
-```
-## Assumption Status
-
-### Summary
-- Valid: 2
-- Invalidated: 1
-
-### Valid Assumptions
-1. **[interface]** User model has id, name, email fields (confidence: 0.9)
-   - Files: src/types.ts, src/user.ts
-   - Created: 10:35:00
-
-2. **[dependency]** Using TypeScript 5.0+ (confidence: 0.8)
-   - Files: tsconfig.json
-   - Created: 10:32:00
-
-### Invalidated Assumptions
-- **[config]** ~~Using default ESLint rules~~ ❌
-  - Invalidated at: 10:45:00
-  - Invalidated by: run_def456
-```
-
----
-
-## nella_check_dependencies
-
-Check for dependency changes (package.json, lockfile) since the last snapshot.
-
-### Parameters
-
-None.
-
-### Example
-
-```typescript
-nella_check_dependencies({});
-```
-
-### Response
-
-```
-## Dependency Changes
-
-✅ No changes since last snapshot
-
-- Snapshot taken: 2026-01-16T10:30:00Z
-- Lock file: package-lock.json
-- Packages: 1,234 total
-- Status: Unchanged
-```
-
-## Assumption Types
-
-| Type | Use For |
+| Tool | Purpose |
 |------|---------|
-| `schema` | Database schema assumptions |
-| `interface` | TypeScript/API interface structure |
-| `dependency` | Package/library assumptions |
-| `behavior` | Expected code behavior |
-| `config` | Configuration assumptions |
-| `structure` | Project structure assumptions |
-| `other` | Anything else |
+| [`nella_get_context`](./nella-get-context.md) | Return session context, dependency snapshot details, trust metadata, and the current heartbeat challenge. |
+| [`nella_add_assumption`](./nella-add-assumption.md) | Record an assumption and tie it to related files or glob patterns. |
+| [`nella_check_assumptions`](./nella-check-assumptions.md) | Summarize valid and invalidated assumptions by type. |
+| [`nella_check_dependencies`](./nella-check-dependencies.md) | Compare the current dependency state to the last snapshot. |
+
+## Shared Behavior
+
+- `nella_add_assumption.relatedFiles` supports exact paths and glob patterns. The core assumption tracker matches these with `minimatch`.
+- `nella_check_assumptions` returns `isError: true` when any recorded assumption has been invalidated.
+- `nella_check_dependencies` returns `isError: true` when it detects dependency changes.
+- `nella_get_context` is the entry point for the session trust chain: it returns the trust token, HMAC integrity guidance, and the heartbeat challenge used by [`nella_heartbeat`](./nella-heartbeat.md).
+
+## Typical Flow
+
+1. Call [`nella_get_context`](./nella-get-context.md) to understand the current session.
+2. Record assumptions with [`nella_add_assumption`](./nella-add-assumption.md) before making changes.
+3. Re-check assumptions with [`nella_check_assumptions`](./nella-check-assumptions.md) after edits.
+4. Run [`nella_check_dependencies`](./nella-check-dependencies.md) when package state may have changed.

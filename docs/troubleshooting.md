@@ -9,14 +9,14 @@ Common issues and solutions when using Nella.
 The CLI isn't in your PATH. Solutions:
 
 ```bash
-# Check if it's installed
-npx @getnella/mcp --version
+# Check if the CLI is on your PATH
+which nella
 
 # Reinstall globally
 npm install -g @getnella/mcp
 
-# Or use npx instead of a global install
-npx @getnella/mcp index --force
+# Or run the local stdio MCP server without a global install
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
 On Windows, you may need to restart your terminal or add npm's global bin to your PATH.
@@ -51,7 +51,7 @@ Messages like `usearch not available, falling back to brute-force` are normal. O
    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 3. **Test the server manually:**
    ```bash
-   npx @getnella/mcp mcp
+   npx -y @getnella/mcp --workspace /path/to/project
    ```
    If this shows errors, fix them before restarting Claude Desktop
 4. **Check Node.js version:** Nella requires Node.js 18+
@@ -63,7 +63,7 @@ Messages like `usearch not available, falling back to brute-force` are normal. O
 
 Common causes:
 - The server process crashed — check Claude Desktop's logs
-- `NELLA_REPO_PATH` points to a directory that doesn't exist
+- The configured `--workspace` path points to a directory that doesn't exist
 - Node.js is not accessible from the shell that Claude Desktop uses
 
 ### MCP server is slow to start
@@ -79,7 +79,7 @@ npm install -g @getnella/mcp
   "mcpServers": {
     "nella": {
       "command": "nella",
-      "args": ["mcp"]
+      "args": ["mcp", "--workspace", "/absolute/path/to/project"]
     }
   }
 }
@@ -123,7 +123,7 @@ A typical monorepo index is ~500MB. Breakdown:
 | `embeddings.cache.json` | 131 MB | Delete to re-embed (costs API calls) |
 | `lexical.json` | 2.6 MB | No |
 
-Add `.nella/indexing/` to your `.gitignore` — indexes should not be committed.
+Add `.nella/index/` to your `.gitignore` — indexes should not be committed.
 
 ### Code verifier false positives
 
@@ -193,4 +193,4 @@ Nella is a commercial product. Visit [getnella.dev](https://getnella.dev) for pr
 ## Related Docs
 
 - [CLI Commands](../cli/commands.md) — Full command reference
-- [MCP Setup](../user-guide/mcp-setup.md) — Connect Nella to your IDE
+- [Quick Start](../getting-started/quick-start.md) — Connect Nella to your IDE

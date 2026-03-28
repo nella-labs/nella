@@ -71,7 +71,7 @@ Sessions survive across multiple conversations. When a new MCP connection starts
 
 ## Cross-Agent Context
 
-For multi-agent setups, use the **SharedContextManager** (exposed via `nella_set_context` and `nella_get_context (core)` tools on the hosted server). See the [Context Sharing guide](../core/context-sharing.md) for details.
+For multi-agent setups, use the **SharedContextManager** programmatically from `@usenella/core`. The current `@getnella/mcp` package focuses on session context and does not expose a package-level `nella_set_context` tool. See the [Context Sharing guide](../core/context-sharing.md) for details.
 
 ## Related Docs
 

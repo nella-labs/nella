@@ -8,7 +8,7 @@ Practical examples for using `@getnella/mcp`.
 - [MCP Integration](#mcp-integration)
 - [Hosted Server](#hosted-server)
 - [Authentication](#authentication)
-- [Playground](#playground)
+- [Direct Package Entrypoint](#direct-package-entrypoint)
 
 ---
 
@@ -55,7 +55,7 @@ Add to Claude Desktop config:
 
 ```bash
 # Add via CLI
-claude mcp add nella -- npx @getnella/mcp mcp --workspace .
+claude mcp add nella -- npx -y @getnella/mcp --workspace .
 ```
 
 ---
@@ -65,14 +65,14 @@ claude mcp add nella -- npx @getnella/mcp mcp --workspace .
 ### Start a Self-Hosted Nella Server
 
 ```bash
-# Start with defaults (localhost:3847)
+# Start with defaults (0.0.0.0:3000)
 nella serve
 
 # Production setup — bind to all interfaces
 nella serve --port 8080 --host 0.0.0.0
 
 # With Redis for distributed rate limiting
-REDIS_URL=redis://localhost:6379 nella serve --port 3847
+REDIS_URL=redis://localhost:6379 nella serve --port 3000
 ```
 
 ### Connect Clients to the Server
@@ -93,14 +93,14 @@ nella connect --client cursor --api-key nella_existing_key
 ```bash
 # Pull and run
 docker pull ghcr.io/nella-labs/nella-mcp:latest
-docker run -p 3847:3847 \
+docker run -p 3000:3000 \
   -e NELLA_API_KEY=nella_secret \
   -e SUPABASE_URL=https://xxx.supabase.co \
   -e SUPABASE_SERVICE_ROLE_KEY=eyJ... \
   ghcr.io/nella-labs/nella-mcp:latest
 
 # Health check
-curl http://localhost:3847/health
+curl http://localhost:3000/health
 ```
 
 ---
@@ -122,16 +122,14 @@ nella auth logout
 
 ---
 
-## Playground
+## Direct Package Entrypoint
 
-### Launch the Playground
+Use the package entrypoint when you want a direct stdio MCP process without installing the global CLI:
 
 ```bash
-# Start playground with default settings
-nella playground
+# Show direct entrypoint help
+npx -y @getnella/mcp --help
 
-# Custom port and workspace
-nella playground --port 4000 --workspace ./my-project
+# Start stdio MCP for a specific workspace
+npx -y @getnella/mcp --workspace ./my-project
 ```
-
-> **Tip:** The playground provides a web-based UI at `http://localhost:PORT` with a chat interface for testing MCP tools, a file browser, context viewer, and real-time WebSocket updates.

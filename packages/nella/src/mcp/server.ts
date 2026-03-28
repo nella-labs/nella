@@ -6,9 +6,8 @@
  * to AI agents like Claude.
  *
  * Usage:
- *   npx @getnella/mcp                              # auto-start via npx
- *   npx @getnella/mcp --workspace /path/to/project  # with explicit workspace
- *   nella mcp --workspace /path/to/project           # via CLI subcommand
+ *   npx -y @getnella/mcp --workspace /path/to/project  # direct stdio entrypoint
+ *   nella mcp --workspace /path/to/project            # via CLI subcommand
  */
 
 import * as crypto from "crypto";

@@ -1,46 +1,41 @@
 # MCP Setup
 
-Connect Nella to your AI coding agent via the Model Context Protocol (MCP). This guide covers setup for Claude Desktop, Cursor, VS Code, and custom MCP clients.
+Connect Nella to your AI coding agent via the Model Context Protocol (MCP). This guide covers local stdio setups, hosted HTTP setups, and custom client wiring.
 
-## What is MCP?
+## What Is MCP?
 
-The Model Context Protocol lets AI agents call external tools during a conversation. When connected to Nella's MCP server, your agent can:
+The Model Context Protocol lets AI agents call external tools during a conversation. When connected to Nella, your agent can:
 
-- Search your indexed codebase for relevant code
-- Track session context, assumptions, and dependencies
+- search your indexed codebase for relevant code
+- track session context, assumptions, and dependency drift
+- continue Nella's trust-chain flow with heartbeat checks
 
 ## Claude Desktop
 
 ### Automatic Setup
 
-The fastest way to connect:
+The fastest path is:
 
 ```bash
-nella connect
+nella connect --client claude
 ```
 
-This command:
-1. Authenticates with your Nella account (opens browser if needed)
-2. Creates an API key
-3. Writes the MCP configuration to Claude Desktop's config file
-4. Verifies the connection
+This flow writes the Claude Desktop MCP config for you and can create a hosted API key when needed.
 
 ### Manual Setup
 
 Edit Claude Desktop's config file:
 
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "/path/to/your/project"
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "/path/to/your/project"]
     }
   }
 }
@@ -50,52 +45,44 @@ Restart Claude Desktop after saving.
 
 ### Verify Connection
 
-In Claude Desktop, you should see Nella's tools listed in the tool picker. Ask Claude:
+In Claude Desktop, ask:
 
 > "What Nella tools are available?"
 
-It should list tools like `nella_search`, `nella_get_context`, `nella_index`, etc.
+You should see tools such as `nella_search`, `nella_index`, `nella_get_context`, and `nella_heartbeat`.
 
 ### Troubleshooting Claude Desktop
 
 | Issue | Solution |
 |-------|----------|
-| Tools not appearing | Restart Claude Desktop. Check that `npx @getnella/mcp mcp` runs without errors in your terminal |
-| "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from the default shell |
-| Permission errors | Ensure `NELLA_REPO_PATH` points to a directory you have read access to |
-| Slow startup | First run downloads the package. Subsequent starts are faster |
+| Tools not appearing | Restart Claude Desktop. Check that `npx -y @getnella/mcp --workspace /path/to/project` runs without errors in your terminal. |
+| "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from Claude Desktop's default shell. |
+| Permission errors | Ensure the configured `--workspace` path exists and is readable by the MCP process. |
+| Slow startup | The first `npx` run downloads the package. Subsequent starts are faster. |
 
 ## Cursor
 
 ### Setup
 
-Add Nella to Cursor's MCP configuration:
-
-**Settings → MCP Servers → Add Server**
+Add Nella in Settings -> MCP Servers -> Add Server:
 
 ```json
 {
   "nella": {
     "command": "npx",
-    "args": ["-y", "@getnella/mcp"],
-    "env": {
-      "NELLA_REPO_PATH": "${workspaceFolder}"
-    }
+    "args": ["-y", "@getnella/mcp", "--workspace", "${workspaceFolder}"]
   }
 }
 ```
 
-Or edit `.cursor/mcp.json` in your project root:
+Or commit a project-local `.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "."
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "${workspaceFolder}"]
     }
   }
 }
@@ -105,23 +92,20 @@ Or edit `.cursor/mcp.json` in your project root:
 
 | Issue | Solution |
 |-------|----------|
-| Server not starting | Check Cursor's MCP panel for error messages |
-| "Command not found" | Ensure `npx` is in your PATH. Try using the full path to `npx` |
-| Workspace path issues | Use absolute paths instead of `${workspaceFolder}` if variables aren't resolving |
+| Server not starting | Check Cursor's MCP panel for error messages. |
+| "Command not found" | Ensure `npx` is in your PATH, or use the absolute path to `npx`. |
+| Workspace path issues | Use an absolute path instead of `${workspaceFolder}` if variable substitution is not resolving. |
 
-## VS Code (Copilot)
+## VS Code
 
-For VS Code with GitHub Copilot, add to `.vscode/mcp.json`:
+For VS Code with MCP-enabled tooling, add Nella to `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
     "nella": {
       "command": "npx",
-      "args": ["-y", "@getnella/mcp"],
-      "env": {
-        "NELLA_REPO_PATH": "${workspaceFolder}"
-      }
+      "args": ["-y", "@getnella/mcp", "--workspace", "${workspaceFolder}"]
     }
   }
 }
@@ -129,21 +113,23 @@ For VS Code with GitHub Copilot, add to `.vscode/mcp.json`:
 
 ## Hosted MCP Server
 
-For cloud-hosted deployments (team use, CI/CD), use the hosted variant:
+For team use, CI, or shared deployments, use the hosted HTTP server:
 
 ```bash
 # Start the hosted server
 nella serve --port 3001
 
-# Or connect to Nella's cloud-hosted server
-nella connect --hosted
+# Or configure a client for hosted mode
+nella connect --mode hosted
 ```
 
-The hosted server uses Streamable HTTP instead of stdio, enabling:
-- Multi-tenant access with API key authentication
-- Rate limiting per key and per agent
-- WebSocket support for real-time updates
-- Health endpoint for load balancer probes
+The hosted server provides:
+
+- `POST /mcp` for Streamable HTTP MCP traffic
+- `GET /health` for health checks
+- `/ws` for the hosted WebSocket bridge
+- API key authentication backed by Supabase
+- Redis-backed or in-memory rate limiting
 
 ### Connecting to a Hosted Server
 
@@ -162,7 +148,7 @@ The hosted server uses Streamable HTTP instead of stdio, enabling:
 
 ## Custom MCP Clients
 
-If you're building your own MCP client, connect to the stdio transport:
+If you're building your own MCP client, connect to the stdio transport like this:
 
 ```typescript
 import { Client } from '@modelcontextprotocol/sdk/client';
@@ -170,46 +156,45 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 
 const transport = new StdioClientTransport({
   command: 'npx',
-  args: ['-y', '@getnella/mcp', 'mcp'],
-  env: { NELLA_REPO_PATH: '/path/to/repo' },
+  args: ['-y', '@getnella/mcp', '--workspace', '/path/to/repo'],
 });
 
 const client = new Client({ name: 'my-app', version: '1.0.0' });
 await client.connect(transport);
 
-// List available tools
 const tools = await client.listTools();
 
-// Call a tool
 const result = await client.callTool({
   name: 'nella_search',
   arguments: {
     query: 'user authentication',
-    repo_path: '/path/to/repo',
   },
 });
 ```
 
-## Environment Variables
+## Hosted Server Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NELLA_REPO_PATH` | Path to the project being validated | Current directory |
-| `NELLA_API_KEY` | API key for hosted server auth | None |
+| `SUPABASE_URL` | Supabase project URL for hosted auth and data access | Required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key | Required |
+| `REDIS_URL` | Redis connection string for shared rate limiting | Optional |
+| `PORT` | Hosted MCP port | `3000` |
 | `NELLA_LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`, `error`) | `info` |
 
 ## Available MCP Tools
 
-Once connected, these tools are available to the agent:
+Once connected, the local MCP server exposes these tools:
 
 | Tool | Category | Description |
 |------|----------|-------------|
 | `nella_index` | Indexing | Index workspace codebase for search |
-| `nella_search` | Indexing | Search indexed codebase (hybrid/semantic/lexical) |
+| `nella_search` | Indexing | Search indexed codebase (hybrid, semantic, or lexical) |
 | `nella_get_context` | Context | Get current session context |
 | `nella_add_assumption` | Context | Record an assumption |
 | `nella_check_assumptions` | Context | Check assumption validity |
 | `nella_check_dependencies` | Context | Detect dependency drift |
+| `nella_heartbeat` | Trust chain | Continue the challenge-response flow |
 
 ## Related Docs
 

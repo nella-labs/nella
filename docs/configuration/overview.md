@@ -13,7 +13,7 @@ Nella is configured through its MCP tools and CLI commands. No configuration fil
 
 ## MCP Tools
 
-Nella provides 6 MCP tools:
+The local MCP server currently exposes 7 tools:
 
 | Tool | Description |
 |------|-------------|
@@ -23,6 +23,7 @@ Nella provides 6 MCP tools:
 | `nella_add_assumption` | Record an assumption about the codebase |
 | `nella_check_assumptions` | Check assumption status and conflicts |
 | `nella_check_dependencies` | Check for dependency drift |
+| `nella_heartbeat` | Verify trust-chain continuity between tool calls |
 
 ## CLI Commands
 
@@ -33,7 +34,8 @@ Nella provides 6 MCP tools:
 | `nella serve` | Start hosted MCP server (Streamable HTTP) |
 | `nella connect` | Configure MCP clients to use Nella |
 | `nella auth` | Manage authentication (login/logout/status) |
-| `nella playground` | Start playground server with real-time dashboard |
+| `nella setup` | Shortcut for `nella connect --client claude-code --mode local` |
+| `nella help` | Show the global or per-command help output |
 
 ## Task YAML Configuration
 

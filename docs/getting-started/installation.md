@@ -20,13 +20,13 @@ pnpm add -g @getnella/mcp
 yarn global add @getnella/mcp
 ```
 
-Verify the installation:
+Verify the CLI is available:
 
 ```bash
-nella --version
+nella help
 ```
 
-> **Tip:** You can also use `npx` without a global install — most MCP clients support running `npx @getnella/mcp mcp` directly.
+> **Tip:** You can also use `npx` without a global install. For direct stdio/local MCP, use `npx -y @getnella/mcp --workspace /path/to/project`.
 
 ## Docker
 
@@ -41,7 +41,7 @@ ENTRYPOINT ["nella"]
 
 ```bash
 docker build -t nella .
-docker run -v $(pwd):/workspace nella mcp
+docker run -v $(pwd):/workspace nella mcp --workspace /workspace
 ```
 
 ## Verify Setup
@@ -49,8 +49,14 @@ docker run -v $(pwd):/workspace nella mcp
 Run a quick check to confirm everything works:
 
 ```bash
-nella --version
+nella help
 nella mcp --help
+```
+
+If you want to test the direct stdio entrypoint instead of the CLI wrapper:
+
+```bash
+npx -y @getnella/mcp --help
 ```
 
 ## Next Steps

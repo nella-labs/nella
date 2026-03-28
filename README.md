@@ -33,22 +33,38 @@ LLMs used as coding agents suffer from fundamental reliability problems. Nella a
 
 ## Quick Start
 
-### MCP Server (for Claude Desktop, VS Code, Cursor)
+### MCP setup
 
 ```bash
 npm install -g @getnella/mcp
 
-# Configure your MCP client
+# Configure a supported client
 nella connect --client claude
 nella connect --client vscode
 nella connect --client cursor
+
+# Claude Code shortcut
+nella setup
+```
+
+For a manual local stdio setup, use the package entrypoint directly and pass a workspace:
+
+```bash
+npx -y @getnella/mcp --workspace /path/to/project
 ```
 
 ### Index your codebase
 
 ```bash
+nella auth login
 nella index --force
 ```
+
+`nella index` needs either a Nella login or Azure embedding environment variables.
+
+### CLI commands
+
+`nella` currently exposes `index`, `mcp`, `serve`, `connect`, `auth`, `setup`, and `help`.
 
 ### Available MCP Tools
 
@@ -60,6 +76,7 @@ nella index --force
 | `nella_add_assumption` | Record an assumption about the codebase |
 | `nella_check_assumptions` | Get status of recorded assumptions |
 | `nella_check_dependencies` | Check for dependency drift |
+| `nella_heartbeat` | Verify trust-chain continuity between tool calls |
 
 ## Architecture
 

@@ -10,8 +10,8 @@
  *   nella auth       - Login, logout, or check status
  *
  * MCP Quick Start:
- *   npx @getnella/mcp                   # starts MCP server directly
- *   npx @getnella/mcp -w /path/to/repo  # with explicit workspace
+ *   npx -y @getnella/mcp --workspace /path/to/repo  # starts MCP server directly
+ *   nella mcp --workspace /path/to/repo             # equivalent CLI form
  */
 
 import * as fs from "fs";
@@ -499,7 +499,7 @@ function showHelp(): void {
   console.log(tagline);
 
   // Quick start
-  console.log(`  ${theme.muted("Quick start:")} ${theme.primary("npx @getnella/mcp")} ${theme.muted("--workspace ./my-project")}`);
+  console.log(`  ${theme.muted("Quick start:")} ${theme.primary("npx -y @getnella/mcp")} ${theme.muted("--workspace ./my-project")}`);
   console.log("");
 
   const tableChars = {

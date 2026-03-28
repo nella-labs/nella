@@ -7,7 +7,7 @@ Connect Nella to any MCP-compatible client or build your own integration.
 Nella's MCP server uses the stdio transport by default. Any MCP client that supports stdio can connect:
 
 ```bash
-npx @getnella/mcp mcp
+npx -y @getnella/mcp --workspace /path/to/repo
 ```
 
 The server communicates over stdin/stdout using the MCP protocol.
@@ -22,8 +22,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 
 const transport = new StdioClientTransport({
   command: 'npx',
-  args: ['-y', '@getnella/mcp', 'mcp'],
-  env: { NELLA_REPO_PATH: '/path/to/repo' },
+  args: ['-y', '@getnella/mcp', '--workspace', '/path/to/repo'],
 });
 
 const client = new Client({ name: 'my-app', version: '1.0.0' });
@@ -49,7 +48,7 @@ console.log(result);
 For team use or CI/CD, run Nella as an HTTP server:
 
 ```bash
-nella serve --port 3001
+nella serve --port 3001 --host 127.0.0.1
 ```
 
 Connect via Streamable HTTP transport:
@@ -67,22 +66,21 @@ Connect via Streamable HTTP transport:
 }
 ```
 
-The hosted server supports:
-- Multi-tenant access with API key authentication
-- Rate limiting per key
-- Health endpoint for load balancer probes
+The current local `nella serve` implementation requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and uses `REDIS_URL` when available. If you omit flags, it uses `PORT` or `3000` and binds `0.0.0.0`.
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NELLA_REPO_PATH` | Path to the project being validated | Current directory |
-| `NELLA_API_KEY` | API key for hosted server auth | None |
+| `SUPABASE_URL` | Supabase project URL for hosted mode | None |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key for hosted mode | None |
+| `REDIS_URL` | Optional Redis URL for hosted-mode rate limiting | None |
+| `PORT` | Hosted server port when `--port` is omitted | `3000` |
 | `NELLA_LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`, `error`) | `info` |
 
 ## Available Tools
 
-Once connected, the client can call any of Nella's MCP tools:
+Local stdio connections expose the workspace tools below:
 
 | Tool | Description |
 |------|-------------|
@@ -92,5 +90,6 @@ Once connected, the client can call any of Nella's MCP tools:
 | `nella_add_assumption` | Record an assumption |
 | `nella_check_assumptions` | Check assumption validity |
 | `nella_check_dependencies` | Detect dependency drift |
+| `nella_heartbeat` | Verify trust-chain continuity between tool calls |
 
 See the [MCP Tools Reference](../mcp/tools.md) for full input/output schemas.

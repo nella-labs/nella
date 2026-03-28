@@ -167,24 +167,27 @@ timeout_seconds: number
 | `nella serve` | Start hosted MCP server (Streamable HTTP) |
 | `nella connect` | Configure MCP clients to use Nella |
 | `nella auth` | Manage authentication (login/logout/status) |
-| `nella playground` | Start playground server with real-time dashboard |
+| `nella setup` | Shortcut for local Claude Code setup |
 | `nella help` | Show help |
 
 ### Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--workspace` | `-w` | Workspace path for mcp/playground |
-| `--port` | `-p` | Port for serve/playground (default: 3847) |
-| `--host` | | Host for serve/playground (default: localhost) |
+| `--workspace` | `-w` | Workspace path for `mcp`; `index` defaults to the current directory |
+| `--port` | `-p` | Port for `serve` (default: `PORT` env var or `3000`) |
+| `--host` | | Host for `serve` (default: `0.0.0.0`) |
 | `--api-key` | `-k` | API key for connect command |
 | `--server-url` | `-u` | Server URL for connect (default: production) |
-| `--client` | | Target MCP client: claude, vscode, or all |
+| `--client` | | Target MCP client: claude, claude-code, vscode, cursor, windsurf, cline, roo-code, or all |
+| `--mode` | | Connect mode: `local` or `hosted` |
+| `--yes` | `-y` | Skip confirmation prompts for setup/connect |
 | `--json` | | Output as JSON |
+| `--help` | `-h` | Show help text |
 
 ---
 
-## MCP Tools (6)
+## MCP Tools (7)
 
 | Tool | Description |
 |------|-------------|
@@ -194,6 +197,7 @@ timeout_seconds: number
 | `nella_add_assumption` | Record an assumption |
 | `nella_check_assumptions` | Check assumption status and conflicts |
 | `nella_check_dependencies` | Check for dependency drift |
+| `nella_heartbeat` | Continue the trust-chain challenge-response flow |
 
 ---
 
