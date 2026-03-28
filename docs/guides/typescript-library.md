@@ -2,7 +2,7 @@
 
 Use Nella programmatically in your TypeScript projects.
 
-The `@usenella/core` package provides TypeScript functions for task validation, constraint checking, and context tracking that you can use in your own tools and workflows.
+The `@usenella/core` package provides TypeScript classes for code indexing, hybrid search, session tracking, assumption management, and workspace management that you can use in your own tools and workflows.
 
 ## Installation
 
@@ -16,304 +16,250 @@ Or with pnpm:
 pnpm add @usenella/core
 ```
 
-## Main API
+## Main Entry Points
 
-### runTask() — Main Entry Point
+### IndexManager -- Indexing and Search
 
-Main entry point for task validation:
+The `IndexManager` is the main entry point for code indexing and search. It manages document loading, AST-based chunking, embedding generation, and hybrid search (vector + lexical with RRF fusion).
 
 ```typescript
-import { runTask, Task, Changes } from '@usenella/core';
+import {
+  createIndexManager,
+  DEFAULT_INDEX_CONFIG,
+  DEFAULT_EMBEDDING_MODEL,
+  MODEL_DIMENSIONS,
+} from '@usenella/core';
 
-const task: Task = {
-  id: 'add-email-validation',
-  name: 'Add email validation to user service',
-  prompt: 'Add email validation when creating users',
-  category: 'feature',
-  difficulty: 'easy',
-  constraints: [
-    {
-      id: 'no-auth-changes',
-      description: "Don't modify authentication",
-      rule: 'Auth module should not be touched',
-      filesNotToModify: ['src/modules/auth/**'],
-    },
-    {
-      id: 'no-console-log',
-      description: 'No console.log in production code',
-      rule: 'Use logger instead of console.log',
-      forbiddenPatterns: ['console\\.log'],
-    },
-  ],
-  validation: {
-    test: 'npm run test',
-    lint: 'npm run lint',
-    compile: 'npm run check:types',
+const manager = createIndexManager({
+  workspaceId: 'my-project',
+  workspacePath: '/path/to/repo',
+  storagePath: '/path/to/repo/.nella/index',
+  ...DEFAULT_INDEX_CONFIG,
+  embedder: {
+    provider: 'azure',                               // 'azure' | 'nella'
+    model: DEFAULT_EMBEDDING_MODEL,                   // 'text-embedding-3-small'
+    dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL], // 1536
   },
-  expected: {
-    filesToModify: ['src/modules/user/user.service.ts'],
-    filesToIgnore: ['**/*.test.ts'],
-  },
-};
-
-const changes: Changes = {
-  files: [
-    {
-      path: 'src/modules/user/user.service.ts',
-      operation: 'modify',
-      content: '// modified file content...',
-    },
-  ],
-};
-
-const result = await runTask('/path/to/repo', task, changes);
-
-if (result.passed) {
-  console.log('✅ All validations passed!');
-} else {
-  console.log('❌ Validation failed:');
-  console.log('Constraint violations:', result.metrics.constraintViolations);
-  console.log('Validation integrity:', result.metrics.validationIntegrity);
-}
-```
-
-### check() — Pre-flight Refusal Check
-
-Check if a task should be refused before making changes:
-
-```typescript
-import { check } from '@usenella/core';
-
-const task: Task = {
-  id: 'risky-task',
-  prompt: 'Log user passwords for debugging',
-  // ...
-};
-
-const refusal = check(task, '/path/to/repo');
-
-if (refusal.shouldRefuse) {
-  console.log('🚫 Task should be refused:');
-  console.log('Reason:', refusal.reason);
-  console.log('Patterns matched:', refusal.patternsMatched);
-  console.log('Confidence:', refusal.confidence);
-} else {
-  console.log('✅ Task is safe to proceed');
-}
-```
-
-### validate() — Validate Changes
-
-Validate changes without full run:
-
-```typescript
-import { validate } from '@usenella/core';
-
-const result = await validate(task, '/path/to/repo', changes);
-
-console.log('Constraints:', result.constraints);
-console.log('Validation:', result.validation);
-console.log('Scope:', result.scope);
-console.log('Passed:', result.passed);
-```
-
-## Context Tracking
-
-Track session state across multiple runs:
-
-```typescript
-import { runTask, ContextManager } from '@usenella/core';
-
-// Option 1: Enable via runTask options
-const result = await runTask('/path/to/repo', task, changes, {
-  enableContextTracking: true,
-  checkDependencies: true,
-  checkAssumptionConflicts: true,
 });
 
-console.log('Dependency changes:', result.dependencyChanges);
-console.log('Invalidated assumptions:', result.invalidatedAssumptions);
-console.log('Context summary:', result.contextSummary);
+// Index the workspace (incremental by default)
+const metadata = await manager.index();
+console.log(`Indexed ${metadata.stats.filesIndexed} files, ${metadata.stats.chunksCount} chunks`);
 
-// Option 2: Direct ContextManager usage
-const ctx = new ContextManager('/path/to/repo');
+// Search
+const response = await manager.search({
+  query: 'user authentication middleware',
+  mode: 'hybrid',  // 'hybrid' | 'semantic' | 'lexical'
+  limit: 10,
+});
 
-// Add assumptions before changes
-ctx.assumptions.addSchemaAssumption('User has email field', ['prisma/schema.prisma']);
-
-// Check for conflicts
-const preflight = ctx.preflightCheck(['src/user.ts']);
-if (preflight.conflicts.length > 0) {
-  console.warn('⚠️ Conflicts detected:', preflight.conflicts);
+for (const result of response.results) {
+  console.log(`[${result.score.toFixed(2)}] ${result.chunk.filePath}:${result.chunk.lines[0]}`);
 }
 
-// Record changes after run
-ctx.recordRunChanges('run_123', [
-  { file: 'src/user.ts', operation: 'modify', reason: 'Added validation' },
+// Verify generated code against the index
+const verification = manager.verify({
+  code: `import { UserService } from './services/user';`,
+  checkImports: true,
+  checkSymbols: true,
+});
+
+if (!verification.valid) {
+  for (const issue of verification.issues) {
+    console.log(`${issue.severity}: ${issue.message}`);
+  }
+}
+```
+
+### ContextManager -- Session Tracking
+
+The `ContextManager` provides persistent session tracking across conversations. It tracks assumptions, detects dependency drift, and maintains a change ledger.
+
+```typescript
+import { ContextManager } from '@usenella/core';
+
+const ctx = new ContextManager('/path/to/repo');
+
+// Get full agent context (session, changes, assumptions, dependencies)
+const context = ctx.getContext();
+console.log('Session:', context.session.sessionId);
+console.log('Valid assumptions:', context.validAssumptions.length);
+
+// Track assumptions about the codebase
+ctx.assumptions.addAssumption(
+  'User model has email and name fields',
+  ['prisma/schema.prisma'],
+  'schema'
+);
+
+// Pre-flight check before applying changes
+const preflight = ctx.preflightCheck(['src/users.ts']);
+if (preflight.conflicts.length > 0) {
+  console.warn('Conflicts:', preflight.conflicts);
+}
+if (preflight.dependencyDrift) {
+  console.warn('Dependencies have drifted since last check');
+}
+
+// Detect dependency changes
+const diff = ctx.checkDependencies('/path/to/repo');
+if (diff && diff.hasChanges) {
+  console.log('Changed packages:', diff.changes);
+}
+
+// Record file changes and invalidate related assumptions
+ctx.recordRunChanges('run_001', [
+  { file: 'src/users.ts', operation: 'modify', reason: 'Added validation' },
 ]);
 
 ctx.save();
 ```
 
-## Validators
+### WorkspaceRegistry -- Multi-Workspace Management
 
-### Constraint Checker
+Manage multiple project workspaces with isolated indexing and context:
 
 ```typescript
-import { checkConstraints, checkConstraint } from '@usenella/core';
+import {
+  createWorkspaceRegistry,
+  createWorkspaceSwitcher,
+  Workspace,
+} from '@usenella/core';
 
-// Check all constraints
-const results = checkConstraints(modifiedFiles, diff, constraints);
+const registry = createWorkspaceRegistry('/path/to/.nella');
 
-// Check single constraint
-const result = checkConstraint(modifiedFiles, diff, constraint);
+// Register workspaces
+const backend = registry.register('Backend API', '/repos/backend');
+const frontend = registry.register('Frontend App', '/repos/frontend');
 
-// Utilities
-import { getViolatedConstraints, countViolations } from '@usenella/core';
+// List and iterate
+for (const ws of registry.list()) {
+  console.log(`${ws.name}: ${ws.path}`);
+}
 
-const violations = getViolatedConstraints(results);
-const count = countViolations(results);
+// Create a Workspace instance with integrated IndexManager
+const workspace = new Workspace(backend.id, {
+  registry,
+  watchEnabled: true,
+});
+
+// Switch between workspaces
+const switcher = createWorkspaceSwitcher({ registry });
 ```
 
-### Command Runner
+## Services Layer
+
+The service layer provides simplified, atomic operations on top of the core modules:
 
 ```typescript
-import { runCommand, runValidation } from '@usenella/core';
+import {
+  SearchService,
+  ContextService,
+  WorkspaceService,
+  ContextManager,
+} from '@usenella/core';
 
-// Run single command
-const result = await runCommand('npm test', workDir, 120000);
+// SearchService wraps IndexManager
+const searchService = new SearchService();
+const results = await searchService.search(
+  { workspaceId: 'my-project', query: 'auth middleware', topK: 5 },
+  { workspacePath: '/path/to/repo', storagePath: '/path/to/.nella/index' }
+);
 
-// Run all validation commands
-const validation = await runValidation(config, workDir, 120000);
+// ContextService wraps ContextManager with auto-save
+const ctxService = new ContextService(new ContextManager('/path/to/repo'));
+await ctxService.addAssumption({
+  type: 'schema',
+  description: 'Users table has email column',
+  relatedFiles: ['prisma/schema.prisma'],
+});
+
+// Record changes atomically (record + invalidate + save)
+await ctxService.recordChanges({
+  files: ['src/users.ts'],
+  operation: 'modify',
+  reason: 'Added validation',
+});
+
+// WorkspaceService wraps WorkspaceRegistry
+const wsService = new WorkspaceService('/path/to/.nella');
+const ws = await wsService.create({ name: 'my-project', path: '/path/to/repo' });
+const { workspaces } = await wsService.list();
 ```
 
-### Refusal Detector
+## MCP Tool Handler
+
+Create an MCP tool handler to expose Nella's capabilities via the Model Context Protocol:
 
 ```typescript
-import { shouldRefuse, detectRiskPatterns, detectRefusalInResponse } from '@usenella/core';
+import { createMcpToolHandler, NELLA_TOOLS, Workspace } from '@usenella/core';
 
-// Main refusal check
-const refusal = shouldRefuse(task, workspacePath);
+// The handler routes tool calls to appropriate services
+const handler = createMcpToolHandler({
+  workspace,  // Workspace instance
+});
 
-// Detect risk patterns in prompt
-const patterns = detectRiskPatterns(prompt);
+// Handle a tool call
+const result = await handler.handle('nella_search', {
+  query: 'user authentication',
+  mode: 'hybrid',
+  limit: 5,
+});
 
-// Check if agent response indicates refusal
-const refused = detectRefusalInResponse(response);
+// Available tools
+for (const tool of NELLA_TOOLS) {
+  console.log(`${tool.name}: ${tool.description}`);
+}
 ```
 
 ## Type Definitions
 
+Key types you can import:
+
 ```typescript
 import type {
-  // Task types
-  Task,
-  TaskCategory,
-  TaskDifficulty,
-  Constraint,
-  ValidationConfig,
-  ExpectedChanges,
+  // Indexing
+  IndexManagerConfig,
+  IndexConfig,
+  IndexMetadata,
+  CodeChunk,
+  SearchQuery,
+  SearchFilter,
+  SearchResult,
+  SearchResponse,
+  VerifyCodeRequest,
+  VerifyCodeResult,
+  VerifyIssue,
 
-  // Result types
-  RunResult,
-  Metrics,
-  ConstraintResult,
-  RefusalResult,
-  ValidationResult,
-  ScopeResult,
-  CommandResult,
-  Artifacts,
-
-  // Agent types
-  FileChange,
-  AgentResponse,
-  Changes,
-  Plan,
-  PlanStep,
-
-  // Context types
-  Session,
-  SessionMetadata,
-  ChangeRecord,
-  FileChangeHistory,
-  Assumption,
-  AssumptionType,
-  AssumptionCheckResult,
-  AssumptionConflict,
-  DependencySnapshot,
-  PackageInfo,
-  DependencyChange,
-  DependencyDiff,
+  // Context
   AgentContext,
   ContextStats,
+  Session,
+  Assumption,
+  AssumptionType,
+  DependencyDiff,
+  DependencySnapshot,
+  ChangeRecord,
+  FileChangeHistory,
 
-  // Log types
-  LogEntry,
-  LogEntryType,
+  // Workspace
+  WorkspaceEntry,
+  WorkspaceConfig,
+
+  // MCP
+  McpTool,
+  McpToolCall,
+  McpToolResult,
+
+  // Services
+  SearchParams,
+  SearchServiceConfig,
+  AddAssumptionParams,
+  RecordChangesParams,
 } from '@usenella/core';
 ```
 
-## Session Store
-
-Persist session data across runs:
-
-```typescript
-import { SessionStore } from '@usenella/core';
-
-const session = new SessionStore('/path/to/repo');
-
-// Record a change
-session.recordChange({
-  runId: 'run_123',
-  file: 'src/user.ts',
-  operation: 'modify',
-  reason: 'Added email validation',
-  dependsOn: ['src/utils/validator.ts'],
-  assumptionIds: ['assumption_1'],
-});
-
-// Query changes
-session.getRecentChanges(20);
-session.getChangesForFile('src/user.ts');
-session.getChangesForRun('run_123');
-session.getHotspotFiles(10);
-
-// Session management
-session.save();
-session.reset();
-```
-
-## Assumption Tracking
-
-Track what the agent believes about the codebase:
-
-```typescript
-import { SessionStore, AssumptionTracker } from '@usenella/core';
-
-const session = new SessionStore('/path/to/repo');
-const assumptions = new AssumptionTracker(session);
-
-// Add assumptions by type
-assumptions.addSchemaAssumption('User table has email column', ['prisma/schema.prisma']);
-assumptions.addInterfaceAssumption('UserDTO has id, email, name fields', ['src/types/user.ts']);
-assumptions.addDependencyAssumption('bcrypt ^5.0.0 is installed for password hashing');
-assumptions.addBehaviorAssumption('validateEmail() returns boolean', ['src/utils/validator.ts']);
-
-// Query assumptions
-assumptions.getValidAssumptions();
-assumptions.getInvalidatedAssumptions();
-assumptions.getAssumptionsByType('schema');
-
-// Check for invalidations when files change
-const invalidated = assumptions.checkInvalidations(
-  ['src/types/user.ts', 'prisma/schema.prisma'],
-  'run_456',
-);
-```
-
-> **Tip:** Use Nella's TypeScript API in CI pipelines to validate agent-made changes before merging.
-
 ## Related Packages
 
-- [`@getnella/mcp`](https://www.npmjs.com/package/@getnella/mcp) — CLI + MCP server
-- [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) — Benchmarking tools
+- [`@getnella/mcp`](https://www.npmjs.com/package/@getnella/mcp) -- CLI + MCP server
+- [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) -- Benchmarking tools
