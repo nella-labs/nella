@@ -26,8 +26,6 @@ Verify the CLI is available:
 nella help
 ```
 
-> **Tip:** You can also use `npx` without a global install. For direct stdio/local MCP, use `npx -y @getnella/mcp --workspace /path/to/project`.
-
 ## Verify Setup
 
 Run a quick check to confirm everything works:
@@ -35,12 +33,6 @@ Run a quick check to confirm everything works:
 ```bash
 nella help
 nella mcp --help
-```
-
-If you want to test the direct stdio entrypoint instead of the CLI wrapper:
-
-```bash
-npx -y @getnella/mcp --help
 ```
 
 ## Next Steps

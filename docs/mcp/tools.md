@@ -94,7 +94,6 @@ Builds or refreshes the workspace index used by `nella_search`.
 
 **Behavior**
 
-- Requires an authenticated Nella session (`nella auth login`).
 - Stores index data under `.nella/index` in the workspace.
 
 See [`nella_index`](../api-reference/tools/nella-index.md).

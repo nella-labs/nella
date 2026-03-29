@@ -2,7 +2,7 @@
 
 Index or re-index the workspace codebase for Nella search.
 
-The local MCP server uses the same index manager for indexing and search, so indexing requires an authenticated Nella session or Azure embedding credentials.
+The local MCP server uses the same index manager for indexing and search.
 
 ## Parameters
 

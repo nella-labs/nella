@@ -2,8 +2,6 @@
 
 The Nella MCP Server exposes Nella's capabilities to AI agents like Claude through the Model Context Protocol. It supports both local stdio mode and hosted HTTP mode.
 
-> Status: this folder is an engineering reference. For the maintained local CLI/MCP contract, prefer [`../../packages/nella/README.md`](../../packages/nella/README.md), [`../cli/commands.md`](../cli/commands.md), and the setup guides in [`../integrations/`](../integrations/).
-
 ## Overview
 
 The `@getnella/mcp` package provides a CLI and MCP server that allows AI agents to:
@@ -83,7 +81,7 @@ Indexing and search:
 All tool calls are validated against JSON Schema before execution. Invalid arguments return structured error messages with field-level details.
 
 ### Session Persistence
-Workspace context is persisted under `.nella/`, so assumptions and dependency snapshots survive across conversations.
+Context is automatically persisted to `.nella/session.json` in your workspace, so assumptions and dependency snapshots survive across conversations.
 
 ### Usage Logging
 Both local and hosted servers record tool usage opportunistically when a valid hosted session is available.
@@ -91,46 +89,3 @@ Both local and hosted servers record tool usage opportunistically when a valid h
 ### Trust Chain Protection
 `nella_get_context` issues a challenge and `nella_heartbeat` continues the chain, helping clients confirm they are still interacting with the same trusted session.
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Claude / Agent / Client                    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-              MCP Protocol (stdio OR Streamable HTTP)
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                     @getnella/mcp                          │
-│  ┌─────────────┐  ┌────────────┐  ┌────────────┐           │
-│  │   Search    │  │  Context   │  │ Trust Chain│           │
-│  │  (2 tools)  │  │ (4 tools)  │  │  (1 tool)  │           │
-│  └─────────────┘  └────────────┘  └────────────┘           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                     @usenella/core                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │ Indexing │  │  Auth &  │  │  Context │  │    Sync     │  │
-│  │ & Search │  │Rate Limit│  │  Sharing │  │             │  │
-│  └──────────┘  └──────────┘  └──────────┘  └─────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                ┌─────────────┼─────────────┐
-                │             │             │
-           Workspace
-        .nella/session
-```
-
-## Session Persistence
-
-Context is automatically persisted to `.nella/session.json` in your workspace:
-
-- **Assumptions** — Recorded beliefs about the codebase
-- **Dependencies** — Package snapshots for drift detection
-
-This allows context to survive across multiple conversations with Claude.
-
-## Related Packages
-
-- [@getnella/mcp](../../packages/nella/README.md) — CLI + MCP server

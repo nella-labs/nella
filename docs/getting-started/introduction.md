@@ -73,8 +73,6 @@ For a manual local stdio config, pass the workspace explicitly:
 }
 ```
 
-For CLI indexing outside the MCP client, log in first with `nella auth login`, then run `nella index --force`.
-
 ## Next Steps
 
 - [Installation](./installation.md) — Detailed install options

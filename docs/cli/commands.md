@@ -28,8 +28,6 @@ nella index [--workspace <path>] [--force] [--graph]
 
 **Purpose:** Create vector embeddings and lexical indexes for hybrid codebase search.
 
-**Requirements:** `nella index` needs a Nella login (`nella auth login`) or Azure embedding environment variables.
-
 **Example:**
 ```bash
 # Index current workspace

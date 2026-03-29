@@ -66,18 +66,7 @@ Ask your AI agent:
 
 It should list tools like `nella_search`, `nella_index`, `nella_get_context`, and `nella_heartbeat`.
 
-## Step 4: Index your codebase
-
-If you want to build or refresh the local index from the CLI, authenticate first:
-
-```bash
-nella auth login
-nella index --force
-```
-
-`nella index` needs a Nella login or Azure embedding environment variables.
-
-## Step 5: Use Nella in a conversation
+## Step 4: Use Nella in a conversation
 
 Ask the agent to use Nella for code understanding:
 

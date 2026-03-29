@@ -21,16 +21,6 @@ npx -y @getnella/mcp --workspace /path/to/project
 
 On Windows, you may need to restart your terminal or add npm's global bin to your PATH.
 
-### `Cannot find module '@usenella/core'`
-
-Make sure you've installed the package:
-
-```bash
-npm install @usenella/core
-```
-
-If you installed `@getnella/mcp` globally, you need a separate local install of `@usenella/core` to import it in your code.
-
 ### Optional dependency warnings
 
 Messages like `usearch not available, falling back to brute-force` are normal. Optional dependencies provide performance improvements but aren't required:
@@ -39,7 +29,7 @@ Messages like `usearch not available, falling back to brute-force` are normal. O
 |---------|---------|--------|
 | `usearch not available` | HNSW vector index unavailable | Vector search uses brute-force cosine similarity (slower at scale) |
 | `better-sqlite3 not available` | SQLite rate limiter unavailable | Rate limiting uses in-memory backend (resets on restart) |
-| `onnxruntime-node not available` | Local embeddings unavailable | Embedding requires API calls (Azure or Nella cloud) |
+| `onnxruntime-node not available` | Local embeddings unavailable | Embedding requires API calls (Nella cloud) |
 
 ## MCP Server Issues
 
@@ -99,7 +89,7 @@ Full indexing is I/O-bound by embedding API calls. Tips:
 
 | Solution | Impact |
 |----------|--------|
-| Use Nella cloud embeddings (`nella auth login`) | Higher rate limits than Azure free tier |
+| Use Nella cloud embeddings (`nella auth login`) | Higher rate limits |
 | Incremental re-indexing | 20x faster for unchanged codebases |
 | Use include/exclude globs | Skip large generated files |
 | Install `usearch` for HNSW | Faster vector search (not faster indexing) |
@@ -185,10 +175,6 @@ No. Nella only reads your codebase for indexing and search. The only files Nella
 ### What languages does Nella support?
 
 The indexing/search features use TypeScript's compiler API for AST-based chunking, so they work best with TypeScript/JavaScript. Other languages are indexed as plain text chunks.
-
-### What is Nella's licensing model?
-
-Nella is a commercial product. Visit [getnella.dev](https://getnella.dev) for pricing and plan details.
 
 ## Related Docs
 
