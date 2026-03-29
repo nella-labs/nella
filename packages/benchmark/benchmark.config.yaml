@@ -1,0 +1,15 @@
+version: "2.0.0"
+scanner:
+  threshold: 0.2
+  corpus: ./corpus
+agent:
+  scenarios: all
+  runsPerScenario: 3
+  maxTurns: 5
+  withNella: true
+  withoutNella: false
+  seed: null
+output:
+  dir: ./benchmark-results
+  formats: [json, csv, md]
+  website: true

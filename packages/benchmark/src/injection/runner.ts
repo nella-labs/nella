@@ -155,6 +155,9 @@ export async function runInjectionBenchmark(
       tokenLeakRate,
       hmacIntegrity,
       challengeResponseRate,
+      detectionRateCI: headline.detectionRateCI,
+      falsePositiveRateCI: headline.falsePositiveRateCI,
+      precisionCI: headline.precisionCI,
     },
     byCategory,
     byDifficulty,
@@ -188,10 +191,13 @@ export async function runInjectionBenchmark(
   }
 
   // Print headline
+  const fmtCI = (ci: { lower: number; upper: number }) =>
+    `[${(ci.lower * 100).toFixed(1)}%, ${(ci.upper * 100).toFixed(1)}%]`;
+
   console.log("\n=== HEADLINE RESULTS ===");
-  console.log(`Detection Rate:      ${(headline.detectionRate * 100).toFixed(1)}%`);
-  console.log(`False Positive Rate: ${(headline.falsePositiveRate * 100).toFixed(1)}%`);
-  console.log(`Precision:           ${(headline.precision * 100).toFixed(1)}%`);
+  console.log(`Detection Rate:      ${(headline.detectionRate * 100).toFixed(1)}% ${fmtCI(headline.detectionRateCI)}`);
+  console.log(`False Positive Rate: ${(headline.falsePositiveRate * 100).toFixed(1)}% ${fmtCI(headline.falsePositiveRateCI)}`);
+  console.log(`Precision:           ${(headline.precision * 100).toFixed(1)}% ${fmtCI(headline.precisionCI)}`);
   console.log(`F1 Score:            ${headline.f1Score.toFixed(3)}`);
   console.log(`Boundary Integrity:  ${(boundaryIntegrity * 100).toFixed(1)}%`);
   console.log(`Token Leak Rate:     ${(tokenLeakRate * 100).toFixed(1)}%`);
