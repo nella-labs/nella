@@ -31,19 +31,11 @@ graph TB
         Supabase["Supabase Backend"]
     end
 
-    subgraph benchmark_pkg["@usenella/benchmark v0.0.0"]
-        BenchRunner["Benchmark Runner"]
-        Adapters["Agent Adapters<br/>(Anthropic, OpenAI)"]
-        Metrics["Metrics Calculator"]
-        Reports["Report Generators"]
-    end
-
     subgraph external["External Services"]
         Supabase["Supabase<br/>(PostgreSQL + pgvector)"]
         GCP["Google Cloud<br/>(Cloud SQL + Storage)"]
         EmbeddingAPIs["Embedding APIs<br/>(Voyage, OpenAI)"]
         Cohere["Cohere<br/>(Reranking)"]
-        LLMAPIs["LLM APIs<br/>(Anthropic, OpenAI)"]
     end
 
     Agent -->|"stdio (MCP protocol)"| MCP
@@ -55,13 +47,9 @@ graph TB
     Indexing --> Cohere
     Sync --> Supabase
     Sync --> GCP
-    BenchRunner --> Adapters
-    Adapters --> LLMAPIs
-
     style Agent fill:#6366f1,color:#fff
     style nella_pkg fill:#f3e8ff,stroke:#7c3aed
     style core_pkg fill:#ede9fe,stroke:#6d28d9
-    style benchmark_pkg fill:#fef3c7,stroke:#d97706
     style external fill:#ecfdf5,stroke:#059669
 ```
 
@@ -81,8 +69,6 @@ graph LR
 
     Packages --> Core["core/<br/>@usenella/core"]
     Packages --> Nella["nella/<br/>@getnella/mcp"]
-    Packages --> Benchmark["benchmark/<br/>@usenella/benchmark"]
-
     Core --> C_Context["context/"]
     Core --> C_Indexing["indexing/"]
     Core --> C_Workspace["workspace/"]
@@ -100,17 +86,9 @@ graph LR
     Nella --> N_Tools["mcp/tools/"]
     Nella --> N_Play["playground.ts"]
 
-    Benchmark --> B_Runner["runner/"]
-    Benchmark --> B_Adapters["adapters/"]
-    Benchmark --> B_Validators["validators/"]
-    Benchmark --> B_Metrics["metrics/"]
-    Benchmark --> B_Reports["reports/"]
-    Benchmark --> B_CLI["cli.ts"]
-
     style Root fill:#7c3aed,color:#fff
     style Core fill:#a78bfa,color:#fff
     style Nella fill:#c084fc,color:#fff
-    style Benchmark fill:#fbbf24,color:#000
 ```
 
 ---
@@ -122,7 +100,6 @@ graph LR
     subgraph packages["Nella Packages"]
         nella["@getnella/mcp<br/>v0.0.0"]
         core["@usenella/core<br/>v0.0.0"]
-        bench["@usenella/benchmark<br/>v0.0.0"]
     end
 
     subgraph nella_deps["nella deps"]
@@ -152,12 +129,6 @@ graph LR
         usearch["usearch"]
     end
 
-    subgraph bench_deps["benchmark deps"]
-        dotenv["dotenv"]
-        jsyaml2["js-yaml"]
-        diff_lib["diff"]
-    end
-
     nella -->|"re-exports all"| core
     nella --> mcp_sdk
     nella --> chalk
@@ -180,14 +151,8 @@ graph LR
     core -.->|"optional"| sqlite
     core -.->|"optional"| usearch
 
-    bench -.->|"replicated types"| core
-    bench --> dotenv
-    bench --> jsyaml2
-    bench --> diff_lib
-
     style nella fill:#c084fc,color:#fff
     style core fill:#a78bfa,color:#fff
-    style bench fill:#fbbf24,color:#000
 ```
 
 ---
@@ -778,85 +743,7 @@ graph LR
 
 ---
 
-## 12. Benchmark System
-
-```mermaid
-graph TB
-    subgraph input["Input"]
-        TaskYAML["Task YAML files<br/>(tasks/ directory)"]
-        FixtureRepo["Fixture Repos<br/>(fixtures/ directory)"]
-        AgentConfig["Agent Config<br/>(API keys, models)"]
-    end
-
-    LoadTasks["loadAllTasks()<br/>Parse YAML to Task[]"]
-
-    subgraph loop["For each (Agent, Task) pair"]
-        Clone["FixtureManager.clone()<br/>Create temp directory"]
-        BuildPrompt["PromptBuilder.build()<br/>System + user prompt"]
-        CallAgent["AgentAdapter.call()<br/>(Anthropic / OpenAI)"]
-        ParseResponse["Parse response<br/>Extract file changes"]
-        ApplyChanges["Apply changes<br/>to fixture"]
-
-        subgraph validate["Validation"]
-            RunTests["CommandRunner<br/>test / lint / compile"]
-            CheckConstraints["ConstraintChecker<br/>files + patterns"]
-            CheckScope["ScopeChecker<br/>scope creep"]
-        end
-
-        Retry{"Passed?"}
-        CalcMetrics["MetricsCalculator<br/>8 metrics + cost"]
-    end
-
-    subgraph output["Output"]
-        JSONL["results.jsonl"]
-        Summary["summary.md"]
-        Dashboard["dashboard.html"]
-        Artifacts["artifacts/"]
-    end
-
-    TaskYAML --> LoadTasks
-    FixtureRepo --> Clone
-    AgentConfig --> CallAgent
-    LoadTasks --> Clone
-    Clone --> BuildPrompt
-    BuildPrompt --> CallAgent
-    CallAgent --> ParseResponse
-    ParseResponse --> ApplyChanges
-    ApplyChanges --> RunTests
-    ApplyChanges --> CheckConstraints
-    ApplyChanges --> CheckScope
-    RunTests --> Retry
-    CheckConstraints --> Retry
-    CheckScope --> Retry
-    Retry -->|"No, iteration < max"| BuildPrompt
-    Retry -->|"Yes / max reached"| CalcMetrics
-    CalcMetrics --> JSONL
-    CalcMetrics --> Summary
-    CalcMetrics --> Dashboard
-    CalcMetrics --> Artifacts
-
-    style input fill:#fef3c7
-    style loop fill:#ede9fe
-    style validate fill:#dbeafe
-    style output fill:#d1fae5
-```
-
-### Benchmark Metrics
-
-| Metric | Abbr | Range | Description |
-|--------|------|-------|-------------|
-| Build/Test Pass | BTP | 0 or 1 | Did all build/test commands succeed? |
-| Validation Integrity | VI | 0.0 - 1.0 | Ratio of validations that passed |
-| Constraint Violation Rate | CVR | 0.0 - 1.0 | Fraction of constraints violated |
-| Scope Creep | SC | 0.0+ | Extra files / expected files ratio |
-| Refusal Correctness | RC | boolean | Did agent refuse correctly when expected? |
-| Time to Green | TTG | ms | Wall clock time to first passing state |
-| Iteration Count | IC | 1+ | Number of retries needed |
-| Diff Accuracy | DA | 0.0 - 1.0 | Similarity to expected diff |
-
----
-
-## 13. Playground Dashboard
+## 12. Playground Dashboard
 
 ```mermaid
 graph LR
@@ -918,7 +805,7 @@ graph LR
 
 ---
 
-## 14. Event System
+## 13. Event System
 
 ```mermaid
 graph TB
@@ -1002,7 +889,7 @@ graph TB
 
 ---
 
-## 15. Core Problems Addressed
+## 14. Core Problems Addressed
 
 ```mermaid
 graph LR
@@ -1035,7 +922,7 @@ graph LR
 
 ---
 
-## 16. Agent Runner Architecture
+## 15. Agent Runner Architecture
 
 ```mermaid
 graph TB
@@ -1065,7 +952,7 @@ graph TB
 
 ---
 
-## 17. Sync Module Architecture
+## 16. Sync Module Architecture
 
 ```mermaid
 graph TB
@@ -1100,7 +987,7 @@ graph TB
 
 ---
 
-## 18. Hosted MCP Server Architecture
+## 17. Hosted MCP Server Architecture
 
 ```mermaid
 graph TB
@@ -1132,7 +1019,7 @@ graph TB
 
 ---
 
-## 19. CLI Auth & Connect Flow
+## 18. CLI Auth & Connect Flow
 
 ```mermaid
 sequenceDiagram

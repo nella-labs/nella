@@ -37,10 +37,6 @@ The local MCP server currently exposes 7 tools:
 | `nella setup` | Shortcut for `nella connect --client claude-code --mode local` |
 | `nella help` | Show the global or per-command help output |
 
-## Task YAML Configuration
-
-For the benchmark suite, task configuration lives in YAML files. See the [benchmark documentation](../../packages/benchmark/) for the full task YAML schema, including constraints, validation commands, and expected changes used for evaluation.
-
 ## Next Steps
 
 - Explore [Validation](./validation.md) options

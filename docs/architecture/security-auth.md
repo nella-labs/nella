@@ -1,6 +1,6 @@
 # Security & Auth Architecture
 
-This page covers Nella's security layers — safety/refusal detection, authentication, rate limiting, cloud sync, and the benchmark system's architecture.
+This page covers Nella's security layers — safety/refusal detection, authentication, rate limiting, and cloud sync.
 
 ## Safety & Refusal Detection
 
@@ -232,84 +232,6 @@ graph TB
 | **Bandwidth throttling** | Configurable upload/download limits |
 | **Offline queue** | Queues operations when disconnected, syncs when reconnected |
 | **Conflict resolution** | LWW (last-writer-wins), Merge, Manual, or Server-wins strategies |
-
-## Benchmark System
-
-The benchmark system evaluates AI coding agents against standardized tasks:
-
-```mermaid
-graph TB
-    subgraph input["Input"]
-        TaskYAML["Task YAML files<br/>(tasks/ directory)"]
-        FixtureRepo["Fixture Repos<br/>(fixtures/ directory)"]
-        AgentConfig["Agent Config<br/>(API keys, models)"]
-    end
-
-    LoadTasks["loadAllTasks()<br/>Parse YAML to Task[]"]
-
-    subgraph loop["For each (Agent, Task) pair"]
-        Clone["FixtureManager.clone()<br/>Create temp directory"]
-        BuildPrompt["PromptBuilder.build()<br/>System + user prompt"]
-        CallAgent["AgentAdapter.call()<br/>(Anthropic / OpenAI)"]
-        ParseResponse["Parse response<br/>Extract file changes"]
-        ApplyChanges["Apply changes<br/>to fixture"]
-
-        subgraph validate["Validation"]
-            RunTests["CommandRunner<br/>test / lint / compile"]
-            CheckConstraints["ConstraintChecker<br/>files + patterns"]
-            CheckScope["ScopeChecker<br/>scope creep"]
-        end
-
-        Retry{"Passed?"}
-        CalcMetrics["MetricsCalculator<br/>8 metrics + cost"]
-    end
-
-    subgraph output["Output"]
-        JSONL["results.jsonl"]
-        Summary["summary.md"]
-        Dashboard["dashboard.html"]
-        Artifacts["artifacts/"]
-    end
-
-    TaskYAML --> LoadTasks
-    FixtureRepo --> Clone
-    AgentConfig --> CallAgent
-    LoadTasks --> Clone
-    Clone --> BuildPrompt
-    BuildPrompt --> CallAgent
-    CallAgent --> ParseResponse
-    ParseResponse --> ApplyChanges
-    ApplyChanges --> RunTests
-    ApplyChanges --> CheckConstraints
-    ApplyChanges --> CheckScope
-    RunTests --> Retry
-    CheckConstraints --> Retry
-    CheckScope --> Retry
-    Retry -->|"No, iteration < max"| BuildPrompt
-    Retry -->|"Yes / max reached"| CalcMetrics
-    CalcMetrics --> JSONL
-    CalcMetrics --> Summary
-    CalcMetrics --> Dashboard
-    CalcMetrics --> Artifacts
-
-    style input fill:#fef3c7
-    style loop fill:#ede9fe
-    style validate fill:#dbeafe
-    style output fill:#d1fae5
-```
-
-### Benchmark Metrics
-
-| Metric | Abbr | Range | Description |
-|--------|------|-------|-------------|
-| Build/Test Pass | BTP | 0 or 1 | Did all build/test commands succeed? |
-| Validation Integrity | VI | 0.0–1.0 | Ratio of validations that passed |
-| Constraint Violation Rate | CVR | 0.0–1.0 | Fraction of constraints violated |
-| Scope Creep | SC | 0.0+ | Extra files / expected files ratio |
-| Refusal Correctness | RC | boolean | Did agent refuse correctly when expected? |
-| Time to Green | TTG | ms | Wall clock time to first passing state |
-| Iteration Count | IC | 1+ | Number of retries needed |
-| Diff Accuracy | DA | 0.0–1.0 | Similarity to expected diff |
 
 ## Agent Runner
 

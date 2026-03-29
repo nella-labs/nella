@@ -262,4 +262,3 @@ import type {
 ## Related Packages
 
 - [`@getnella/mcp`](https://www.npmjs.com/package/@getnella/mcp) -- CLI + MCP server
-- [`@usenella/benchmark`](https://www.npmjs.com/package/@usenella/benchmark) -- Benchmarking tools

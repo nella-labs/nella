@@ -76,7 +76,7 @@ The `fixture` field points to a template project in `fixtures/`:
 fixture: my-express-app
 ```
 
-This is primarily used by the benchmark system. For CLI usage, you specify the repo path directly with `-r`.
+For CLI usage, you specify the repo path directly with `-r`.
 
 ## Task Categories
 
@@ -99,4 +99,3 @@ This is primarily used by the benchmark system. For CLI usage, you specify the r
 
 - [Configuration Reference](../core/configuration.md) — Full schema for `RunTaskOptions`
 - [CLI Commands](../cli/commands.md) — How to use tasks with the CLI
-- [Benchmark Tasks](../benchmark/tasks.md) — The 10 included benchmark tasks

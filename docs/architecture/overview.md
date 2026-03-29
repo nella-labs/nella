@@ -29,19 +29,11 @@ graph TB
         Supabase["Supabase Backend"]
     end
 
-    subgraph benchmark_pkg["@usenella/benchmark v0.0.0"]
-        BenchRunner["Benchmark Runner"]
-        Adapters["Agent Adapters<br/>(Anthropic, OpenAI)"]
-        Metrics["Metrics Calculator"]
-        Reports["Report Generators"]
-    end
-
     subgraph external["External Services"]
         Supabase["Supabase<br/>(PostgreSQL + pgvector)"]
         GCP["Google Cloud<br/>(Cloud SQL + Storage)"]
         EmbeddingAPIs["Embedding APIs<br/>(Azure OpenAI, Nella)"]
         Cohere["Cohere Reranker<br/>(via Azure)"]
-        LLMAPIs["LLM APIs<br/>(Anthropic, OpenAI)"]
     end
 
     Agent -->|"stdio (MCP protocol)"| MCP
@@ -54,13 +46,9 @@ graph TB
     Indexing --> Cohere
     Sync --> Supabase
     Sync --> GCP
-    BenchRunner --> Adapters
-    Adapters --> LLMAPIs
-
     style Agent fill:#6366f1,color:#fff
     style nella_pkg fill:#f3e8ff,stroke:#7c3aed
     style core_pkg fill:#ede9fe,stroke:#6d28d9
-    style benchmark_pkg fill:#fef3c7,stroke:#d97706
     style external fill:#ecfdf5,stroke:#059669
 ```
 
@@ -126,13 +114,11 @@ graph LR
 
     Packages --> Core["core/<br/>@usenella/core"]
     Packages --> Nella["nella/<br/>@getnella/mcp"]
-    Packages --> Benchmark["benchmark/<br/>@usenella/benchmark"]
     Packages --> API["api/<br/>@usenella/api"]
 
     style Root fill:#7c3aed,color:#fff
     style Core fill:#a78bfa,color:#fff
     style Nella fill:#c084fc,color:#fff
-    style Benchmark fill:#fbbf24,color:#000
     style API fill:#34d399,color:#000
 ```
 
@@ -140,7 +126,6 @@ graph LR
 |---------|-------------|-------------|
 | `@usenella/core` | Core engine — indexing, context, workspace, auth, sync | `createIndexManager()`, `ContextManager`, `IndexManager`, `WorkspaceRegistry` |
 | `@getnella/mcp` | CLI + MCP server. Re-exports all of core | `startMcpServer()`, CLI commands, MCP tool handlers |
-| `@usenella/benchmark` | Benchmark runner for evaluating agent performance | `BenchmarkRunner`, agent adapters, metrics calculator |
 | `@usenella/api` | REST API server (Express) for hosted deployments | Health, workspace, search, validate, context, auth endpoints |
 
 ## Package Dependencies
@@ -150,18 +135,15 @@ graph LR
     subgraph packages["Nella Packages"]
         nella["@getnella/mcp<br/>v0.0.0"]
         core["@usenella/core<br/>v0.0.0"]
-        bench["@usenella/benchmark<br/>v0.0.0"]
     end
 
     nella -->|"re-exports all"| core
-    bench -.->|"replicated types"| core
 
     style nella fill:#c084fc,color:#fff
     style core fill:#a78bfa,color:#fff
-    style bench fill:#fbbf24,color:#000
 ```
 
-`@getnella/mcp` depends on and re-exports everything from `@usenella/core`, adding the CLI interface and MCP server on top. `@usenella/benchmark` replicates core types but does not directly depend on the core package at runtime.
+`@getnella/mcp` depends on and re-exports everything from `@usenella/core`, adding the CLI interface and MCP server on top.
 
 ## Related Architecture Pages
 

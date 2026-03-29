@@ -141,4 +141,3 @@ This allows context to survive across multiple conversations with Claude.
 
 - [@usenella/core](../core/) — Core reliability engine
 - [@getnella/mcp](../../packages/nella/README.md) — CLI + MCP server
-- [@usenella/benchmark](../benchmark/) — Benchmarking tools

@@ -29,7 +29,6 @@ LLMs used as coding agents suffer from fundamental reliability problems. Nella a
 |---------|-------------|-----|
 | [@getnella/mcp](./packages/nella) | CLI + MCP Server | [![npm](https://img.shields.io/npm/v/@getnella/mcp)](https://www.npmjs.com/package/@getnella/mcp) |
 | [@usenella/core](./packages/core) | Core library | [![npm](https://img.shields.io/npm/v/@usenella/core)](https://www.npmjs.com/package/@usenella/core) |
-| [@usenella/benchmark](./packages/benchmark) | Agent evaluation suite | [![npm](https://img.shields.io/npm/v/@usenella/benchmark)](https://www.npmjs.com/package/@usenella/benchmark) |
 
 ## Quick Start
 
@@ -113,15 +112,11 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run benchmark
-cd packages/benchmark
-npm run benchmark -- -a claude-sonnet -a gpt-4o
 ```
 
 ## Documentation
 
 - [How to Use Nella](./docs/how-to-use.md) — End-to-end workflow and examples
-- [Benchmark Plan](./docs/benchmark-plan.md) — How the benchmark system works
 - [Core API](./packages/core/README.md) — Core library documentation
 - [CLI + MCP Reference](./packages/nella/README.md) — CLI command reference and MCP setup
 
