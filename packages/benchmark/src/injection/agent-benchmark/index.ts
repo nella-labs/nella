@@ -5,3 +5,4 @@ export { runTrial } from "./trial-runner";
 export type { TrialConfig } from "./trial-runner";
 export { runAgentBenchmark } from "./agent-benchmark";
 export type { AgentBenchmarkOptions } from "./agent-benchmark";
+export { mutateScenario } from "./scenario-mutator";

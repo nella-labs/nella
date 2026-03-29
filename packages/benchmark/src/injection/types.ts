@@ -6,6 +6,16 @@
  */
 
 // =============================================================================
+// Confidence Interval
+// =============================================================================
+
+export interface CI {
+  point: number;
+  lower: number;
+  upper: number;
+}
+
+// =============================================================================
 // Enums & Unions
 // =============================================================================
 
@@ -119,6 +129,9 @@ export interface CategoryMetrics {
   recall: number;
   f1Score: number;
   averageScore: number;
+  detectionRateCI?: CI;
+  falsePositiveRateCI?: CI;
+  precisionCI?: CI;
 }
 
 /** Metrics broken down by sample difficulty */
@@ -128,6 +141,7 @@ export interface DifficultyMetrics {
   detectionRate: number;
   falsePositiveRate: number;
   averageScore: number;
+  detectionRateCI?: CI;
 }
 
 /** Metrics broken down by defense layer */
@@ -167,6 +181,9 @@ export interface InjectionBenchmarkResults {
     tokenLeakRate: number;
     hmacIntegrity: number;
     challengeResponseRate: number;
+    detectionRateCI?: CI;
+    falsePositiveRateCI?: CI;
+    precisionCI?: CI;
   };
 
   byCategory: CategoryMetrics[];
@@ -201,6 +218,9 @@ export interface WebsiteStats {
     tokenLeakRate: string;
     hmacIntegrity: string;
     challengeResponseRate: string;
+    detectionRateCI?: string;
+    falsePositiveRateCI?: string;
+    precisionCI?: string;
   };
 
   categories: Array<{

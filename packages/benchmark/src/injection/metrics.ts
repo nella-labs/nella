@@ -6,6 +6,7 @@
  */
 
 import type {
+  CI,
   SampleTestResult,
   LayerTestResult,
   CategoryMetrics,
@@ -14,6 +15,7 @@ import type {
   InjectionSample,
   SampleDifficulty,
 } from "./types";
+import { wilsonCI } from "./stats";
 
 // =============================================================================
 // Core Metrics
@@ -24,6 +26,9 @@ export interface HeadlineMetrics {
   falsePositiveRate: number;
   precision: number;
   f1Score: number;
+  detectionRateCI: CI;
+  falsePositiveRateCI: CI;
+  precisionCI: CI;
 }
 
 /**
@@ -49,7 +54,11 @@ export function computeHeadlineMetrics(results: SampleTestResult[]): HeadlineMet
     ? 2 * (precision * recall) / (precision + recall)
     : 0;
 
-  return { detectionRate, falsePositiveRate, precision, f1Score };
+  const detectionRateCI = wilsonCI(tp, tp + fn);
+  const falsePositiveRateCI = wilsonCI(fp, fp + tn);
+  const precisionCI = wilsonCI(tp, tp + fp);
+
+  return { detectionRate, falsePositiveRate, precision, f1Score, detectionRateCI, falsePositiveRateCI, precisionCI };
 }
 
 // =============================================================================
@@ -113,6 +122,9 @@ export function computeCategoryMetrics(
       recall,
       f1Score,
       averageScore: total > 0 ? scoreSum / total : 0,
+      detectionRateCI: wilsonCI(tp, tp + fn),
+      falsePositiveRateCI: wilsonCI(fp, fp + tn),
+      precisionCI: wilsonCI(tp, tp + fp),
     });
   }
 
@@ -169,6 +181,7 @@ export function computeDifficultyMetrics(
       detectionRate: tp + fn > 0 ? tp / (tp + fn) : 1,
       falsePositiveRate: fp + tn > 0 ? fp / (fp + tn) : 0,
       averageScore: total > 0 ? scoreSum / total : 0,
+      detectionRateCI: wilsonCI(tp, tp + fn),
     });
   }
 

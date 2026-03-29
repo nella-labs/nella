@@ -16,6 +16,8 @@ import type {
 } from "./types";
 import { getScenarios, getScenarioById } from "./scenarios";
 import { runTrial, type TrialConfig } from "./trial-runner";
+import { aggregateRuns, passAtK, passHatK, mcnemarTest, percentiles, wilsonCI } from "../stats";
+import type { ConfidenceInterval, AggregateStats, McNemarResult } from "../stats";
 
 // =============================================================================
 // Options
@@ -370,6 +372,47 @@ function aggregateResults(input: AggregateInput): AgentBenchmarkResults {
     };
   }
 
+  // ── Multi-run metrics (CI, pass@k, consistency) ──────────────────────────
+  const defended = nellaTrials.filter((t) => !t.attackSucceeded).length;
+  const total = nellaTrials.length;
+  const asrCI = wilsonCI(total - defended, total);
+
+  const passAt1 = total > 0 ? passAtK(total, defended, 1) : undefined;
+  const passAt5 = total >= 5 ? passAtK(total, defended, 5) : undefined;
+  const consistency =
+    runsPerScenario > 1 ? passHatK(total, defended, runsPerScenario) : undefined;
+
+  // ── McNemar's test (paired comparison) ──────────────────────────────────
+  let mcnemar: { chi2: number; pValue: number; significant: boolean } | undefined;
+  if (input.withNella && input.withoutNella && allScenarios.length > 0) {
+    const paired = allScenarios.map((s) => ({
+      withNella:
+        nellaTrials.find((t) => t.scenarioId === s.id)?.attackSucceeded ?? true,
+      withoutNella:
+        bareTrials.find((t) => t.scenarioId === s.id)?.attackSucceeded ?? true,
+    }));
+    const result = mcnemarTest(paired);
+    mcnemar = { chi2: result.chi2, pValue: result.pValue, significant: result.significant };
+  }
+
+  // ── Cost efficiency ─────────────────────────────────────────────────────
+  const allTrials = trials;
+  const totalCost = allTrials.reduce((s, t) => s + t.cost, 0);
+  const totalTokens = allTrials.reduce((s, t) => s + t.tokensUsed, 0);
+  const defendedCount = allTrials.filter((t) => !t.attackSucceeded).length;
+  const costEfficiency = {
+    totalCost,
+    costPerScenario: allScenarios.length > 0 ? totalCost / allScenarios.length : 0,
+    costPerDefense: defendedCount > 0 ? totalCost / defendedCount : 0,
+    tokensPerScenario: allScenarios.length > 0 ? totalTokens / allScenarios.length : 0,
+    totalTokens,
+  };
+
+  // ── Latency percentiles ─────────────────────────────────────────────────
+  const durations = allTrials.map((t) => t.durationMs);
+  const lat = percentiles(durations);
+  const latency = { p50Ms: lat.p50, p95Ms: lat.p95, p99Ms: lat.p99 };
+
   return {
     runDate,
     runId,
@@ -385,6 +428,13 @@ function aggregateResults(input: AggregateInput): AgentBenchmarkResults {
     perScenario,
     perAgent,
     trials,
+    passAt1,
+    passAt5,
+    consistency,
+    attackSuccessRateCI: { point: asrCI.point, lower: asrCI.lower, upper: asrCI.upper },
+    mcnemar,
+    costEfficiency,
+    latency,
   };
 }
 
@@ -402,13 +452,46 @@ function printSummary(results: AgentBenchmarkResults): void {
   // Overall
   console.log("\n  Attack Success Rate:");
   if (results.attackSuccessRate.withNella >= 0) {
-    console.log(`    With Nella:    ${pct(results.attackSuccessRate.withNella)}`);
+    const ciStr = results.attackSuccessRateCI
+      ? ` [${pct(results.attackSuccessRateCI.lower)}, ${pct(results.attackSuccessRateCI.upper)}]`
+      : "";
+    console.log(`    With Nella:    ${pct(results.attackSuccessRate.withNella)}${ciStr}`);
   }
   if (results.attackSuccessRate.withoutNella >= 0) {
     console.log(`    Without Nella: ${pct(results.attackSuccessRate.withoutNella)}`);
   }
   if (results.attackSuccessRate.reduction > 0) {
     console.log(`    Reduction:     ${pct(results.attackSuccessRate.reduction)}`);
+  }
+
+  // McNemar's test
+  if (results.mcnemar) {
+    const sigStr = results.mcnemar.significant ? "significant" : "not significant";
+    console.log(`    McNemar:       p = ${results.mcnemar.pValue.toFixed(3)} (${sigStr})`);
+  }
+
+  // Pass@k and consistency
+  if (results.passAt1 !== undefined || results.passAt5 !== undefined || results.consistency !== undefined) {
+    const parts: string[] = [];
+    if (results.passAt1 !== undefined) parts.push(`Pass@1: ${pct(results.passAt1)}`);
+    if (results.passAt5 !== undefined) parts.push(`Pass@5: ${pct(results.passAt5)}`);
+    if (results.consistency !== undefined) parts.push(`Consistency: ${pct(results.consistency)}`);
+    console.log(`\n  Multi-run: ${parts.join(" | ")}`);
+  }
+
+  // Cost efficiency
+  if (results.costEfficiency) {
+    const ce = results.costEfficiency;
+    console.log(
+      `\n  Cost: $${ce.totalCost.toFixed(2)} total | $${ce.costPerScenario.toFixed(2)}/scenario | ${Math.round(ce.tokensPerScenario)} tokens/scenario`,
+    );
+  }
+
+  // Latency
+  if (results.latency) {
+    console.log(
+      `  Latency: p50 ${results.latency.p50Ms}ms | p95 ${results.latency.p95Ms}ms | p99 ${results.latency.p99Ms}ms`,
+    );
   }
 
   // Per category

@@ -6,6 +6,7 @@
  */
 
 export type {
+  CI,
   InjectionCategory,
   SampleDifficulty,
   ContentContext,
@@ -34,4 +35,14 @@ export { runInjectionBenchmark } from "./runner";
 export type { InjectionBenchmarkOptions } from "./runner";
 export { generateWebsiteStats, generateMarkdownReport, generateCsvReport, writeReports } from "./reporter";
 export { uploadResults } from "./uploader";
+export {
+  wilsonCI,
+  bootstrapCI,
+  mcnemarTest,
+  aggregateRuns,
+  passAtK,
+  passHatK,
+  percentiles,
+} from "./stats";
+export type { ConfidenceInterval, AggregateStats, McNemarResult } from "./stats";
 export * from "./agent-benchmark";

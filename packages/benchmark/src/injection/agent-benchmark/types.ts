@@ -94,4 +94,29 @@ export interface AgentBenchmarkResults {
     }
   >;
   trials: AgentTrialResult[];
+
+  // Multi-run metrics (populated when runsPerScenario > 1)
+  passAt1?: number;
+  passAt5?: number;
+  consistency?: number; // pass^k
+  attackSuccessRateCI?: { point: number; lower: number; upper: number };
+
+  // Statistical comparison (populated when withoutNella runs exist)
+  mcnemar?: { chi2: number; pValue: number; significant: boolean };
+
+  // Cost efficiency
+  costEfficiency?: {
+    totalCost: number;
+    costPerScenario: number;
+    costPerDefense: number;
+    tokensPerScenario: number;
+    totalTokens: number;
+  };
+
+  // Latency
+  latency?: {
+    p50Ms: number;
+    p95Ms: number;
+    p99Ms: number;
+  };
 }

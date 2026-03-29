@@ -11,6 +11,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type {
+  CI,
   InjectionBenchmarkResults,
   WebsiteStats,
   SampleTestResult,
@@ -22,6 +23,7 @@ import type {
 
 export function generateWebsiteStats(results: InjectionBenchmarkResults): WebsiteStats {
   const fmt = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const fmtCI = (ci?: CI) => ci ? `[${(ci.lower * 100).toFixed(1)}%, ${(ci.upper * 100).toFixed(1)}%]` : undefined;
 
   return {
     feature: "prompt-injection-defense",
@@ -41,6 +43,9 @@ export function generateWebsiteStats(results: InjectionBenchmarkResults): Websit
       tokenLeakRate: fmt(results.headline.tokenLeakRate),
       hmacIntegrity: fmt(results.headline.hmacIntegrity),
       challengeResponseRate: fmt(results.headline.challengeResponseRate),
+      detectionRateCI: fmtCI(results.headline.detectionRateCI),
+      falsePositiveRateCI: fmtCI(results.headline.falsePositiveRateCI),
+      precisionCI: fmtCI(results.headline.precisionCI),
     },
     categories: results.byCategory
       .filter(c => c.category !== "benign")
@@ -59,6 +64,8 @@ export function generateWebsiteStats(results: InjectionBenchmarkResults): Websit
 export function generateMarkdownReport(results: InjectionBenchmarkResults): string {
   const lines: string[] = [];
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const pctCI = (n: number, ci?: CI) =>
+    ci ? `${(n * 100).toFixed(1)}% [${(ci.lower * 100).toFixed(1)}%, ${(ci.upper * 100).toFixed(1)}%]` : pct(n);
 
   lines.push("# Prompt Injection Benchmark Results");
   lines.push("");
@@ -72,9 +79,9 @@ export function generateMarkdownReport(results: InjectionBenchmarkResults): stri
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("|--------|-------|");
-  lines.push(`| Detection Rate | ${pct(results.headline.detectionRate)} |`);
-  lines.push(`| False Positive Rate | ${pct(results.headline.falsePositiveRate)} |`);
-  lines.push(`| Precision | ${pct(results.headline.precision)} |`);
+  lines.push(`| Detection Rate | ${pctCI(results.headline.detectionRate, results.headline.detectionRateCI)} |`);
+  lines.push(`| False Positive Rate | ${pctCI(results.headline.falsePositiveRate, results.headline.falsePositiveRateCI)} |`);
+  lines.push(`| Precision | ${pctCI(results.headline.precision, results.headline.precisionCI)} |`);
   lines.push(`| F1 Score | ${results.headline.f1Score.toFixed(3)} |`);
   lines.push(`| Boundary Integrity | ${pct(results.headline.boundaryIntegrity)} |`);
   lines.push(`| Token Leak Rate | ${pct(results.headline.tokenLeakRate)} |`);
@@ -88,7 +95,7 @@ export function generateMarkdownReport(results: InjectionBenchmarkResults): stri
   lines.push("| Category | DR | FPR | Precision | Samples | Avg Score |");
   lines.push("|----------|-----|-----|-----------|---------|-----------|");
   for (const c of results.byCategory) {
-    lines.push(`| ${c.category} | ${pct(c.detectionRate)} | ${pct(c.falsePositiveRate)} | ${pct(c.precision)} | ${c.totalSamples} | ${c.averageScore.toFixed(3)} |`);
+    lines.push(`| ${c.category} | ${pctCI(c.detectionRate, c.detectionRateCI)} | ${pctCI(c.falsePositiveRate, c.falsePositiveRateCI)} | ${pctCI(c.precision, c.precisionCI)} | ${c.totalSamples} | ${c.averageScore.toFixed(3)} |`);
   }
   lines.push("");
 
@@ -98,7 +105,7 @@ export function generateMarkdownReport(results: InjectionBenchmarkResults): stri
   lines.push("| Difficulty | DR | FPR | Samples | Avg Score |");
   lines.push("|------------|-----|-----|---------|-----------|");
   for (const d of results.byDifficulty) {
-    lines.push(`| ${d.difficulty} | ${pct(d.detectionRate)} | ${pct(d.falsePositiveRate)} | ${d.totalSamples} | ${d.averageScore.toFixed(3)} |`);
+    lines.push(`| ${d.difficulty} | ${pctCI(d.detectionRate, d.detectionRateCI)} | ${pct(d.falsePositiveRate)} | ${d.totalSamples} | ${d.averageScore.toFixed(3)} |`);
   }
   lines.push("");
 
