@@ -20,6 +20,7 @@ import { loadAllTasks } from "./scenarios";
 import { BenchmarkConfig, AgentConfig } from "./types";
 import { writeDashboard } from "./reports";
 import { runInjectionBenchmark } from "./injection";
+import { runAgentBenchmark } from "./injection/agent-benchmark";
 
 interface CliArgs {
   tasksDir: string;
@@ -305,6 +306,141 @@ async function runInjection(argv: string[]) {
 }
 
 // =============================================================================
+// Injection Agent Subcommand
+// =============================================================================
+
+interface InjectionAgentArgs {
+  agents: Array<{ name: string; provider: "anthropic" | "openai"; model: string; apiKey: string }>;
+  scenarios?: string[];
+  outputDir: string;
+  runs: number;
+  withNella: boolean;
+  withoutNella: boolean;
+  verbose: boolean;
+}
+
+function parseInjectionAgentArgs(argv: string[]): InjectionAgentArgs {
+  const result: InjectionAgentArgs = {
+    agents: [],
+    outputDir: path.resolve(process.cwd(), "injection-agent-results"),
+    runs: 1,
+    withNella: true,
+    withoutNella: false,
+    verbose: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case "--agent":
+      case "-a": {
+        const name = argv[++i];
+        const agentConfig = resolveAgentConfig(name);
+        if (agentConfig) result.agents.push(agentConfig);
+        break;
+      }
+      case "--scenarios":
+        result.scenarios = argv[++i].split(",");
+        break;
+      case "--output":
+      case "-o":
+        result.outputDir = path.resolve(argv[++i]);
+        break;
+      case "--runs":
+      case "-n":
+        result.runs = parseInt(argv[++i], 10);
+        break;
+      case "--without-nella":
+        result.withoutNella = true;
+        break;
+      case "--verbose":
+        result.verbose = true;
+        break;
+      case "--help":
+      case "-h":
+        console.log(`
+Nella Agent Injection Benchmark (Admin Only)
+
+Tests real LLM agents against poisoned codebases to measure
+prompt injection attack success rates with/without nella defenses.
+
+Usage:
+  nella-benchmark injection-agent [options]
+
+Options:
+  --agent, -a <name>     Agent: claude-sonnet, claude-opus, gpt-4o, gpt-4o-mini
+  --scenarios <ids>      Comma-separated scenario IDs (default: all)
+  --output, -o <path>    Output directory
+  --runs, -n <count>     Runs per scenario (default: 1)
+  --without-nella        Also run without nella for A/B comparison
+  --verbose              Print per-trial results
+  --help, -h             Show help
+
+Environment:
+  ANTHROPIC_API_KEY      Required for Claude models
+  OPENAI_API_KEY         Required for OpenAI models
+
+Examples:
+  nella-benchmark injection-agent -a claude-sonnet
+  nella-benchmark injection-agent -a claude-sonnet -a gpt-4o --without-nella --runs 3
+  nella-benchmark injection-agent --scenarios A1,B1,C1 --verbose
+`);
+        process.exit(0);
+    }
+  }
+
+  // Default agents from env
+  if (result.agents.length === 0) {
+    if (process.env.ANTHROPIC_API_KEY) {
+      result.agents.push(resolveAgentConfig("claude-sonnet")!);
+    }
+    if (process.env.OPENAI_API_KEY) {
+      result.agents.push(resolveAgentConfig("gpt-4o")!);
+    }
+  }
+
+  return result;
+}
+
+function resolveAgentConfig(name: string): InjectionAgentArgs["agents"][0] | null {
+  switch (name) {
+    case "claude-sonnet":
+      if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY required"); return null; }
+      return { name, provider: "anthropic", model: "claude-sonnet-4-20250514", apiKey: process.env.ANTHROPIC_API_KEY };
+    case "claude-opus":
+      if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY required"); return null; }
+      return { name, provider: "anthropic", model: "claude-opus-4-20250514", apiKey: process.env.ANTHROPIC_API_KEY };
+    case "gpt-4o":
+      if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
+      return { name, provider: "openai", model: "gpt-4o", apiKey: process.env.OPENAI_API_KEY };
+    case "gpt-4o-mini":
+      if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
+      return { name, provider: "openai", model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY };
+    default:
+      console.error(`Unknown agent: ${name}`);
+      return null;
+  }
+}
+
+async function runInjectionAgent(argv: string[]) {
+  const args = parseInjectionAgentArgs(argv);
+
+  if (args.agents.length === 0) {
+    console.error("No agents configured. Use --agent or set API key env vars.");
+    process.exit(1);
+  }
+
+  await runAgentBenchmark({
+    agents: args.agents,
+    scenarios: args.scenarios,
+    runsPerScenario: args.runs,
+    withNella: args.withNella,
+    withoutNella: args.withoutNella,
+    outputDir: args.outputDir,
+    verbose: args.verbose,
+  });
+}
+
+// =============================================================================
 // Main
 // =============================================================================
 
@@ -313,6 +449,11 @@ async function main() {
   const rawArgs = process.argv.slice(2);
   if (rawArgs[0] === "injection") {
     await runInjection(rawArgs.slice(1));
+    return;
+  }
+
+  if (rawArgs[0] === "injection-agent") {
+    await runInjectionAgent(rawArgs.slice(1));
     return;
   }
 
