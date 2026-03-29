@@ -43,6 +43,18 @@ const AUTH_FILE = path.join(AUTH_DIR, "auth.json");
 // Types
 // =============================================================================
 
+interface OrgRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface ProjectRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface StoredSession {
   access_token: string;
   refresh_token: string;
@@ -51,6 +63,8 @@ interface StoredSession {
     id: string;
     email: string;
   };
+  org?: OrgRef;
+  project?: ProjectRef;
 }
 
 interface SupabaseAuthResponse {
@@ -307,7 +321,7 @@ export async function login(): Promise<{
     return await new Promise((resolve) => {
       let settled = false;
 
-      const server = http.createServer((req, res) => {
+      const server = http.createServer(async (req, res) => {
         const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
 
         // Handle CORS preflight for fetch() from https://app.getnella.dev
@@ -367,6 +381,16 @@ export async function login(): Promise<{
             Math.floor(Date.now() / 1000) + parseInt(expiresIn, 10),
           user: { id: userId, email },
         };
+
+        // Fetch org/project context (best-effort, non-blocking for login)
+        try {
+          const orgProject = await fetchOrgProjectContext(session);
+          if (orgProject.org) session.org = orgProject.org;
+          if (orgProject.project) session.project = orgProject.project;
+        } catch {
+          // Non-fatal — org/project can be set later via `nella org switch`
+        }
+
         saveSession(session);
 
         // Respond with success page
@@ -416,6 +440,127 @@ export async function login(): Promise<{
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// =============================================================================
+// Org / Project Context
+// =============================================================================
+
+async function fetchOrgProjectContext(
+  session: StoredSession
+): Promise<{ org: OrgRef | null; project: ProjectRef | null }> {
+  const headers = {
+    Authorization: `Bearer ${session.access_token}`,
+    apikey: SUPABASE_ANON_KEY,
+  };
+
+  // Fetch organizations
+  const orgsRes = await httpsRequest(`${WEBSITE_API_BASE}/organizations`, { headers });
+  if (orgsRes.status !== 200) return { org: null, project: null };
+
+  const { organizations } = JSON.parse(orgsRes.body) as {
+    organizations: Array<{ id: string; name: string; slug: string; is_personal: boolean }>;
+  };
+  if (!organizations?.length) return { org: null, project: null };
+
+  // Default to personal org, fall back to first
+  const raw = organizations.find((o) => o.is_personal) || organizations[0];
+  const org: OrgRef = { id: raw.id, name: raw.name, slug: raw.slug };
+
+  // Fetch projects for the default org
+  const projsRes = await httpsRequest(
+    `${WEBSITE_API_BASE}/organizations/${org.id}/projects`,
+    { headers }
+  );
+  if (projsRes.status !== 200) return { org, project: null };
+
+  const { projects } = JSON.parse(projsRes.body) as {
+    projects: Array<{ id: string; name: string; slug: string }>;
+  };
+  if (!projects?.length) return { org, project: null };
+
+  const project: ProjectRef = {
+    id: projects[0].id,
+    name: projects[0].name,
+    slug: projects[0].slug,
+  };
+
+  return { org, project };
+}
+
+/**
+ * Get the currently active organization from the stored session.
+ */
+export function getActiveOrg(): OrgRef | null {
+  const session = loadSession();
+  return session?.org ?? null;
+}
+
+/**
+ * Get the currently active project from the stored session.
+ */
+export function getActiveProject(): ProjectRef | null {
+  const session = loadSession();
+  return session?.project ?? null;
+}
+
+/**
+ * Switch the active organization (persists to auth.json).
+ */
+export function switchOrg(org: OrgRef): void {
+  const session = loadSession();
+  if (!session) throw new Error("Not logged in");
+  session.org = org;
+  session.project = undefined; // clear project when switching org
+  saveSession(session);
+}
+
+/**
+ * Switch the active project (persists to auth.json).
+ */
+export function switchProject(project: ProjectRef): void {
+  const session = loadSession();
+  if (!session) throw new Error("Not logged in");
+  session.project = project;
+  saveSession(session);
+}
+
+/**
+ * Fetch all organizations for the current user.
+ */
+export async function fetchOrganizations(
+  session: StoredSession
+): Promise<Array<{ id: string; name: string; slug: string; is_personal: boolean; role: string }>> {
+  const res = await httpsRequest(`${WEBSITE_API_BASE}/organizations`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+  });
+  if (res.status !== 200) throw new Error(`Failed to fetch organizations: ${res.status}`);
+  const { organizations } = JSON.parse(res.body);
+  return organizations;
+}
+
+/**
+ * Fetch projects for an organization.
+ */
+export async function fetchProjects(
+  session: StoredSession,
+  orgId: string
+): Promise<Array<{ id: string; name: string; slug: string; description: string | null }>> {
+  const res = await httpsRequest(
+    `${WEBSITE_API_BASE}/organizations/${orgId}/projects`,
+    {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+    }
+  );
+  if (res.status !== 200) throw new Error(`Failed to fetch projects: ${res.status}`);
+  const { projects } = JSON.parse(res.body);
+  return projects;
 }
 
 // =============================================================================

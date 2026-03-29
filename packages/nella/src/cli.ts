@@ -35,6 +35,12 @@ import {
   clearSession,
   getValidSession,
   createApiKey,
+  getActiveOrg,
+  getActiveProject,
+  switchOrg,
+  switchProject,
+  fetchOrganizations,
+  fetchProjects,
 } from "./auth";
 import { runConnectCommand } from "./connect";
 
@@ -133,7 +139,7 @@ function divider(): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "index" | "mcp" | "serve" | "connect" | "auth" | "setup" | "help";
+  command: "index" | "mcp" | "serve" | "connect" | "auth" | "org" | "project" | "setup" | "help";
   force?: boolean;
   repoPath?: string;
   output?: "json" | "pretty";
@@ -150,6 +156,9 @@ interface CliArgs {
   yes?: boolean;
   // Auth-specific args
   authSubcommand?: "login" | "logout" | "status";
+  // Org/project subcommands
+  subcommand?: string;
+  subcommandArg?: string;
   // Graph flag
   graph?: boolean;
   // Help flag (per-command)
@@ -167,7 +176,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "setup" || arg === "help") {
+    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "org" || arg === "project" || arg === "setup" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -176,6 +185,20 @@ function parseArgs(args: string[]): CliArgs {
         if (sub === "login" || sub === "logout" || sub === "status") {
           result.authSubcommand = sub;
           i++; // consume subcommand
+        }
+      }
+
+      // Parse org/project subcommand + optional argument
+      if ((arg === "org" || arg === "project") && i + 1 < args.length) {
+        const sub = args[i + 1];
+        if (sub && !sub.startsWith("-")) {
+          result.subcommand = sub;
+          i++;
+          // Check for subcommand argument (e.g. slug for switch)
+          if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+            result.subcommandArg = args[i + 1];
+            i++;
+          }
         }
       }
 
@@ -289,6 +312,12 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
       console.log(`  ${theme.muted("User ID:")} ${theme.dim(session.user.id)}`);
       const exp = new Date(session.expires_at * 1000);
       console.log(`  ${theme.muted("Expires:")} ${theme.dim(exp.toLocaleString())}`);
+      if (session.org) {
+        console.log(`  ${theme.muted("Org:")}     ${theme.secondary(session.org.name)} ${theme.dim(`@${session.org.slug}`)}`);
+      }
+      if (session.project) {
+        console.log(`  ${theme.muted("Project:")} ${theme.secondary(session.project.name)} ${theme.dim(`@${session.project.slug}`)}`);
+      }
     } else {
       console.log(`  ${theme.icons.warning}  ${theme.warning("Not logged in")}`);
       console.log(`\n  ${theme.muted("Run")} ${theme.secondary("nella auth login")} ${theme.muted("to authenticate")}`);
@@ -298,6 +327,228 @@ async function runAuthCommand(args: CliArgs): Promise<void> {
   }
 }
 
+
+// =============================================================================
+// Org Command
+// =============================================================================
+
+async function runOrgCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const sub = args.subcommand;
+
+  if (!sub || args.showHelp) {
+    console.log(`  ${theme.primary.bold("nella org")} — Manage organizations\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella org list")}              ${theme.muted("List your organizations")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella org switch <slug>")}     ${theme.muted("Switch active organization")}`);
+    console.log("");
+    return;
+  }
+
+  const session = await getValidSession();
+  if (!session) {
+    console.log(`  ${theme.icons.error}  ${theme.error("Not logged in.")} Run ${theme.primary.bold("nella auth login")} first.\n`);
+    process.exit(1);
+  }
+
+  if (sub === "list") {
+    const orgs = await fetchOrganizations(session);
+    const activeOrg = getActiveOrg();
+
+    console.log(`  ${theme.primary.bold("Organizations")}\n`);
+    for (const org of orgs) {
+      const active = activeOrg?.id === org.id ? theme.success(" (active)") : "";
+      const personal = org.is_personal ? theme.muted(" · personal") : "";
+      console.log(`  ${active ? theme.icons.success : theme.icons.bullet}  ${theme.bold(org.name)} ${theme.muted(`@${org.slug}`)} ${theme.dim(`[${org.role}]`)}${personal}${active}`);
+    }
+    console.log("");
+    return;
+  }
+
+  if (sub === "switch") {
+    const slug = args.subcommandArg;
+    if (!slug) {
+      console.log(`  ${theme.icons.error}  ${theme.error("Usage:")} nella org switch <slug>\n`);
+      process.exit(1);
+    }
+
+    const orgs = await fetchOrganizations(session);
+    const target = orgs.find((o) => o.slug === slug);
+    if (!target) {
+      console.log(`  ${theme.icons.error}  ${theme.error(`Organization "${slug}" not found.`)}\n`);
+      console.log(`  ${theme.muted("Available:")} ${orgs.map((o) => o.slug).join(", ")}\n`);
+      process.exit(1);
+    }
+
+    switchOrg({ id: target.id, name: target.name, slug: target.slug });
+
+    // Auto-select first project in the new org
+    try {
+      const projects = await fetchProjects(session, target.id);
+      if (projects.length > 0) {
+        switchProject({ id: projects[0].id, name: projects[0].name, slug: projects[0].slug });
+        console.log(`  ${theme.icons.success}  Switched to ${theme.primary.bold(target.name)} ${theme.muted(`@${target.slug}`)}`);
+        console.log(`  ${theme.muted("Active project:")} ${projects[0].name}\n`);
+      } else {
+        console.log(`  ${theme.icons.success}  Switched to ${theme.primary.bold(target.name)} ${theme.muted(`@${target.slug}`)}\n`);
+      }
+    } catch {
+      console.log(`  ${theme.icons.success}  Switched to ${theme.primary.bold(target.name)} ${theme.muted(`@${target.slug}`)}\n`);
+    }
+    return;
+  }
+
+  console.log(`  ${theme.icons.error}  Unknown subcommand: ${sub}\n`);
+  process.exit(1);
+}
+
+// =============================================================================
+// Project Command
+// =============================================================================
+
+async function runProjectCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const sub = args.subcommand;
+
+  if (!sub || args.showHelp) {
+    console.log(`  ${theme.primary.bold("nella project")} — Manage projects\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella project list")}              ${theme.muted("List projects in current org")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella project switch <slug>")}     ${theme.muted("Switch active project")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella project link")}              ${theme.muted("Link current workspace to active project")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella project unlink")}            ${theme.muted("Unlink workspace from project")}`);
+    console.log("");
+    return;
+  }
+
+  const session = await getValidSession();
+  if (!session) {
+    console.log(`  ${theme.icons.error}  ${theme.error("Not logged in.")} Run ${theme.primary.bold("nella auth login")} first.\n`);
+    process.exit(1);
+  }
+
+  const activeOrg = getActiveOrg();
+  if (!activeOrg) {
+    console.log(`  ${theme.icons.error}  ${theme.error("No active organization.")} Run ${theme.primary.bold("nella org switch <slug>")} first.\n`);
+    process.exit(1);
+  }
+
+  if (sub === "list") {
+    const projects = await fetchProjects(session, activeOrg.id);
+    const activeProject = getActiveProject();
+
+    console.log(`  ${theme.primary.bold("Projects")} ${theme.muted(`in ${activeOrg.name}`)}\n`);
+    for (const proj of projects) {
+      const active = activeProject?.id === proj.id ? theme.success(" (active)") : "";
+      const desc = proj.description ? theme.muted(` — ${proj.description}`) : "";
+      console.log(`  ${active ? theme.icons.success : theme.icons.bullet}  ${theme.bold(proj.name)} ${theme.muted(`@${proj.slug}`)}${desc}${active}`);
+    }
+    console.log("");
+    return;
+  }
+
+  if (sub === "switch") {
+    const slug = args.subcommandArg;
+    if (!slug) {
+      console.log(`  ${theme.icons.error}  ${theme.error("Usage:")} nella project switch <slug>\n`);
+      process.exit(1);
+    }
+
+    const projects = await fetchProjects(session, activeOrg.id);
+    const target = projects.find((p) => p.slug === slug);
+    if (!target) {
+      console.log(`  ${theme.icons.error}  ${theme.error(`Project "${slug}" not found in ${activeOrg.name}.`)}\n`);
+      console.log(`  ${theme.muted("Available:")} ${projects.map((p) => p.slug).join(", ")}\n`);
+      process.exit(1);
+    }
+
+    switchProject({ id: target.id, name: target.name, slug: target.slug });
+    console.log(`  ${theme.icons.success}  Switched to project ${theme.primary.bold(target.name)} ${theme.muted(`@${target.slug}`)}\n`);
+    return;
+  }
+
+  if (sub === "link") {
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+      console.log(`  ${theme.icons.error}  ${theme.error("No active project.")} Run ${theme.primary.bold("nella project switch <slug>")} first.\n`);
+      process.exit(1);
+    }
+
+    const workspacePath = path.resolve(args.workspace || process.cwd());
+    const workspaceId = path.basename(workspacePath);
+
+    // Load local registry and update the workspace entry
+    const registryPath = path.join(os.homedir(), ".nella", "registry.json");
+    let registry: { workspaces: Array<Record<string, unknown>> } = { workspaces: [] };
+    if (fs.existsSync(registryPath)) {
+      try {
+        registry = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+      } catch {
+        // Start fresh
+      }
+    }
+
+    const entry = registry.workspaces.find(
+      (w) => w.path === workspacePath || w.id === workspaceId
+    );
+    if (entry) {
+      entry.orgId = activeOrg.id;
+      entry.projectId = activeProject.id;
+    } else {
+      registry.workspaces.push({
+        id: workspaceId,
+        name: workspaceId,
+        path: workspacePath,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+        indexStatus: "none",
+        stats: { filesIndexed: 0, chunksCount: 0, totalTokens: 0 },
+        orgId: activeOrg.id,
+        projectId: activeProject.id,
+      });
+    }
+
+    const registryDir = path.dirname(registryPath);
+    if (!fs.existsSync(registryDir)) fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + "\n", "utf-8");
+
+    console.log(`  ${theme.icons.success}  Linked ${theme.primary.bold(workspacePath)}`);
+    console.log(`  ${theme.muted("  →")} ${activeOrg.name} / ${activeProject.name}\n`);
+    return;
+  }
+
+  if (sub === "unlink") {
+    const workspacePath = path.resolve(args.workspace || process.cwd());
+    const workspaceId = path.basename(workspacePath);
+    const registryPath = path.join(os.homedir(), ".nella", "registry.json");
+
+    if (!fs.existsSync(registryPath)) {
+      console.log(`  ${theme.icons.warning}  No workspace registry found.\n`);
+      return;
+    }
+
+    const registry = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+    const entry = registry.workspaces?.find(
+      (w: Record<string, unknown>) => w.path === workspacePath || w.id === workspaceId
+    );
+    if (entry) {
+      delete entry.orgId;
+      delete entry.projectId;
+      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + "\n", "utf-8");
+      console.log(`  ${theme.icons.success}  Unlinked ${theme.primary.bold(workspacePath)} from project\n`);
+    } else {
+      console.log(`  ${theme.icons.warning}  Workspace not found in registry.\n`);
+    }
+    return;
+  }
+
+  console.log(`  ${theme.icons.error}  Unknown subcommand: ${sub}\n`);
+  process.exit(1);
+}
 
 // =============================================================================
 // Index Command — index workspace for search & code verification
@@ -529,6 +780,16 @@ function showHelp(): void {
   console.log(srvTable.toString());
   console.log("");
 
+  // Collaboration commands
+  console.log(sectionHeader("Collaboration"));
+  const collabTable = new Table({ chars: tableChars, style: tableStyle });
+  collabTable.push(
+    [theme.primary("org"), theme.muted("List or switch organizations")],
+    [theme.primary("project"), theme.muted("List, switch, link/unlink projects")],
+  );
+  console.log(collabTable.toString());
+  console.log("");
+
   // Setup commands
   console.log(sectionHeader("Setup"));
   const setupTable = new Table({ chars: tableChars, style: tableStyle });
@@ -608,6 +869,12 @@ async function main(): Promise<void> {
       break;
     case "auth":
       await runAuthCommand(args);
+      break;
+    case "org":
+      await runOrgCommand(args);
+      break;
+    case "project":
+      await runProjectCommand(args);
       break;
     case "connect":
       await runConnectCommand(
