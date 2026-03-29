@@ -62,20 +62,19 @@ Returns stats on files indexed, chunks created, and embeddings generated.`,
       name: "nella_search",
       description: `Search the indexed codebase using hybrid (semantic + lexical) search.
 
-USE THIS FIRST when you need to find, understand, or locate code. This is faster and more token-efficient than grep/glob — one search replaces multiple manual lookups. Use it for:
-- Finding where something is defined or implemented
-- Understanding how a module or function works
-- Locating code to modify or refactor
-- Discovering patterns the codebase uses
+Returns ranked results with file paths, line numbers, and symbols. Default compact mode returns only metadata (~300 tokens for 5 results). Use detail: "full" to include code blocks.
 
-Requires the workspace to be indexed first with nella_index.
+Best for:
+- Finding where something is defined or implemented
+- Understanding module/function relationships
+- Locating code patterns across the codebase
+
+Requires nella_index to have been run first.
 
 Search modes:
 - hybrid: Combines semantic and lexical search (default, best results)
 - semantic: Vector similarity search (good for conceptual queries)
-- lexical: BM25 keyword search (good for exact matches)
-
-Returns matching code chunks with file paths, line numbers, and relevance scores.`,
+- lexical: BM25 keyword search (good for exact matches)`,
       inputSchema: {
         type: "object",
         properties: {
@@ -88,9 +87,14 @@ Returns matching code chunks with file paths, line numbers, and relevance scores
             enum: ["hybrid", "semantic", "lexical"],
             description: "Search mode (default: hybrid)",
           },
+          detail: {
+            type: "string",
+            enum: ["compact", "full"],
+            description: "Output detail level. 'compact' (default): file paths, line ranges, symbols, and scores — no code blocks. 'full': includes full code chunks.",
+          },
           topK: {
             type: "number",
-            description: "Number of results to return (default: 10)",
+            description: "Number of results to return (default: 5)",
           },
           language: {
             type: "string",
@@ -160,7 +164,7 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
       vectorWeight: 0.4,
       lexicalWeight: 0.6,
       rerankEnabled: true,
-      topK: 10,
+      topK: 5,
     },
     include: DEFAULT_INDEX_CONFIG.include,
     exclude: [...DEFAULT_INDEX_CONFIG.exclude, "**/.nella/**"],
@@ -241,7 +245,8 @@ async function handleSearch(
 ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const query = args.query as string;
   const mode = (args.mode as "hybrid" | "semantic" | "lexical") || "hybrid";
-  const topK = (args.topK as number) || 10;
+  const detail = (args.detail as "compact" | "full") || "compact";
+  const topK = (args.topK as number) || 5;
   const language = args.language as string | undefined;
   const filePattern = args.filePattern as string | undefined;
 
@@ -279,16 +284,44 @@ async function handleSearch(
     }
 
     // Build header with confidence guidance
-    let header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms, confidence: ${(response.confidence * 100).toFixed(0)}%):`;
+    let header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms, ${(response.confidence * 100).toFixed(0)}%):`;
 
     if (response.suggestion === "low_confidence") {
-      header += `\n> Low confidence results. Consider: (1) reindex with nella_index if files changed, (2) use more specific terms, (3) try mode: "lexical" for exact symbol matches.`;
+      header += `\n> Low confidence. Try: reindex, more specific terms, or mode: "lexical".`;
     } else if (response.suggestion === "query_unclear") {
-      header += `\n> Query may be too broad. Try searching for specific function names, class names, or file paths.`
+      header += `\n> Query may be too broad. Try specific function/class names.`;
     }
+
+    const compact = detail === "compact";
+
+    if (compact) {
+      // Compact mode: numbered list of file:line pointers, no code blocks
+      const lines: string[] = [];
+      for (let i = 0; i < response.results.length; i++) {
+        const result = response.results[i];
+        const relPath = path.relative(context.workspacePath, result.chunk.filePath);
+        const [startLine, endLine] = result.chunk.lines;
+        const score = (result.score * 100).toFixed(1);
+        const symbolNames = result.chunk.symbols.map((s) => s.name).join(", ");
+        const symbolKinds = [...new Set(result.chunk.symbols.map((s) => s.kind))].join(", ");
+        const symbolSuffix = symbolNames ? ` — ${symbolNames} [${symbolKinds}]` : "";
+        lines.push(`${i + 1}. ${relPath}:${startLine}-${endLine} (${score}%)${symbolSuffix}`);
+      }
+
+      const output = wrapSearchResponse(header, lines, {
+        sessionToken: context.sessionToken,
+        hmacKey: context.hmacKey,
+        compact: true,
+      });
+
+      return {
+        content: [{ type: "text", text: output }],
+      };
+    }
+
+    // Full mode: existing behavior with code blocks and security wrapping
     const nonce = generateNonce();
     const totalResults = response.results.length;
-
     const wrappedResults: string[] = [];
 
     for (let i = 0; i < response.results.length; i++) {

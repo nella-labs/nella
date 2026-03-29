@@ -7,7 +7,9 @@ import {
   wrapSearchResult,
   wrapSearchResponse,
   SEARCH_PREAMBLE,
+  SEARCH_PREAMBLE_COMPACT,
   SEARCH_EPILOGUE,
+  SEARCH_EPILOGUE_COMPACT,
 } from "../result-isolation";
 
 describe("Result Isolation", () => {
@@ -181,6 +183,26 @@ describe("Result Isolation", () => {
       // Token should be stripped AND outer HMAC should be present
       assert.ok(!output.includes(sessionToken));
       assert.ok(output.includes("[NELLA INTEGRITY:"));
+    });
+
+    it("uses compact preamble/epilogue when compact option is true", () => {
+      const output = wrapSearchResponse("Found 3 results:", ["line 1", "line 2"], { compact: true });
+      assert.ok(output.includes(SEARCH_PREAMBLE_COMPACT));
+      assert.ok(output.includes(SEARCH_EPILOGUE_COMPACT));
+      assert.ok(!output.includes(SEARCH_PREAMBLE));
+      assert.ok(!output.includes(SEARCH_EPILOGUE));
+    });
+
+    it("compact mode does not add blank lines between results", () => {
+      const output = wrapSearchResponse("header:", ["line 1", "line 2", "line 3"], { compact: true });
+      // In compact mode, results should be on consecutive lines without blank separators
+      assert.ok(output.includes("line 1\nline 2\nline 3"));
+    });
+
+    it("uses full preamble/epilogue by default", () => {
+      const output = wrapSearchResponse("header:", ["result 1"]);
+      assert.ok(output.includes(SEARCH_PREAMBLE));
+      assert.ok(output.includes(SEARCH_EPILOGUE));
     });
   });
 });

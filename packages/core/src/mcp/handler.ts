@@ -413,9 +413,10 @@ export class McpToolHandler {
   // =============================================================================
 
   private async handleSearch(args: SearchToolArgs): Promise<McpToolResult> {
+    const detail = args.detail || "compact";
     const response = await this.workspace.search({
       query: args.query,
-      limit: args.limit || 10,
+      limit: args.limit || 5,
       mode: args.mode || "hybrid",
       filter: {
         fileTypes: args.fileTypes,
@@ -435,20 +436,43 @@ export class McpToolHandler {
       };
     }
 
+    const header = `Found ${response.results.length} results (confidence: ${(response.confidence * 100).toFixed(0)}%):`;
+
+    if (detail === "compact") {
+      const lines = response.results.map((r, i) => {
+        const chunk = r.chunk;
+        const startLine = chunk.lines?.[0];
+        const endLine = chunk.lines?.[1];
+        const lineRange = startLine ? `:${startLine}${endLine ? `-${endLine}` : ""}` : "";
+        const score = (r.score * 100).toFixed(1);
+        const symbolNames = chunk.symbols?.map((s) => s.name).join(", ") || "";
+        const symbolKinds = [...new Set(chunk.symbols?.map((s) => s.kind) || [])].join(", ");
+        const symbolSuffix = symbolNames ? ` — ${symbolNames} [${symbolKinds}]` : "";
+        return `${i + 1}. ${chunk.filePath}${lineRange} (${score}%)${symbolSuffix}`;
+      });
+
+      return {
+        content: [{
+          type: "text",
+          text: `${header}\n\n${lines.join("\n")}`,
+        }],
+      };
+    }
+
     const results = response.results.map((r, i) => {
       const chunk = r.chunk;
       const startLine = chunk.lines?.[0];
-      const header = `## Result ${i + 1}: ${chunk.filePath}${startLine ? `:${startLine}` : ""}\n`;
+      const resultHeader = `## Result ${i + 1}: ${chunk.filePath}${startLine ? `:${startLine}` : ""}\n`;
       const metadata = `Type: ${chunk.type} | Score: ${(r.score * 100).toFixed(1)}%\n`;
       const symbols = chunk.symbols?.length ? `Symbols: ${chunk.symbols.map((s) => s.name).join(", ")}\n` : "";
-      return `${header}${metadata}${symbols}\n\`\`\`${chunk.language || ""}\n${chunk.content}\n\`\`\``;
+      return `${resultHeader}${metadata}${symbols}\n\`\`\`${chunk.language || ""}\n${chunk.content}\n\`\`\``;
     });
 
     return {
       content: [
         {
           type: "text",
-          text: `Found ${response.results.length} results (confidence: ${(response.confidence * 100).toFixed(0)}%):\n\n${results.join("\n\n")}`,
+          text: `${header}\n\n${results.join("\n\n")}`,
         },
       ],
     };

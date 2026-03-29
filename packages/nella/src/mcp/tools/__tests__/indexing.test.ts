@@ -51,6 +51,23 @@ describe("Indexing Tool Handlers", () => {
       const required = (searchTool.inputSchema as any).required;
       assert.ok(required.includes("query"));
     });
+
+    it("nella_search has detail parameter with compact/full enum", () => {
+      const tools = registerIndexingTools();
+      const searchTool = tools[1];
+
+      const props = (searchTool.inputSchema as any).properties;
+      assert.ok(props.detail);
+      assert.deepEqual(props.detail.enum, ["compact", "full"]);
+    });
+
+    it("nella_search topK description reflects default of 5", () => {
+      const tools = registerIndexingTools();
+      const searchTool = tools[1];
+
+      const props = (searchTool.inputSchema as any).properties;
+      assert.ok(props.topK.description.includes("5"));
+    });
   });
 
   // ===========================================================================

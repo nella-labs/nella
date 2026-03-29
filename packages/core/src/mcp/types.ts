@@ -128,6 +128,7 @@ export interface SearchToolArgs {
   query: string;
   limit?: number;
   mode?: "semantic" | "lexical" | "hybrid";
+  detail?: "compact" | "full";
   fileTypes?: string[];
   paths?: string[];
   includeSymbols?: boolean;
