@@ -107,6 +107,8 @@ export interface AgentRunConfig {
   model: string;
   apiKey: string;
   prompt: string;
+  /** Override the default system prompt. Falls back to the built-in prompt when omitted. */
+  systemPrompt?: string;
   maxTurns?: number;
   maxTokens?: number;
 }

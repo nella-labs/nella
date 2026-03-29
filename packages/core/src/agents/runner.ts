@@ -99,7 +99,7 @@ export class AgentRunner {
 
     // Build initial messages
     const messages: AgentMessage[] = [
-      { role: "system", content: PLAYGROUND_SYSTEM_PROMPT },
+      { role: "system", content: config.systemPrompt ?? PLAYGROUND_SYSTEM_PROMPT },
       { role: "user", content: config.prompt },
     ];
 
