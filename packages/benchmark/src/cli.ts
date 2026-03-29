@@ -367,7 +367,7 @@ Usage:
   nella-benchmark injection-agent [options]
 
 Options:
-  --agent, -a <name>     Agent: claude-sonnet, claude-opus, gpt-4o, gpt-4o-mini
+  --agent, -a <name>     Agent: claude-sonnet, claude-opus, gpt-4.1, gpt-4.1-mini, gpt-4o, gpt-4o-mini
   --scenarios <ids>      Comma-separated scenario IDs (default: all)
   --output, -o <path>    Output directory
   --runs, -n <count>     Runs per scenario (default: 1)
@@ -394,7 +394,7 @@ Examples:
       result.agents.push(resolveAgentConfig("claude-sonnet")!);
     }
     if (process.env.OPENAI_API_KEY) {
-      result.agents.push(resolveAgentConfig("gpt-4o")!);
+      result.agents.push(resolveAgentConfig("gpt-4.1")!);
     }
   }
 
@@ -409,6 +409,12 @@ function resolveAgentConfig(name: string): InjectionAgentArgs["agents"][0] | nul
     case "claude-opus":
       if (!process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY required"); return null; }
       return { name, provider: "anthropic", model: "claude-opus-4-20250514", apiKey: process.env.ANTHROPIC_API_KEY };
+    case "gpt-4.1":
+      if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
+      return { name, provider: "openai", model: "gpt-4.1", apiKey: process.env.OPENAI_API_KEY };
+    case "gpt-4.1-mini":
+      if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
+      return { name, provider: "openai", model: "gpt-4.1-mini", apiKey: process.env.OPENAI_API_KEY };
     case "gpt-4o":
       if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
       return { name, provider: "openai", model: "gpt-4o", apiKey: process.env.OPENAI_API_KEY };
