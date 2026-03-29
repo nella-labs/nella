@@ -268,6 +268,12 @@ export interface CloudSyncState {
 
   /** Recent errors */
   errors: Array<{ path: string; message: string; timestamp: string }>;
+
+  /** Organization ID (for project-scoped sync) */
+  orgId?: string;
+
+  /** Project ID (for project-scoped sync) */
+  projectId?: string;
 }
 
 /**
@@ -325,6 +331,8 @@ export interface Workspace {
   createdAt: Date;
   updatedAt: Date;
   lastIndexedAt: Date | null;
+  orgId?: string;
+  projectId?: string;
 }
 
 export interface WorkspaceConfig {
@@ -492,6 +500,8 @@ export interface CreateWorkspaceParams {
   name: string;
   rootPath: string;
   config?: Partial<WorkspaceConfig>;
+  orgId?: string;
+  projectId?: string;
 }
 
 export interface UpsertFileParams {

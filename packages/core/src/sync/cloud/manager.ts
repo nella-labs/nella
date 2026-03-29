@@ -176,7 +176,9 @@ export class WorkspaceCloudSyncManager {
     private readonly workspacePath: string,
     private readonly config: SyncConfig,
     options: Partial<CloudSyncOptions> = {},
-    storage?: CloudObjectStorage
+    storage?: CloudObjectStorage,
+    private readonly orgId?: string,
+    private readonly projectId?: string
   ) {
     this.options = mergeOptions(config, options);
     this.storage = storage || new GCSObjectStorage(this.config.cloudStorageConfig?.basePath || "");
@@ -194,6 +196,8 @@ export class WorkspaceCloudSyncManager {
       conflicts: [],
       history: [],
       errors: [],
+      orgId,
+      projectId,
     };
   }
 
@@ -289,7 +293,7 @@ export class WorkspaceCloudSyncManager {
 
   private remoteRoot(): string {
     const prefix = this.options.prefix?.replace(/^\/+|\/+$/g, "") || "";
-    return [prefix, this.workspaceId].filter(Boolean).join("/");
+    return [prefix, this.orgId, this.projectId, this.workspaceId].filter(Boolean).join("/");
   }
 
   private indexPath(): string {
@@ -871,13 +875,17 @@ export function createWorkspaceCloudSyncManager(
   workspacePath: string,
   config: SyncConfig,
   options: Partial<CloudSyncOptions> = {},
-  storage?: CloudObjectStorage
+  storage?: CloudObjectStorage,
+  orgId?: string,
+  projectId?: string
 ): WorkspaceCloudSyncManager {
   return new WorkspaceCloudSyncManager(
     workspaceId,
     workspacePath,
     config,
     options,
-    storage
+    storage,
+    orgId,
+    projectId
   );
 }

@@ -179,7 +179,9 @@ export class SyncManager {
   async createCloudSync(
     workspaceId: string,
     workspacePath: string,
-    options: Partial<CloudSyncOptions> = {}
+    options: Partial<CloudSyncOptions> = {},
+    orgId?: string,
+    projectId?: string
   ): Promise<WorkspaceCloudSyncManager> {
     if (!this.config) {
       throw new Error("SyncManager not initialized. Call init() first.");
@@ -197,7 +199,10 @@ export class SyncManager {
       workspaceId,
       workspacePath,
       this.config,
-      options
+      options,
+      undefined,
+      orgId,
+      projectId
     );
     manager.onEvent((event) => this.emit(event));
     await manager.init();
@@ -251,7 +256,13 @@ export class SyncManager {
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`);
     }
-    return await this.createCloudSync(workspaceId, workspace.rootPath);
+    return await this.createCloudSync(
+      workspaceId,
+      workspace.rootPath,
+      {},
+      workspace.orgId,
+      workspace.projectId
+    );
   }
   
   // ---------------------------------------------------------------------------
