@@ -267,3 +267,30 @@ export type {
   AuthenticateResult,
   CreateApiKeyParams,
 } from "./services";
+
+// =============================================================================
+// Agents (LLM Agent Integration)
+// =============================================================================
+
+export {
+  AgentRunner,
+  createAgentAdapter,
+  AnthropicAdapter,
+  OpenAIAdapter,
+  AgentAdapter,
+} from "./agents";
+
+export type {
+  AgentRunConfig,
+  AgentRunResult,
+  AgentTurn,
+  AgentConfig,
+  AgentMessage,
+  ToolUseRequest,
+  ToolDefinition,
+  TokenUsage,
+  AgentProvider,
+  AgentRunnerEvent,
+  AgentRunnerEventHandler,
+  LLMCallOptions,
+} from "./agents";
