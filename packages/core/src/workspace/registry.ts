@@ -141,12 +141,24 @@ export class WorkspaceRegistry {
   /**
    * Register a new workspace
    */
-  register(workspacePath: string, name?: string, config?: Partial<WorkspaceConfig>): WorkspaceEntry {
+  register(
+    workspacePath: string,
+    name?: string,
+    config?: Partial<WorkspaceConfig>,
+    orgId?: string,
+    projectId?: string
+  ): WorkspaceEntry {
     const normalizedPath = path.normalize(path.resolve(workspacePath));
 
     // Check if already registered
     const existing = this.findByPath(normalizedPath);
     if (existing) {
+      // Update org/project if provided and different
+      if (orgId !== undefined || projectId !== undefined) {
+        if (orgId !== undefined) existing.orgId = orgId;
+        if (projectId !== undefined) existing.projectId = projectId;
+        this.save();
+      }
       return existing;
     }
 
@@ -167,6 +179,8 @@ export class WorkspaceRegistry {
         totalTokens: 0,
       },
       config: config ? { ...this.getDefaultConfig(), ...config } : undefined,
+      orgId,
+      projectId,
     };
 
     // Add to registry

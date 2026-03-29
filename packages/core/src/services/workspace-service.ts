@@ -21,6 +21,8 @@ export interface CreateWorkspaceParams {
   name: string;
   path: string;
   config?: Partial<WorkspaceConfig>;
+  orgId?: string;
+  projectId?: string;
 }
 
 export interface WorkspaceInfo {
@@ -31,6 +33,8 @@ export interface WorkspaceInfo {
   indexed: boolean;
   indexStatus: string;
   fileCount: number;
+  orgId?: string;
+  projectId?: string;
 }
 
 // =============================================================================
@@ -50,7 +54,13 @@ export class WorkspaceService {
    * Create and register a workspace.
    */
   async create(params: CreateWorkspaceParams): Promise<WorkspaceInfo> {
-    const entry = this.registry.register(params.name, params.path, params.config);
+    const entry = this.registry.register(
+      params.path,
+      params.name,
+      params.config,
+      params.orgId,
+      params.projectId
+    );
     return this.toInfo(entry);
   }
 
@@ -104,6 +114,8 @@ export class WorkspaceService {
       indexed: entry.indexStatus === "ready",
       indexStatus: entry.indexStatus,
       fileCount: entry.stats?.filesIndexed || 0,
+      orgId: entry.orgId,
+      projectId: entry.projectId,
     };
   }
 }

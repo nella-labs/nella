@@ -21,6 +21,8 @@ export interface WorkspaceEntry {
     totalTokens: number;
   };
   config?: WorkspaceConfig;
+  orgId?: string;
+  projectId?: string;
 }
 
 export interface WorkspaceConfig {

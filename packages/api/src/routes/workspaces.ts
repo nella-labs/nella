@@ -23,11 +23,15 @@ const createWorkspaceSchema = z.object({
   name: z.string().min(1).max(255),
   path: z.string().min(1),
   config: z.record(z.unknown()).optional(),
+  org_id: z.string().uuid().optional(),
+  project_id: z.string().uuid().optional(),
 });
 
 const updateWorkspaceSchema = z.object({
   config: z.record(z.unknown()).optional(),
   name: z.string().min(1).max(255).optional(),
+  org_id: z.string().uuid().optional(),
+  project_id: z.string().uuid().optional(),
 });
 
 // =============================================================================
@@ -54,7 +58,13 @@ export function workspacesRouter(): Router {
   // POST /api/v1/workspaces — workspace creation gated by plan limit
   router.post("/", requireScope("workspaces:write"), checkWorkspacePlanLimit, validateBody(createWorkspaceSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const ws = await service.create(req.body);
+      const ws = await service.create({
+        name: req.body.name,
+        path: req.body.path,
+        config: req.body.config,
+        orgId: req.body.org_id,
+        projectId: req.body.project_id,
+      });
       log("info", "Workspace created", { workspaceId: ws.id, userId: req.user?.userId });
       sendCreated(res, ws);
     } catch (err) {
@@ -79,7 +89,13 @@ export function workspacesRouter(): Router {
   // PATCH /api/v1/workspaces/:id
   router.patch("/:id", requireScope("workspaces:write"), validateBody(updateWorkspaceSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const ws = await service.update(req.params.id, req.body.config || {});
+      const updates: Record<string, unknown> = {};
+      if (req.body.config) updates.config = req.body.config;
+      if (req.body.name) updates.name = req.body.name;
+      if (req.body.org_id !== undefined) updates.orgId = req.body.org_id;
+      if (req.body.project_id !== undefined) updates.projectId = req.body.project_id;
+
+      const ws = await service.update(req.params.id, updates);
       if (!ws) {
         sendError(res, req, 404, "NOT_FOUND", `Workspace '${req.params.id}' not found`);
         return;
