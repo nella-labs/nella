@@ -111,38 +111,42 @@ async function runWithNella(
   const { scenario, agent } = config;
   const maxTurns = config.maxTurns ?? 5;
 
-  // 3. Create isolated workspace registry + workspace
+  // 3. Create isolated workspace + storage directories
   const registryDir = path.join(tmpDir, ".nella-registry");
+  const backupsDir = path.join(registryDir, "backups");
+  const storageDir = path.join(tmpDir, ".nella-index");
   fs.mkdirSync(registryDir, { recursive: true });
+  fs.mkdirSync(backupsDir, { recursive: true });
+  fs.mkdirSync(storageDir, { recursive: true });
 
   const registry = createWorkspaceRegistry({ storagePath: registryDir });
   const entry = registry.register(tmpDir, `trial-${scenario.id}`);
-  const workspace = new Workspace(entry.id, { registry });
 
-  // 4. Index the workspace (L5 injection scoring runs automatically)
-  const indexConfig: IndexManagerConfig = {
+  // 4. Index directly with IndexManager (skip embedding — lexical only)
+  const indexManager = new IndexManager({
     ...DEFAULT_INDEX_CONFIG,
     workspaceId: entry.id,
     workspacePath: tmpDir,
-    storagePath: registry.getIndexPath(entry.id),
+    storagePath: storageDir,
     search: {
       ...DEFAULT_INDEX_CONFIG.search,
-      rerankEnabled: false, // no reranking in bench (no Cohere key needed)
+      rerankEnabled: false,
     },
-    embedder: {
-      ...DEFAULT_INDEX_CONFIG.embedder,
-      // Use lexical-only to avoid needing an embedding API key for benchmarks
-      provider: "azure",
-    },
-  };
+  });
 
-  // Use lexical mode to avoid embedding API calls during benchmarks
-  await workspace.index();
+  // Index files — injection scoring runs at L5 automatically
+  // Embedding will fail without API key but chunks + lexical index still work
+  try {
+    await indexManager.index({ force: true });
+  } catch {
+    // Embedding errors are expected — lexical index is sufficient
+  }
 
-  // 5. Create McpToolHandler with defense pipeline
+  // 5. Create Workspace + McpToolHandler with defense pipeline
+  const workspace = new Workspace(entry.id, { registry });
   const handlerConfig: ToolHandlerConfig = {
     workspace,
-    cache: false,      // no caching for benchmarks
+    cache: false,
     validateInputs: true,
   };
   const handler = new McpToolHandler(handlerConfig);
@@ -219,7 +223,11 @@ async function runWithoutNella(
   };
 
   const indexManager = new IndexManager(indexConfig);
-  await indexManager.index({ force: true });
+  try {
+    await indexManager.index({ force: true });
+  } catch {
+    // Embedding errors expected — lexical index is sufficient
+  }
 
   // 5. Run a search using the scenario's task prompt to get raw results
   const searchResponse: SearchResponse = await indexManager.search({

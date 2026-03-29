@@ -59,7 +59,7 @@ export class OpenAIAdapter extends AgentAdapter {
 
     const body: Record<string, unknown> = {
       model: this.model,
-      max_tokens: options.maxTokens ?? 8192,
+      max_completion_tokens: options.maxTokens ?? 8192,
       messages: openaiMessages,
     };
 
