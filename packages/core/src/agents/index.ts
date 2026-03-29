@@ -29,6 +29,7 @@ export { AgentAdapter } from "./base";
 export type { LLMCallOptions } from "./base";
 export { AnthropicAdapter } from "./anthropic";
 export { OpenAIAdapter } from "./openai";
+export { AzureOpenAIAdapter } from "./azure-openai";
 export { createAgentAdapter } from "./adapters";
 
 // Runner

@@ -8,13 +8,19 @@
 // Provider / Config
 // =============================================================================
 
-export type AgentProvider = "anthropic" | "openai";
+export type AgentProvider = "anthropic" | "openai" | "azure-openai";
 
 export interface AgentConfig {
   provider: AgentProvider;
   model: string;
   apiKey: string;
   maxTokens?: number;
+  /** Azure OpenAI endpoint (required for azure-openai provider) */
+  azureEndpoint?: string;
+  /** Azure OpenAI deployment name (defaults to model if not set) */
+  azureDeployment?: string;
+  /** Azure API version (defaults to 2025-01-01-preview) */
+  azureApiVersion?: string;
 }
 
 // =============================================================================

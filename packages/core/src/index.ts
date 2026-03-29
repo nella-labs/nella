@@ -277,6 +277,7 @@ export {
   createAgentAdapter,
   AnthropicAdapter,
   OpenAIAdapter,
+  AzureOpenAIAdapter,
   AgentAdapter,
 } from "./agents";
 

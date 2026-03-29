@@ -367,7 +367,7 @@ Usage:
   nella-benchmark injection-agent [options]
 
 Options:
-  --agent, -a <name>     Agent: claude-sonnet, claude-opus, gpt-5.4, gpt-5.4-mini, gpt-5.3-instant
+  --agent, -a <name>     Agent: claude-sonnet, claude-opus, gpt-5.4, gpt-5.4-mini, azure-openai
   --scenarios <ids>      Comma-separated scenario IDs (default: all)
   --output, -o <path>    Output directory
   --runs, -n <count>     Runs per scenario (default: 1)
@@ -376,8 +376,11 @@ Options:
   --help, -h             Show help
 
 Environment:
-  ANTHROPIC_API_KEY      Required for Claude models
-  OPENAI_API_KEY         Required for OpenAI models
+  ANTHROPIC_API_KEY        Required for Claude models
+  OPENAI_API_KEY           Required for OpenAI models
+  AZURE_OPENAI_API_KEY     Required for Azure OpenAI
+  AZURE_OPENAI_ENDPOINT    Azure endpoint URL (e.g. https://myresource.openai.azure.com)
+  AZURE_OPENAI_DEPLOYMENT  Azure deployment name
 
 Examples:
   nella-benchmark injection-agent -a claude-sonnet
@@ -418,6 +421,21 @@ function resolveAgentConfig(name: string): InjectionAgentArgs["agents"][0] | nul
     case "gpt-5.3-instant":
       if (!process.env.OPENAI_API_KEY) { console.error("OPENAI_API_KEY required"); return null; }
       return { name, provider: "openai", model: "gpt-5.3-instant", apiKey: process.env.OPENAI_API_KEY };
+    case "azure-openai": {
+      const key = process.env.AZURE_OPENAI_API_KEY;
+      const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+      const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+      if (!key) { console.error("AZURE_OPENAI_API_KEY required"); return null; }
+      if (!endpoint) { console.error("AZURE_OPENAI_ENDPOINT required"); return null; }
+      return {
+        name: `azure-openai:${deployment || "default"}`,
+        provider: "azure-openai" as any,
+        model: deployment || "gpt-5.4",
+        apiKey: key,
+        azureEndpoint: endpoint,
+        azureDeployment: deployment,
+      } as any;
+    }
     default:
       console.error(`Unknown agent: ${name}`);
       return null;
