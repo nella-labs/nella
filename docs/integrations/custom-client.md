@@ -43,41 +43,6 @@ const result = await client.callTool({
 console.log(result);
 ```
 
-## Hosted Server (HTTP)
-
-For team use or CI/CD, run Nella as an HTTP server:
-
-```bash
-nella serve --port 3001 --host 127.0.0.1
-```
-
-Connect via Streamable HTTP transport:
-
-```json
-{
-  "mcpServers": {
-    "nella": {
-      "url": "http://localhost:3001/mcp",
-      "headers": {
-        "Authorization": "Bearer nella_abc123..."
-      }
-    }
-  }
-}
-```
-
-The current local `nella serve` implementation requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and uses `REDIS_URL` when available. If you omit flags, it uses `PORT` or `3000` and binds `0.0.0.0`.
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SUPABASE_URL` | Supabase project URL for hosted mode | None |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key for hosted mode | None |
-| `REDIS_URL` | Optional Redis URL for hosted-mode rate limiting | None |
-| `PORT` | Hosted server port when `--port` is omitted | `3000` |
-| `NELLA_LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`, `error`) | `info` |
-
 ## Available Tools
 
 Local stdio connections expose the workspace tools below:

@@ -97,5 +97,4 @@ For CLI usage, you specify the repo path directly with `-r`.
 
 ## Related Docs
 
-- [Configuration Reference](../core/configuration.md) — Full schema for `RunTaskOptions`
 - [CLI Commands](../cli/commands.md) — How to use tasks with the CLI

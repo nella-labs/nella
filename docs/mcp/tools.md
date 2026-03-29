@@ -94,7 +94,7 @@ Builds or refreshes the workspace index used by `nella_search`.
 
 **Behavior**
 
-- Requires either an authenticated Nella session or Azure embedding credentials (`AZURE_EMBEDDING_API_KEY` and `AZURE_ENDPOINT`).
+- Requires an authenticated Nella session (`nella auth login`).
 - Stores index data under `.nella/index` in the workspace.
 
 See [`nella_index`](../api-reference/tools/nella-index.md).

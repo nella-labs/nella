@@ -174,9 +174,9 @@ Context is stored in `.nella/sessions/{sessionId}.json`. Check that:
 
 ## FAQ
 
-### Can I use Nella without an account?
+### Do I need a Nella account?
 
-Yes. All core features (indexing, search, context tracking) work locally without any account. Cloud features (sync, hosted MCP server) require a Nella account.
+Yes. A Nella account is required. Run `nella auth login` to authenticate before using Nella tools.
 
 ### Does Nella modify my source code?
 

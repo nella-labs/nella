@@ -51,13 +51,3 @@ Once connected, your AI agent has access to these tools:
 
 - **`nella_heartbeat`** — Verify trust-chain continuity between tool calls
 
-## 5) Explore advanced modules
-
-Nella Core includes advanced modules for larger agent systems:
-
-- **Workspace registry** — multi-repo routing for agent tools.
-- **Auth + rate limiting** — API key management and per-agent quotas.
-- **Cloud sync** — push/pull run data from Google Cloud Storage.
-- **Playground server** — real-time playground with session telemetry.
-
-Start with the [Core Modules guide](./core/modules.md) for examples.

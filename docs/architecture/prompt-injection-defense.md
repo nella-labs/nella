@@ -252,6 +252,5 @@ LLM-based detection would add latency, cost, and a circular dependency (using an
 
 ## Related Architecture Pages
 
-- [Security & Auth](./security-auth.md) — Safety detection, authentication, rate limiting, and cloud sync
 - [Indexing & RAG](./indexing-rag.md) — Code chunking, embedding, hybrid search, and code verification
 - [MCP Server](./mcp-server.md) — MCP protocol implementation and tool routing

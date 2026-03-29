@@ -1,6 +1,6 @@
 # API Reference
 
-Reference for the 7 MCP tools exposed by the local Nella server in `packages/nella/src/mcp/server.ts`.
+Reference for the 7 MCP tools exposed by the Nella MCP server.
 
 ## Tool Categories
 

@@ -18,10 +18,7 @@ The `@getnella/mcp` package provides a CLI and MCP server that allows AI agents 
 | Document | Description |
 |----------|-------------|
 | [Tools Reference](./tools.md) | Complete reference for all MCP tools |
-| [Integration Guide](./integration.md) | Setup for Claude Desktop, Claude Code, hosted/self-hosted, and custom clients |
-| [Context Management](../core/context.md) | Session persistence, assumptions, and dependency tracking |
-| [CLI Commands](../cli/commands.md) | Full CLI reference (`serve`, `connect`, `auth`, etc.) |
-| [Examples](../core/examples.md) | Practical code examples |
+| [CLI Commands](../cli/commands.md) | Full CLI reference (`connect`, `auth`, etc.) |
 | [Tips & Best Practices](../guides/tips-and-best-practices.md) | Always-on setup, prompt tips, workflow guides |
 
 ## Quick Start
@@ -88,9 +85,6 @@ All tool calls are validated against JSON Schema before execution. Invalid argum
 ### Session Persistence
 Workspace context is persisted under `.nella/`, so assumptions and dependency snapshots survive across conversations.
 
-### Hosted Auth and Rate Limiting
-`nella serve` uses Supabase-backed API key validation and Redis-backed or in-memory rate limiting for hosted deployments.
-
 ### Usage Logging
 Both local and hosted servers record tool usage opportunistically when a valid hosted session is available.
 
@@ -124,8 +118,8 @@ Both local and hosted servers record tool usage opportunistically when a valid h
                               │
                 ┌─────────────┼─────────────┐
                 │             │             │
-           Workspace      GCP/Supabase    Redis
-        .nella/session    (cloud sync)  (rate limits)
+           Workspace
+        .nella/session
 ```
 
 ## Session Persistence
@@ -139,5 +133,4 @@ This allows context to survive across multiple conversations with Claude.
 
 ## Related Packages
 
-- [@usenella/core](../core/) — Core reliability engine
 - [@getnella/mcp](../../packages/nella/README.md) — CLI + MCP server

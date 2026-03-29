@@ -31,7 +31,6 @@ The local MCP server currently exposes 7 tools:
 |---------|-------------|
 | `nella index` | Index codebase for search and context |
 | `nella mcp` | Start MCP server (stdio transport) |
-| `nella serve` | Start hosted MCP server (Streamable HTTP) |
 | `nella connect` | Configure MCP clients to use Nella |
 | `nella auth` | Manage authentication (login/logout/status) |
 | `nella setup` | Shortcut for `nella connect --client claude-code --mode local` |

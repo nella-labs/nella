@@ -110,12 +110,7 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     target: "configuration/overview.mdx",
     transform: transformGeneric,
   },
-  {
-    source: "configuration/constraints.md",
-    target: "configuration/constraints.mdx",
-    transform: transformGeneric,
-  },
-  {
+{
     source: "configuration/validation.md",
     target: "configuration/validation.mdx",
     transform: transformGeneric,

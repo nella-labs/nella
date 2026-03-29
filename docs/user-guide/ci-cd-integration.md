@@ -33,25 +33,6 @@ jobs:
         run: nella index
 ```
 
-## Docker
-
-Run Nella in a container for consistent environments:
-
-```dockerfile
-FROM node:20-alpine
-RUN npm install -g @getnella/mcp
-WORKDIR /workspace
-ENTRYPOINT ["nella"]
-```
-
-```bash
-# Build
-docker build -t nella .
-
-# Run indexing
-docker run -v $(pwd):/workspace nella index
-```
-
 ## Best Practices
 
 1. **Use `--json` for machine parsing** — Human-readable output is nice for local use, but JSON is reliable in CI
@@ -61,4 +42,3 @@ docker run -v $(pwd):/workspace nella index
 ## Related Docs
 
 - [Task Authoring](./task-authoring.md) — Write task definitions
-- [Configuration Reference](../core/configuration.md) — All configuration options

@@ -69,12 +69,6 @@ Context is stored in `.nella/session.json` in the workspace:
 
 Sessions survive across multiple conversations. When a new MCP connection starts, the previous session's context is loaded.
 
-## Cross-Agent Context
-
-For multi-agent setups, use the **ContextManager** from the [Context Sharing module](../core/context-sharing.md) programmatically. The current `@getnella/mcp` package focuses on session context and does not expose a `nella_set_context` tool.
-
 ## Related Docs
 
-- [Context Sharing](../core/context-sharing.md) — Cross-agent context
-- [Context Module](../core/context.md) — ContextManager API
 - [MCP Tools Reference](tools.md) — All context-related tools

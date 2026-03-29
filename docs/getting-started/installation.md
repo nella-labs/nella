@@ -28,22 +28,6 @@ nella help
 
 > **Tip:** You can also use `npx` without a global install. For direct stdio/local MCP, use `npx -y @getnella/mcp --workspace /path/to/project`.
 
-## Docker
-
-Run Nella in a container:
-
-```dockerfile
-FROM node:20-alpine
-RUN npm install -g @getnella/mcp
-WORKDIR /workspace
-ENTRYPOINT ["nella"]
-```
-
-```bash
-docker build -t nella .
-docker run -v $(pwd):/workspace nella mcp --workspace /workspace
-```
-
 ## Verify Setup
 
 Run a quick check to confirm everything works:

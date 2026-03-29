@@ -7,7 +7,6 @@ Complete command reference for the `nella` CLI that ships with `@getnella/mcp`.
 - [Commands](#commands)
   - [nella index](#nella-index)
   - [nella mcp](#nella-mcp)
-  - [nella serve](#nella-serve)
   - [nella connect](#nella-connect)
   - [nella auth](#nella-auth)
   - [nella setup](#nella-setup)
@@ -60,27 +59,6 @@ nella mcp --workspace /path/to/project
 
 # direct package entrypoint
 npx -y @getnella/mcp --workspace /path/to/project
-```
-
----
-
-### `nella serve`
-
-Start the hosted MCP server over HTTP.
-
-```bash
-nella serve [--port <number>] [--host <host>]
-```
-
-**Purpose:** Run Nella as a hosted MCP server with API key authentication and rate limiting.
-
-**Requirements:** The current implementation requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. It uses `REDIS_URL` when available.
-
-**Runtime defaults:** If you omit flags, the server uses `PORT` or `3000`, and binds `0.0.0.0`.
-
-**Example:**
-```bash
-nella serve --port 3001 --host 127.0.0.1
 ```
 
 ---
@@ -151,8 +129,6 @@ nella help
 | `--workspace <path>` | `-w` | Workspace path. Required for `mcp`; defaults to cwd for `index`. | `index`, `mcp` |
 | `--graph` | | Build a dependency graph from the indexed workspace. | `index` |
 | `--force` | `-f` | Force full reindex. | `index` |
-| `--port <number>` | `-p` | Port for the hosted server. If omitted, the current implementation uses `PORT` or `3000`. | `serve` |
-| `--host <host>` | | Host for the hosted server. If omitted, the current implementation uses `0.0.0.0`. | `serve` |
 | `--api-key <key>` | `-k` | API key for hosted connection mode. | `connect` |
 | `--server-url <url>` | `-u` | Hosted server URL. | `connect` |
 | `--client <name>` | | Target client: `claude`, `claude-code`, `vscode`, `cursor`, `windsurf`, `cline`, `roo-code`, or `all`. | `connect` |

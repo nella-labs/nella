@@ -156,5 +156,4 @@ You do not need to manage the token. It is generated, delivered, and protected a
 ## Further Reading
 
 - [Prompt Injection Defense Architecture](../architecture/prompt-injection-defense.md) — Full technical details on all 5 layers
-- [Security & Auth Architecture](../architecture/security-auth.md) — Safety detection, authentication, and rate limiting
 - [Tips & Best Practices](./tips-and-best-practices.md) — General best practices for using Nella with AI agents

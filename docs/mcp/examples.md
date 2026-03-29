@@ -80,5 +80,4 @@ Let me regenerate the Prisma client and check the new schema...
 ## Related Docs
 
 - [MCP Tools Reference](tools.md) — Complete tool documentation
-- [Integration Guide](integration.md) — Setup and configuration
 - [CLI Examples](../cli/commands.md) — CLI usage examples

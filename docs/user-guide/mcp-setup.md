@@ -111,41 +111,6 @@ For VS Code with MCP-enabled tooling, add Nella to `.vscode/mcp.json`:
 }
 ```
 
-## Hosted MCP Server
-
-For team use, CI, or shared deployments, use the hosted HTTP server:
-
-```bash
-# Start the hosted server
-nella serve --port 3001
-
-# Or configure a client for hosted mode
-nella connect --mode hosted
-```
-
-The hosted server provides:
-
-- `POST /mcp` for Streamable HTTP MCP traffic
-- `GET /health` for health checks
-- `/ws` for the hosted WebSocket bridge
-- API key authentication backed by Supabase
-- Redis-backed or in-memory rate limiting
-
-### Connecting to a Hosted Server
-
-```json
-{
-  "mcpServers": {
-    "nella": {
-      "url": "https://mcp.getnella.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer nella_abc123..."
-      }
-    }
-  }
-}
-```
-
 ## Custom MCP Clients
 
 If you're building your own MCP client, connect to the stdio transport like this:
@@ -172,16 +137,6 @@ const result = await client.callTool({
 });
 ```
 
-## Hosted Server Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SUPABASE_URL` | Supabase project URL for hosted auth and data access | Required |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key | Required |
-| `REDIS_URL` | Redis connection string for shared rate limiting | Optional |
-| `PORT` | Hosted MCP port | `3000` |
-| `NELLA_LOG_LEVEL` | Logging verbosity (`debug`, `info`, `warn`, `error`) | `info` |
-
 ## Available MCP Tools
 
 Once connected, the local MCP server exposes these tools:
@@ -199,5 +154,3 @@ Once connected, the local MCP server exposes these tools:
 ## Related Docs
 
 - [MCP Tools Reference](../mcp/tools.md) — Detailed input/output schemas for every tool
-- [MCP Integration Guide](../mcp/integration.md) — Advanced MCP configuration
-- [Authentication](../core/auth.md) — API key management and auth flows
