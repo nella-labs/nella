@@ -173,6 +173,38 @@ export function generateCsvReport(results: SampleTestResult[]): string {
 }
 
 // =============================================================================
+// Category Summary CSV (with CIs)
+// =============================================================================
+
+export function generateCategoryCsvReport(results: InjectionBenchmarkResults): string {
+  const fmtCI = (ci?: CI) => ci ? `${(ci.lower * 100).toFixed(1)}%-${(ci.upper * 100).toFixed(1)}%` : "";
+
+  const headers = [
+    "category",
+    "total_samples",
+    "tp", "fp", "tn", "fn",
+    "detection_rate", "detection_rate_ci",
+    "false_positive_rate", "false_positive_rate_ci",
+    "precision", "precision_ci",
+    "recall", "f1_score", "avg_score",
+  ];
+
+  const rows = results.byCategory.map(c => [
+    c.category,
+    c.totalSamples,
+    c.truePositives, c.falsePositives, c.trueNegatives, c.falseNegatives,
+    (c.detectionRate * 100).toFixed(1), fmtCI(c.detectionRateCI),
+    (c.falsePositiveRate * 100).toFixed(1), fmtCI(c.falsePositiveRateCI),
+    (c.precision * 100).toFixed(1), fmtCI(c.precisionCI),
+    (c.recall * 100).toFixed(1),
+    c.f1Score.toFixed(3),
+    c.averageScore.toFixed(3),
+  ]);
+
+  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+}
+
+// =============================================================================
 // Write All Reports
 // =============================================================================
 
@@ -198,6 +230,10 @@ export function writeReports(
     const csvPath = path.join(outputDir, "results.csv");
     fs.writeFileSync(csvPath, generateCsvReport(results.sampleResults));
     written.push(csvPath);
+
+    const categoryCsvPath = path.join(outputDir, "categories.csv");
+    fs.writeFileSync(categoryCsvPath, generateCategoryCsvReport(results));
+    written.push(categoryCsvPath);
   }
 
   if (formats.md !== false) {

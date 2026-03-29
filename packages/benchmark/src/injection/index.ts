@@ -33,7 +33,7 @@ export { runScannerTests, runScorerTests, runIsolationTests } from "./layer-test
 export { computeHeadlineMetrics, computeCategoryMetrics, computeDifficultyMetrics, computeLayerMetrics } from "./metrics";
 export { runInjectionBenchmark } from "./runner";
 export type { InjectionBenchmarkOptions } from "./runner";
-export { generateWebsiteStats, generateMarkdownReport, generateCsvReport, writeReports } from "./reporter";
+export { generateWebsiteStats, generateMarkdownReport, generateCsvReport, generateCategoryCsvReport, writeReports } from "./reporter";
 export { uploadResults } from "./uploader";
 export {
   wilsonCI,
