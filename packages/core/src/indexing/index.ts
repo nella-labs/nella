@@ -149,14 +149,14 @@ export class IndexManager {
   /**
    * Index the workspace
    */
-  async index(options: { force?: boolean; paths?: string[] } = {}): Promise<IndexMetadata> {
-    const { force = false, paths } = options;
+  async index(options: { force?: boolean; paths?: string[]; exclude?: string[] } = {}): Promise<IndexMetadata> {
+    const { force = false, paths, exclude } = options;
     const workspacePath = this.config.workspacePath;
 
     // Get files to index
     const files = paths
       ? paths.map((p) => path.resolve(workspacePath, p))
-      : this.getFilesToIndex(workspacePath);
+      : this.getFilesToIndex(workspacePath, exclude);
 
     // Force reindex: wipe all state for a clean rebuild
     if (force) {
@@ -477,8 +477,55 @@ export class IndexManager {
     return parts.join("\n");
   }
 
-  private getFilesToIndex(rootPath: string): string[] {
+  /**
+   * Parse a .gitignore or .nellaignore file into minimatch-compatible patterns.
+   * Handles comments, blank lines, directory patterns, and root-relative patterns.
+   * Negation patterns (!) are skipped — they require ordered evaluation that
+   * minimatch's simple .some() check can't support.
+   */
+  private static parseIgnoreFile(filePath: string): string[] {
+    if (!fs.existsSync(filePath)) return [];
+    const content = fs.readFileSync(filePath, "utf-8");
+    const patterns: string[] = [];
+
+    for (const raw of content.split("\n")) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      // Skip negation patterns — would need ordered evaluation
+      if (line.startsWith("!")) continue;
+
+      let pattern = line;
+
+      // Root-relative: starts with / → strip it (already relative to root)
+      if (pattern.startsWith("/")) {
+        pattern = pattern.slice(1);
+      }
+
+      // Directory pattern: ends with / → match everything inside
+      if (pattern.endsWith("/")) {
+        pattern = `**/${pattern}**`;
+      } else if (!pattern.includes("/")) {
+        // No slash → can match anywhere in tree
+        pattern = `**/${pattern}`;
+        // Also match as a directory containing files
+        patterns.push(`**/${line}/**`);
+      }
+
+      patterns.push(pattern);
+    }
+
+    return patterns;
+  }
+
+  private getFilesToIndex(rootPath: string, extraExcludes?: string[]): string[] {
     const files: string[] = [];
+
+    // Merge config excludes with .gitignore, .nellaignore, and any extra patterns
+    const ignorePatterns = [
+      ...IndexManager.parseIgnoreFile(path.join(rootPath, ".gitignore")),
+      ...IndexManager.parseIgnoreFile(path.join(rootPath, ".nellaignore")),
+    ];
+    const allExcludes = [...this.config.exclude, ...ignorePatterns, ...(extraExcludes || [])];
 
     const walk = (dir: string): void => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -487,8 +534,8 @@ export class IndexManager {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(rootPath, fullPath);
 
-        // Check excludes
-        const excluded = this.config.exclude.some((pattern) =>
+        // Check excludes (config + .gitignore + .nellaignore)
+        const excluded = allExcludes.some((pattern) =>
           minimatch(relativePath, pattern, { dot: true })
         );
         if (excluded) continue;
