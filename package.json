@@ -49,6 +49,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "nella": "^0.10.4",
     "usearch": "^2.21.4"
   }
 }
