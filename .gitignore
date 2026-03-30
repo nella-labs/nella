@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Lockfiles from other package managers
 package-lock.json
@@ -8,39 +9,76 @@ yarn.lock
 # Build outputs
 dist/
 build/
+*.tsbuildinfo
+.turbo/
 
 # Environment files
 .env
 .env.local
+.env.*.local
+!.env.example
 
-# Benchmark results (generated, not tracked)
+# Benchmark results (generated)
 benchmark-results/
 
-# IDE
+# IDE / Editor
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS files
 .DS_Store
 Thumbs.db
-tasks/
+._*
+
 # Logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
+logs.json
+logs2.json
 
-# Coverage
+# Coverage / Testing
 coverage/
+*.lcov
 
-# Private docs
+# Private / Local docs
 .private/
 private/
 
-# Nella
-.nella/
+# Archgraph
+.archgraph/
 
-# Claude
+# Nella MCP
+.nella/
+.mcp.json
+
+# Git hooks (local)
+.husky/
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# Claude / AI tooling
 .claude/
 CLAUDE.md
+.agents/
 
-# Workspace
-nella.code-workspace
+# Supabase migrations (managed separately)
+supabase/migrations/
+
+# Task management (local)
+tasks/
+
+# Workspace files
+*.code-workspace
+
+# Temp files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.docker/
