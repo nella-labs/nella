@@ -38,9 +38,7 @@ Run this when:
 - Files have changed significantly
 - You need to search the codebase with nella_search
 
-Options:
-- force: Full reindex (ignores cache, re-embeds everything)
-- paths: Only index specific files/directories
+Automatically respects .gitignore and .nellaignore files. Use the exclude parameter for one-off exclusions.
 
 Returns stats on files indexed, chunks created, and embeddings generated.`,
       inputSchema: {
@@ -54,6 +52,11 @@ Returns stats on files indexed, chunks created, and embeddings generated.`,
             type: "array",
             items: { type: "string" },
             description: "Specific file or directory paths to index (default: entire workspace)",
+          },
+          exclude: {
+            type: "array",
+            items: { type: "string" },
+            description: "Additional glob patterns to exclude (e.g., ['**/tests/**', '**/docs/**']). Merged with .gitignore and .nellaignore.",
           },
         },
       },
@@ -204,11 +207,12 @@ async function handleIndex(
 ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const force = (args.force as boolean) || false;
   const paths = args.paths as string[] | undefined;
+  const exclude = args.exclude as string[] | undefined;
 
   const manager = await getOrCreateManager(context.workspacePath);
 
   try {
-    const metadata = await manager.index({ force, paths });
+    const metadata = await manager.index({ force, paths, exclude });
     const stats = metadata.stats;
 
     return {
