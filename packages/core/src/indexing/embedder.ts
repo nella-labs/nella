@@ -478,8 +478,17 @@ export class Embedder {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Nella embedding API error: ${response.status} ${error}`);
+      const raw = await response.text();
+      let detail = raw;
+      try {
+        const parsed = JSON.parse(raw);
+        // Handle nested error structures from upstream providers
+        const inner = parsed.detail ? (typeof parsed.detail === 'string' ? JSON.parse(parsed.detail) : parsed.detail) : parsed;
+        detail = inner?.error?.message || parsed.error || parsed.message || raw;
+      } catch {
+        // keep raw text
+      }
+      throw new Error(`Embedding service error (${response.status}): ${detail}`);
     }
 
     const data = await response.json() as {

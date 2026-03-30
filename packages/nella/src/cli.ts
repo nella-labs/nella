@@ -693,7 +693,26 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
       const message = error instanceof Error ? error.message : String(error);
       console.log("");
       console.log(`  ${theme.icons.error}  ${theme.error.bold("Indexing failed")}`);
-      console.log(`  ${theme.muted(message)}`);
+      console.log("");
+
+      // Format error with actionable hints
+      if (message.includes("Embedding service error") || message.includes("embedding")) {
+        console.log(`  ${theme.error("Embedding Error")}`);
+        console.log(`  ${theme.muted(message.replace(/^Embedding service error \(\d+\): /, ""))}`);
+        console.log("");
+        console.log(`  ${theme.muted("Possible fixes:")}`);
+        console.log(`  ${theme.muted("  1. Check your Nella auth:")} ${theme.primary("nella auth status")}`);
+        console.log(`  ${theme.muted("  2. Re-authenticate:")} ${theme.primary("nella auth login")}`);
+        console.log(`  ${theme.muted("  3. If the issue persists, the embedding service may be temporarily unavailable.")}`);
+      } else if (message.includes("Not authenticated") || message.includes("auth")) {
+        console.log(`  ${theme.error("Authentication Error")}`);
+        console.log(`  ${theme.muted(message)}`);
+        console.log("");
+        console.log(`  ${theme.muted("Run")} ${theme.primary("nella auth login")} ${theme.muted("to authenticate.")}`);
+      } else {
+        console.log(`  ${theme.muted(message)}`);
+      }
+
       console.log("");
       process.exit(1);
     }
