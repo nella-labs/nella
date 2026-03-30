@@ -83,8 +83,5 @@ temp/
 # Docker
 .docker/
 
-# Changesets
-.changeset/
-
 # Git submodules (dead references)
 .gitmodules
