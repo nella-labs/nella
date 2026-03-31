@@ -1,0 +1,321 @@
+{
+  "runDate": "2026-03-31T02:27:31.537Z",
+  "feature": "context-tracking",
+  "version": "1.0.0",
+  "totalScenarios": 30,
+  "headline": {
+    "assumptionAccuracy": 1,
+    "invalidationDetectionRate": 1,
+    "falsePositiveRate": 0,
+    "driftDetectionRate": 1,
+    "assumptionAccuracyCI": {
+      "point": 1,
+      "lower": 0.886482908609522,
+      "upper": 1
+    }
+  },
+  "byScenarioType": [
+    {
+      "type": "file_change",
+      "accuracy": 1,
+      "samples": 8
+    },
+    {
+      "type": "dependency_update",
+      "accuracy": 1,
+      "samples": 5
+    },
+    {
+      "type": "schema_modification",
+      "accuracy": 1,
+      "samples": 5
+    },
+    {
+      "type": "config_change",
+      "accuracy": 1,
+      "samples": 4
+    },
+    {
+      "type": "no_change",
+      "accuracy": 1,
+      "samples": 5
+    },
+    {
+      "type": "glob_pattern",
+      "accuracy": 1,
+      "samples": 3
+    }
+  ],
+  "trials": [
+    {
+      "scenarioId": "fc-01-prisma-user-model",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 3
+    },
+    {
+      "scenarioId": "fc-02-types-interface",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-03-api-routes",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-04-helper-behavior",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-05-middleware-auth",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-06-service-layer",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-07-multiple-assumptions",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 2,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "fc-08-create-new-file-overlap",
+      "type": "file_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "dep-01-add-dependency",
+      "type": "dependency_update",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 0
+    },
+    {
+      "scenarioId": "dep-02-remove-dependency",
+      "type": "dependency_update",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 0
+    },
+    {
+      "scenarioId": "dep-03-major-version-bump",
+      "type": "dependency_update",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "dep-04-lockfile-change",
+      "type": "dependency_update",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 0
+    },
+    {
+      "scenarioId": "dep-05-tsconfig-options",
+      "type": "dependency_update",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 0
+    },
+    {
+      "scenarioId": "schema-01-remove-field",
+      "type": "schema_modification",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "schema-02-add-required-field",
+      "type": "schema_modification",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 2
+    },
+    {
+      "scenarioId": "schema-03-rename-field",
+      "type": "schema_modification",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 2
+    },
+    {
+      "scenarioId": "schema-04-change-field-type",
+      "type": "schema_modification",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "schema-05-move-model",
+      "type": "schema_modification",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "cfg-01-env-var-names",
+      "type": "config_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "cfg-02-db-connection-pattern",
+      "type": "config_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "cfg-03-api-base-url",
+      "type": "config_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "cfg-04-auth-settings",
+      "type": "config_change",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "noop-01-unrelated-logger",
+      "type": "no_change",
+      "expectedInvalidated": false,
+      "actualInvalidated": false,
+      "classification": "TN",
+      "invalidatedCount": 0,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "noop-02-unrelated-readme",
+      "type": "no_change",
+      "expectedInvalidated": false,
+      "actualInvalidated": false,
+      "classification": "TN",
+      "invalidatedCount": 0,
+      "executionTimeMs": 0
+    },
+    {
+      "scenarioId": "noop-03-unrelated-test",
+      "type": "no_change",
+      "expectedInvalidated": false,
+      "actualInvalidated": false,
+      "classification": "TN",
+      "invalidatedCount": 0,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "noop-04-unrelated-styles",
+      "type": "no_change",
+      "expectedInvalidated": false,
+      "actualInvalidated": false,
+      "classification": "TN",
+      "invalidatedCount": 0,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "noop-05-unrelated-ci",
+      "type": "no_change",
+      "expectedInvalidated": false,
+      "actualInvalidated": false,
+      "classification": "TN",
+      "invalidatedCount": 0,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "glob-01-models-wildcard",
+      "type": "glob_pattern",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "glob-02-config-double-star",
+      "type": "glob_pattern",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    },
+    {
+      "scenarioId": "glob-03-src-deep-nested",
+      "type": "glob_pattern",
+      "expectedInvalidated": true,
+      "actualInvalidated": true,
+      "classification": "TP",
+      "invalidatedCount": 1,
+      "executionTimeMs": 1
+    }
+  ]
+}

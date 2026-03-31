@@ -1,0 +1,1089 @@
+{
+  "runDate": "2026-03-31T02:38:31.896Z",
+  "feature": "search-quality",
+  "version": "1.0.0",
+  "totalQueries": 50,
+  "headline": {
+    "precisionAt5": 0.3146666666666667,
+    "recallAt5": 0.8615714285714285,
+    "mrr": 0.85,
+    "avgLatencyMs": 1.26,
+    "precisionAt5CI": {
+      "point": 0.32,
+      "lower": 0.207580440939994,
+      "upper": 0.45810557136276076
+    },
+    "recallAt5CI": {
+      "point": 0.86,
+      "lower": 0.7381354280147191,
+      "upper": 0.9304925473797714
+    }
+  },
+  "byQueryType": [
+    {
+      "type": "function_lookup",
+      "precisionAt5": 0.23222222222222225,
+      "recallAt5": 1,
+      "mrr": 0.9333333333333333,
+      "samples": 15
+    },
+    {
+      "type": "bug_description",
+      "precisionAt5": 0.22500000000000003,
+      "recallAt5": 0.85,
+      "mrr": 0.7833333333333334,
+      "samples": 10
+    },
+    {
+      "type": "concept_search",
+      "precisionAt5": 0.3600000000000001,
+      "recallAt5": 0.8944444444444444,
+      "mrr": 0.8222222222222222,
+      "samples": 15
+    },
+    {
+      "type": "cross_file",
+      "precisionAt5": 0.4600000000000001,
+      "recallAt5": 0.6161904761904762,
+      "mrr": 0.8333333333333334,
+      "samples": 10
+    }
+  ],
+  "trials": [
+    {
+      "queryId": "fl-01",
+      "query": "where is email validation defined",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 3,
+      "topResults": [
+        "src/models/user.ts",
+        "src/utils/validation.ts",
+        "src/models/product.ts",
+        "src/middleware/errorHandler.ts",
+        "src/routes/users.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-02",
+      "query": "function that hashes passwords",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/database/migrations.ts",
+        "src/routes/auth.ts"
+      ],
+      "relevant": [
+        "src/utils/crypto.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-03",
+      "query": "JWT token verification function",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/middleware/auth.ts",
+        "src/routes/auth.ts",
+        "src/types/index.ts",
+        "src/utils/crypto.ts",
+        "src/config/index.ts"
+      ],
+      "relevant": [
+        "src/middleware/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-04",
+      "query": "where is the database connection pool created",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/database/connection.ts",
+        "src/models/product.ts",
+        "src/models/user.ts",
+        "src/database/migrations.ts",
+        "src/utils/logger.ts"
+      ],
+      "relevant": [
+        "src/database/connection.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-05",
+      "query": "function to sanitize user for API response",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/models/user.ts",
+        "src/types/index.ts",
+        "src/models/product.ts",
+        "src/utils/crypto.ts",
+        "src/utils/validation.ts"
+      ],
+      "relevant": [
+        "src/models/user.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-06",
+      "query": "where does the product search query get built",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/product.ts",
+        "src/routes/products.ts",
+        "src/database/connection.ts",
+        "src/database/migrations.ts",
+        "src/middleware/errorHandler.ts"
+      ],
+      "relevant": [
+        "src/routes/products.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-07",
+      "query": "password comparison function",
+      "type": "function_lookup",
+      "precisionAt5": 0.25,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/models/user.ts",
+        "src/utils/validation.ts",
+        "src/database/migrations.ts"
+      ],
+      "relevant": [
+        "src/utils/crypto.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-08",
+      "query": "generate random token for API keys",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/types/index.ts",
+        "src/models/product.ts",
+        "src/routes/auth.ts",
+        "src/database/migrations.ts"
+      ],
+      "relevant": [
+        "src/utils/crypto.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-09",
+      "query": "where is the rate limit store defined",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/middleware/rateLimit.ts",
+        "src/models/product.ts",
+        "src/models/user.ts",
+        "src/config/index.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/middleware/rateLimit.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-10",
+      "query": "migration runner function",
+      "type": "function_lookup",
+      "precisionAt5": 0.3333333333333333,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/database/migrations.ts",
+        "src/index.ts",
+        "src/models/user.ts"
+      ],
+      "relevant": [
+        "src/database/migrations.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-11",
+      "query": "product price formatting function",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/product.ts",
+        "src/routes/products.ts",
+        "src/database/migrations.ts",
+        "src/index.ts",
+        "src/utils/logger.ts"
+      ],
+      "relevant": [
+        "src/models/product.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-12",
+      "query": "where are zod schemas for user input defined",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/routes/users.ts",
+        "tests/users.test.ts",
+        "src/utils/validation.ts"
+      ],
+      "relevant": [
+        "src/models/user.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-13",
+      "query": "function to validate password strength",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/utils/crypto.ts",
+        "src/models/product.ts",
+        "src/types/index.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-14",
+      "query": "AppError class definition",
+      "type": "function_lookup",
+      "precisionAt5": 0.5,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/middleware/errorHandler.ts",
+        "src/types/index.ts"
+      ],
+      "relevant": [
+        "src/middleware/errorHandler.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "fl-15",
+      "query": "child logger creation function",
+      "type": "function_lookup",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/utils/logger.ts",
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/index.ts",
+        "src/middleware/errorHandler.ts"
+      ],
+      "relevant": [
+        "src/utils/logger.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-01",
+      "query": "login fails when email has special characters like quotes",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 0.5,
+      "mrr": 0.5,
+      "latencyMs": 4,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/database/migrations.ts",
+        "src/database/connection.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts",
+        "src/routes/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-02",
+      "query": "rate limiter not resetting after timeout period expires",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/middleware/rateLimit.ts",
+        "src/config/index.ts",
+        "src/middleware/errorHandler.ts",
+        "src/index.ts",
+        "src/database/migrations.ts"
+      ],
+      "relevant": [
+        "src/middleware/rateLimit.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-03",
+      "query": "database connection pool exhaustion under high load",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/database/connection.ts",
+        "src/config/index.ts",
+        "src/database/migrations.ts",
+        "src/index.ts",
+        "src/routes/products.ts"
+      ],
+      "relevant": [
+        "src/database/connection.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-04",
+      "query": "user can update other users profiles without admin role",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 3,
+      "topResults": [
+        "src/models/user.ts",
+        "src/routes/users.ts",
+        "src/middleware/auth.ts",
+        "src/models/product.ts",
+        "tests/users.test.ts"
+      ],
+      "relevant": [
+        "src/routes/users.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-05",
+      "query": "JWT token still valid after logout",
+      "type": "bug_description",
+      "precisionAt5": 0.4,
+      "recallAt5": 1,
+      "mrr": 0.3333333333333333,
+      "latencyMs": 1,
+      "topResults": [
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/routes/auth.ts",
+        "src/middleware/errorHandler.ts",
+        "src/middleware/auth.ts"
+      ],
+      "relevant": [
+        "src/routes/auth.ts",
+        "src/middleware/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-06",
+      "query": "product search SQL injection through search parameter",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 3,
+      "topResults": [
+        "src/models/product.ts",
+        "src/routes/products.ts",
+        "src/database/migrations.ts",
+        "src/index.ts",
+        "src/utils/logger.ts"
+      ],
+      "relevant": [
+        "src/routes/products.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-07",
+      "query": "error handler leaks stack trace in production",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 0.5,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/middleware/errorHandler.ts",
+        "src/models/product.ts",
+        "src/models/user.ts",
+        "src/types/index.ts",
+        "src/database/connection.ts"
+      ],
+      "relevant": [
+        "src/middleware/errorHandler.ts",
+        "src/config/index.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-08",
+      "query": "migration rollback does not actually undo DDL changes",
+      "type": "bug_description",
+      "precisionAt5": 0.25,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/database/migrations.ts",
+        "src/middleware/errorHandler.ts",
+        "src/index.ts",
+        "src/database/connection.ts"
+      ],
+      "relevant": [
+        "src/database/migrations.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-09",
+      "query": "password hash timing attack vulnerability in login",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 0.5,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/utils/validation.ts",
+        "src/types/index.ts"
+      ],
+      "relevant": [
+        "src/utils/crypto.ts",
+        "src/routes/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "bd-10",
+      "query": "phone validation accepts invalid short numbers",
+      "type": "bug_description",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/middleware/errorHandler.ts",
+        "src/models/product.ts",
+        "src/routes/users.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-01",
+      "query": "how does authentication work in this project",
+      "type": "concept_search",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.6666666666666666,
+      "mrr": 0.3333333333333333,
+      "latencyMs": 2,
+      "topResults": [
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/middleware/auth.ts",
+        "src/types/index.ts",
+        "src/database/migrations.ts"
+      ],
+      "relevant": [
+        "src/middleware/auth.ts",
+        "src/routes/auth.ts",
+        "src/types/index.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-02",
+      "query": "error handling strategy and custom error classes",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/middleware/errorHandler.ts",
+        "src/index.ts",
+        "src/database/connection.ts",
+        "src/types/index.ts",
+        "src/models/user.ts"
+      ],
+      "relevant": [
+        "src/middleware/errorHandler.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-03",
+      "query": "database connection management and pooling",
+      "type": "concept_search",
+      "precisionAt5": 0.4,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/database/connection.ts",
+        "src/config/index.ts",
+        "src/index.ts",
+        "src/routes/products.ts",
+        "src/routes/users.ts"
+      ],
+      "relevant": [
+        "src/database/connection.ts",
+        "src/config/index.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-04",
+      "query": "how is rate limiting implemented",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/middleware/rateLimit.ts",
+        "src/models/product.ts",
+        "src/models/user.ts",
+        "src/config/index.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/middleware/rateLimit.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-05",
+      "query": "user registration and account creation flow",
+      "type": "concept_search",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.6666666666666666,
+      "mrr": 1,
+      "latencyMs": 4,
+      "topResults": [
+        "src/models/user.ts",
+        "src/routes/users.ts",
+        "tests/users.test.ts",
+        "src/index.ts",
+        "src/routes/auth.ts"
+      ],
+      "relevant": [
+        "src/routes/auth.ts",
+        "src/models/user.ts",
+        "src/utils/crypto.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-06",
+      "query": "how does the application validate input data",
+      "type": "concept_search",
+      "precisionAt5": 0.6,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/database/connection.ts",
+        "src/config/index.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/models/product.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-07",
+      "query": "logging and observability setup",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/utils/logger.ts",
+        "tests/users.test.ts",
+        "src/config/index.ts",
+        "src/middleware/errorHandler.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/utils/logger.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-08",
+      "query": "security measures and access control",
+      "type": "concept_search",
+      "precisionAt5": 0.5,
+      "recallAt5": 0.3333333333333333,
+      "mrr": 0.5,
+      "latencyMs": 2,
+      "topResults": [
+        "src/config/index.ts",
+        "src/utils/crypto.ts"
+      ],
+      "relevant": [
+        "src/middleware/auth.ts",
+        "src/middleware/rateLimit.ts",
+        "src/utils/crypto.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-09",
+      "query": "database schema and table definitions",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 0,
+      "topResults": [
+        "src/database/connection.ts",
+        "src/database/migrations.ts",
+        "src/types/index.ts",
+        "src/config/index.ts",
+        "src/models/user.ts"
+      ],
+      "relevant": [
+        "src/database/migrations.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-10",
+      "query": "how are environment variables and config managed",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/config/index.ts",
+        "src/database/connection.ts",
+        "src/routes/auth.ts",
+        "src/index.ts",
+        "src/middleware/errorHandler.ts"
+      ],
+      "relevant": [
+        "src/config/index.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-11",
+      "query": "product catalog features and search capabilities",
+      "type": "concept_search",
+      "precisionAt5": 0.4,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/models/product.ts",
+        "src/routes/products.ts",
+        "src/index.ts",
+        "src/database/migrations.ts",
+        "src/utils/logger.ts"
+      ],
+      "relevant": [
+        "src/routes/products.ts",
+        "src/models/product.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-12",
+      "query": "API routing and endpoint organization",
+      "type": "concept_search",
+      "precisionAt5": 0.6,
+      "recallAt5": 0.75,
+      "mrr": 0.5,
+      "latencyMs": 2,
+      "topResults": [
+        "src/types/index.ts",
+        "src/routes/products.ts",
+        "src/routes/users.ts",
+        "package.json",
+        "src/routes/auth.ts"
+      ],
+      "relevant": [
+        "src/index.ts",
+        "src/routes/users.ts",
+        "src/routes/auth.ts",
+        "src/routes/products.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-13",
+      "query": "password security and storage approach",
+      "type": "concept_search",
+      "precisionAt5": 0.4,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/utils/validation.ts",
+        "src/models/user.ts",
+        "src/middleware/rateLimit.ts",
+        "src/database/migrations.ts"
+      ],
+      "relevant": [
+        "src/utils/crypto.ts",
+        "src/models/user.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-14",
+      "query": "retry logic and fault tolerance patterns",
+      "type": "concept_search",
+      "precisionAt5": 0.5,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 2,
+      "topResults": [
+        "src/middleware/rateLimit.ts",
+        "src/database/connection.ts"
+      ],
+      "relevant": [
+        "src/database/connection.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "cs-15",
+      "query": "type definitions and shared interfaces",
+      "type": "concept_search",
+      "precisionAt5": 0.2,
+      "recallAt5": 1,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/types/index.ts",
+        "src/models/product.ts",
+        "package.json",
+        "src/models/user.ts",
+        "src/config/index.ts"
+      ],
+      "relevant": [
+        "src/types/index.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-01",
+      "query": "what files import the User model",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 1,
+      "mrr": 0.5,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/user.ts",
+        "src/routes/users.ts",
+        "tests/users.test.ts",
+        "src/routes/auth.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/routes/users.ts",
+        "src/routes/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-02",
+      "query": "files that use the database connection pool",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.4,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/database/connection.ts",
+        "src/routes/users.ts",
+        "src/models/user.ts",
+        "tests/users.test.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/routes/users.ts",
+        "src/routes/auth.ts",
+        "src/routes/products.ts",
+        "src/database/migrations.ts",
+        "src/database/connection.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-03",
+      "query": "middleware chain for protected routes",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.6666666666666666,
+      "mrr": 0.5,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/product.ts",
+        "src/index.ts",
+        "src/utils/validation.ts",
+        "src/utils/logger.ts",
+        "src/middleware/auth.ts"
+      ],
+      "relevant": [
+        "src/index.ts",
+        "src/middleware/auth.ts",
+        "src/middleware/rateLimit.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-04",
+      "query": "where is validateEmail used across the codebase",
+      "type": "cross_file",
+      "precisionAt5": 0.6,
+      "recallAt5": 0.75,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/user.ts",
+        "src/models/product.ts",
+        "src/types/index.ts",
+        "src/routes/users.ts",
+        "src/utils/validation.ts"
+      ],
+      "relevant": [
+        "src/utils/validation.ts",
+        "src/routes/users.ts",
+        "src/routes/auth.ts",
+        "src/models/user.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-05",
+      "query": "files that import from config module",
+      "type": "cross_file",
+      "precisionAt5": 0.6,
+      "recallAt5": 0.42857142857142855,
+      "mrr": 0.3333333333333333,
+      "latencyMs": 1,
+      "topResults": [
+        "src/config/index.ts",
+        "tsconfig.json",
+        "src/database/connection.ts",
+        "src/routes/auth.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/index.ts",
+        "src/routes/auth.ts",
+        "src/middleware/auth.ts",
+        "src/middleware/rateLimit.ts",
+        "src/middleware/errorHandler.ts",
+        "src/database/connection.ts",
+        "src/utils/logger.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-06",
+      "query": "which routes use the logger utility",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.5,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/routes/users.ts",
+        "src/models/user.ts",
+        "tests/users.test.ts",
+        "src/routes/auth.ts",
+        "src/index.ts"
+      ],
+      "relevant": [
+        "src/routes/users.ts",
+        "src/routes/auth.ts",
+        "src/routes/products.ts",
+        "src/utils/logger.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-07",
+      "query": "trace the signup flow from route to database",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.5,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/utils/crypto.ts",
+        "src/database/connection.ts",
+        "src/types/index.ts",
+        "src/routes/products.ts",
+        "src/routes/users.ts"
+      ],
+      "relevant": [
+        "src/routes/auth.ts",
+        "src/utils/validation.ts",
+        "src/utils/crypto.ts",
+        "src/database/connection.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-08",
+      "query": "which modules reference the AuthenticatedRequest type",
+      "type": "cross_file",
+      "precisionAt5": 0.6,
+      "recallAt5": 0.75,
+      "mrr": 1,
+      "latencyMs": 0,
+      "topResults": [
+        "src/types/index.ts",
+        "package.json",
+        "src/routes/products.ts",
+        "src/routes/users.ts",
+        "src/models/product.ts"
+      ],
+      "relevant": [
+        "src/types/index.ts",
+        "src/routes/users.ts",
+        "src/routes/products.ts",
+        "src/middleware/auth.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-09",
+      "query": "all files related to product management",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.6666666666666666,
+      "mrr": 1,
+      "latencyMs": 1,
+      "topResults": [
+        "src/models/product.ts",
+        "src/routes/products.ts",
+        "src/utils/crypto.ts",
+        "src/types/index.ts",
+        "src/middleware/auth.ts"
+      ],
+      "relevant": [
+        "src/routes/products.ts",
+        "src/models/product.ts",
+        "src/database/migrations.ts"
+      ],
+      "hit": true
+    },
+    {
+      "queryId": "xf-10",
+      "query": "files involved in the JWT token lifecycle",
+      "type": "cross_file",
+      "precisionAt5": 0.4,
+      "recallAt5": 0.5,
+      "mrr": 1,
+      "latencyMs": 2,
+      "topResults": [
+        "src/middleware/auth.ts",
+        "src/models/user.ts",
+        "src/types/index.ts",
+        "src/models/product.ts",
+        "src/middleware/errorHandler.ts"
+      ],
+      "relevant": [
+        "src/routes/auth.ts",
+        "src/middleware/auth.ts",
+        "src/config/index.ts",
+        "src/types/index.ts"
+      ],
+      "hit": true
+    }
+  ]
+}
