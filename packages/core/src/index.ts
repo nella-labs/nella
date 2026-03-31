@@ -140,7 +140,7 @@ export type {
 // =============================================================================
 
 export { BranchCloudSync } from "./sync/cloud/branch-sync";
-export type { BranchCloudSyncConfig, CloudObjectStorage } from "./sync/cloud/branch-sync";
+export type { BranchCloudSyncConfig } from "./sync/cloud/branch-sync";
 
 export { AgentStateSync } from "./sync/cloud/agent-sync";
 export type { AgentStateSyncConfig, IndexUpdateNotification } from "./sync/cloud/agent-sync";

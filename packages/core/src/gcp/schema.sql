@@ -161,6 +161,79 @@ CREATE TRIGGER branch_indexes_updated_at
     EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================================
+-- Agent Presence (multi-agent coordination via GCP)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_presence (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    agent_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'claude',
+    branch TEXT,
+    current_task TEXT,
+    active_files TEXT[] DEFAULT '{}',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'idle', 'busy', 'disconnected')),
+    capabilities TEXT[] DEFAULT '{}',
+    last_heartbeat TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT unique_agent_workspace UNIQUE (agent_id, workspace_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_presence_workspace ON agent_presence(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_agent_presence_status ON agent_presence(status);
+CREATE INDEX IF NOT EXISTS idx_agent_presence_user ON agent_presence(user_id);
+
+-- ============================================================================
+-- Agent Tasks (multi-agent task coordination via GCP)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_tasks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id TEXT NOT NULL,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    assigned_agent TEXT,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'failed', 'blocked')),
+    parent_task_id UUID REFERENCES agent_tasks(id) ON DELETE SET NULL,
+    files TEXT[] DEFAULT '{}',
+    branch TEXT,
+    priority INTEGER DEFAULT 5,
+    dependencies UUID[] DEFAULT '{}',
+    result JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_workspace ON agent_tasks(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent ON agent_tasks(assigned_agent);
+
+-- ============================================================================
+-- Agent Decisions (decision log via GCP)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_decisions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    decision TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    alternatives TEXT[] DEFAULT '{}',
+    affected_files TEXT[] DEFAULT '{}',
+    branch TEXT,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_decisions_workspace ON agent_decisions(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_agent_decisions_agent ON agent_decisions(agent_id);
+
+-- ============================================================================
 -- Functions
 -- ============================================================================
 
