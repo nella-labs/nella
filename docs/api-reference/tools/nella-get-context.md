@@ -24,7 +24,7 @@ nella_get_context({
 - Includes hotspot files, recent changes, active assumptions, recent invalidations, and dependency snapshot details when available.
 - Also includes:
   - A per-session trust token.
-  - Integrity verification metadata for `nella_search` results.
+  - HMAC integrity metadata for `nella_search` results.
   - The current heartbeat challenge for [`nella_heartbeat`](./nella-heartbeat.md).
 
 ## Response Shape

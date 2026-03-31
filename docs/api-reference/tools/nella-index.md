@@ -26,7 +26,8 @@ nella_index({
 Index complete.
 
 - Files indexed: 42
-- Index ready
+- Chunks created: 318
+- Embeddings generated: 318
 ```
 
 ## Notes

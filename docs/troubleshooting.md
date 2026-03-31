@@ -23,7 +23,13 @@ On Windows, you may need to restart your terminal or add npm's global bin to you
 
 ### Optional dependency warnings
 
-Some optional native dependencies may show warnings during installation — these are safe to ignore and won't affect core functionality.
+Some optional native dependencies may show warnings during installation. These provide performance improvements but aren't required:
+
+| Warning | Impact |
+|---------|--------|
+| `usearch not available` | Vector search falls back to brute-force (slower at scale) |
+| `better-sqlite3 not available` | Rate limiting uses in-memory backend (resets on restart) |
+| `onnxruntime-node not available` | Embeddings require API calls instead of running locally |
 
 ## MCP Server Issues
 
@@ -86,11 +92,11 @@ Full indexing is I/O-bound by embedding API calls. Tips:
 | Use Nella cloud embeddings (`nella auth login`) | Higher rate limits |
 | Incremental re-indexing | 20x faster for unchanged codebases |
 | Use include/exclude globs | Skip large generated files |
-| Install optional native dependencies | Faster vector search (not faster indexing) |
+| Install `usearch` for HNSW | Faster vector search (not faster indexing) |
 
 ### Search results are irrelevant
 
-Hybrid search combines multiple search techniques for better results. If results are poor:
+Hybrid search combines semantic (vector) and lexical (BM25) results. If results are poor:
 
 1. **For exact symbol lookups** — Use lexical search mode directly (it's <2ms and exact)
 2. **For natural language queries** — Semantic search depends on embedding quality and chunk boundaries
