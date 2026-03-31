@@ -67,6 +67,12 @@ export interface IndexMetadata {
     durationMs?: number;
   };
   config: IndexConfig;
+  /** Branch this index belongs to (undefined = default/main) */
+  branchId?: string;
+  /** Parent branch this was forked from */
+  parentBranchId?: string;
+  /** Commit SHA at the fork point */
+  forkCommit?: string;
 }
 
 export interface IndexConfig {

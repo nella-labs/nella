@@ -23,6 +23,42 @@ export interface WorkspaceEntry {
   config?: WorkspaceConfig;
   orgId?: string;
   projectId?: string;
+  /** Git branch tracking (populated when workspace is in a git repo) */
+  git?: GitBranchTracking;
+}
+
+// =============================================================================
+// Branch Tracking
+// =============================================================================
+
+export interface GitBranchTracking {
+  /** Remote repository URL (set when GitHub-linked) */
+  remoteUrl?: string;
+  /** Default/main branch name (e.g., "main" or "master") */
+  defaultBranch: string;
+  /** Currently active branch for this workspace */
+  activeBranch: string;
+  /** Branch index metadata keyed by branch name */
+  branches: Record<string, BranchIndexInfo>;
+}
+
+export interface BranchIndexInfo {
+  /** Branch name */
+  name: string;
+  /** Parent branch this was forked from */
+  parentBranch: string;
+  /** Commit SHA at fork point */
+  forkPoint: string;
+  /** Current HEAD commit when last indexed */
+  headCommit: string;
+  /** Index status for this branch overlay */
+  indexStatus: WorkspaceEntry["indexStatus"];
+  /** Stats specific to this branch overlay */
+  stats: WorkspaceEntry["stats"];
+  /** When this branch index was created */
+  createdAt: string;
+  /** When this branch index was last updated */
+  updatedAt: string;
 }
 
 export interface WorkspaceConfig {
@@ -135,4 +171,8 @@ export type WorkspaceEvent =
   | { type: "workspace:index:error"; workspaceId: string; error: string }
   | { type: "workspace:watch:start"; workspaceId: string }
   | { type: "workspace:watch:stop"; workspaceId: string }
-  | { type: "workspace:files:changed"; workspaceId: string; changes: Array<{ type: string; path: string }> };
+  | { type: "workspace:files:changed"; workspaceId: string; changes: Array<{ type: string; path: string }> }
+  | { type: "workspace:branch:created"; workspaceId: string; branch: string }
+  | { type: "workspace:branch:switched"; workspaceId: string; from: string; to: string }
+  | { type: "workspace:branch:merged"; workspaceId: string; branch: string; into: string }
+  | { type: "workspace:branch:deleted"; workspaceId: string; branch: string };
