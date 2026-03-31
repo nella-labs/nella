@@ -12,6 +12,8 @@ export type {
   WorkspaceRegistry as IWorkspaceRegistry,
   RegistrySettings,
   WorkspaceEvent,
+  GitBranchTracking,
+  BranchIndexInfo,
 } from "./types";
 
 export {

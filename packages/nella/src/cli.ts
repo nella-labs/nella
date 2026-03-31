@@ -25,8 +25,10 @@ import {
   DEFAULT_INDEX_CONFIG,
   buildDependencyGraph,
   dependencyGraphToArchgraphModel,
+  BranchIndexManager,
+  gitUtils,
 } from "@usenella/core";
-import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
+import type { IndexManagerConfig, IndexEvent, BranchIndexInfo } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
 import { startHostedServer } from "./mcp/hosted-server";
 import {
@@ -102,7 +104,7 @@ ${g5("  ██║ ╚████║")}${g5("███████╗")}${g5("�
 ${g6("  ╚═╝  ╚═══╝")}${g6("╚══════╝")}${g6("╚══════╝╚══════╝╚═╝  ╚═╝")}
 `;
 
-const tagline = `  ${theme.muted("Reliability layer for coding agents")}  ${chalk.dim(`v${PKG_VERSION}`)}\n`;
+const tagline = `  ${theme.muted("Codebase intelligence for AI agents")}  ${chalk.dim(`v${PKG_VERSION}`)}\n`;
 
 function sectionHeader(title: string): string {
   const line = theme.muted("─".repeat(Math.max(0, 40 - title.length)));
@@ -139,7 +141,7 @@ function divider(): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "index" | "mcp" | "serve" | "connect" | "auth" | "org" | "project" | "setup" | "help";
+  command: "index" | "mcp" | "serve" | "connect" | "auth" | "org" | "project" | "branch" | "setup" | "help";
   force?: boolean;
   repoPath?: string;
   output?: "json" | "pretty";
@@ -161,6 +163,8 @@ interface CliArgs {
   subcommandArg?: string;
   // Graph flag
   graph?: boolean;
+  // Branch flag (for index command)
+  branch?: string;
   // Help flag (per-command)
   showHelp?: boolean;
 }
@@ -176,7 +180,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "org" || arg === "project" || arg === "setup" || arg === "help") {
+    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "org" || arg === "project" || arg === "branch" || arg === "setup" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -188,8 +192,8 @@ function parseArgs(args: string[]): CliArgs {
         }
       }
 
-      // Parse org/project subcommand + optional argument
-      if ((arg === "org" || arg === "project") && i + 1 < args.length) {
+      // Parse org/project/branch subcommand + optional argument
+      if ((arg === "org" || arg === "project" || arg === "branch") && i + 1 < args.length) {
         const sub = args[i + 1];
         if (sub && !sub.startsWith("-")) {
           result.subcommand = sub;
@@ -253,6 +257,10 @@ function parseArgs(args: string[]): CliArgs {
       result.mode = arg.slice("--mode=".length);
     } else if (arg === "--yes" || arg === "-y") {
       result.yes = true;
+    } else if (arg === "--branch" || arg === "-b") {
+      result.branch = args[++i];
+    } else if (arg.startsWith("--branch=")) {
+      result.branch = arg.slice("--branch=".length);
     }
 
     i++;
@@ -543,6 +551,167 @@ async function runProjectCommand(args: CliArgs): Promise<void> {
     } else {
       console.log(`  ${theme.icons.warning}  Workspace not found in registry.\n`);
     }
+    return;
+  }
+
+  console.log(`  ${theme.icons.error}  Unknown subcommand: ${sub}\n`);
+  process.exit(1);
+}
+
+// =============================================================================
+// Branch Command
+// =============================================================================
+
+async function runBranchCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const sub = args.subcommand;
+  const workspacePath = path.resolve(args.workspace || process.cwd());
+
+  if (args.showHelp || sub === "help") {
+    console.log(`  ${theme.primary.bold("nella branch")} — Manage branch indexes\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella branch")}                     ${theme.muted("Show current branch and index status")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella branch list")}                ${theme.muted("List all branch indexes")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella branch switch <name>")}       ${theme.muted("Switch active branch index")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella branch delete <name>")}       ${theme.muted("Delete a branch index")}`);
+    console.log("");
+    console.log(`  ${theme.primary.bold("Related:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella index --branch <name>")}      ${theme.muted("Index a specific branch")}`);
+    console.log("");
+    return;
+  }
+
+  // Check if workspace is a git repo
+  const isRepo = await gitUtils.isGitRepo(workspacePath);
+  if (!isRepo) {
+    console.log(`  ${theme.icons.error}  ${theme.error("Not a git repository:")} ${workspacePath}\n`);
+    process.exit(1);
+  }
+
+  const currentBranch = await gitUtils.getCurrentBranch(workspacePath);
+  const defaultBranch = await gitUtils.getDefaultBranch(workspacePath);
+
+  // Create a BranchIndexManager for this workspace
+  const storagePath = path.join(workspacePath, ".nella", "index");
+  const branchManager = new BranchIndexManager({
+    workspaceId: path.basename(workspacePath),
+    workspacePath,
+    baseStoragePath: storagePath,
+    defaultBranch,
+    indexConfig: {
+      ...DEFAULT_INDEX_CONFIG,
+      chunking: { maxTokens: 512, overlap: 50, strategy: "ast" },
+    },
+  });
+
+  // Default: show current branch status
+  if (!sub) {
+    const info = branchManager.getBranchInfo(currentBranch);
+    console.log(`  ${theme.primary.bold("Current Branch")}\n`);
+    console.log(`  ${theme.icons.arrow}  Branch: ${theme.primary.bold(currentBranch)}${currentBranch === defaultBranch ? theme.muted(" (default)") : ""}`);
+
+    if (info) {
+      const statusColor = info.indexStatus === "ready" ? theme.success : info.indexStatus === "error" ? theme.error : theme.warning;
+      console.log(`  ${theme.icons.bullet}  Index:  ${statusColor(info.indexStatus)}`);
+      console.log(`  ${theme.icons.bullet}  Files:  ${theme.muted(String(info.stats.filesIndexed))}`);
+      console.log(`  ${theme.icons.bullet}  Chunks: ${theme.muted(String(info.stats.chunksCount))}`);
+      if (info.parentBranch !== currentBranch) {
+        console.log(`  ${theme.icons.bullet}  Parent: ${theme.muted(info.parentBranch)}`);
+      }
+      console.log(`  ${theme.icons.bullet}  Updated: ${theme.muted(info.updatedAt)}`);
+    } else {
+      console.log(`  ${theme.icons.bullet}  Index:  ${theme.warning("not indexed")}`);
+      console.log(`\n  ${theme.muted("Run")} ${theme.primary.bold("nella index")} ${theme.muted("to index this branch")}`);
+    }
+    console.log("");
+    return;
+  }
+
+  // List all branch indexes
+  if (sub === "list") {
+    const branches = branchManager.listBranches();
+    console.log(`  ${theme.primary.bold("Branch Indexes")} ${theme.muted(`(${branches.length})`)}\n`);
+
+    if (branches.length === 0) {
+      console.log(`  ${theme.muted("No branch indexes found. Run")} ${theme.primary.bold("nella index")} ${theme.muted("to create one.")}\n`);
+      return;
+    }
+
+    const table = new Table({
+      head: ["Branch", "Status", "Files", "Chunks", "Parent", "Updated"].map((h) => theme.muted(h)),
+      style: { head: [], border: [] },
+      chars: {
+        top: "", "top-mid": "", "top-left": "", "top-right": "",
+        bottom: "", "bottom-mid": "", "bottom-left": "", "bottom-right": "",
+        left: "  ", "left-mid": "", mid: "", "mid-mid": "",
+        right: "", "right-mid": "", middle: "  ",
+      },
+    });
+
+    for (const info of branches) {
+      const isCurrent = info.name === currentBranch;
+      const isDefault = info.name === defaultBranch;
+      const name = isCurrent
+        ? theme.primary.bold(`* ${info.name}`)
+        : `  ${info.name}`;
+      const statusColor = info.indexStatus === "ready" ? theme.success : info.indexStatus === "error" ? theme.error : theme.warning;
+      const parent = isDefault ? theme.muted("-") : theme.muted(info.parentBranch);
+      const updated = theme.muted(info.updatedAt.split("T")[0] || "-");
+
+      table.push([
+        name,
+        statusColor(info.indexStatus),
+        String(info.stats.filesIndexed),
+        String(info.stats.chunksCount),
+        parent,
+        updated,
+      ]);
+    }
+
+    console.log(table.toString());
+    console.log("");
+    return;
+  }
+
+  // Switch branch index
+  if (sub === "switch") {
+    const branchName = args.subcommandArg;
+    if (!branchName) {
+      console.log(`  ${theme.icons.error}  ${theme.error("Usage:")} nella branch switch <name>\n`);
+      process.exit(1);
+    }
+
+    if (!branchManager.hasBranchIndex(branchName)) {
+      console.log(`  ${theme.icons.warning}  No index for branch "${branchName}". Creating overlay...`);
+      await branchManager.createBranchIndex(branchName);
+    }
+
+    console.log(`  ${theme.icons.success}  Switched to branch index: ${theme.primary.bold(branchName)}\n`);
+    return;
+  }
+
+  // Delete branch index
+  if (sub === "delete") {
+    const branchName = args.subcommandArg;
+    if (!branchName) {
+      console.log(`  ${theme.icons.error}  ${theme.error("Usage:")} nella branch delete <name>\n`);
+      process.exit(1);
+    }
+
+    if (branchName === defaultBranch) {
+      console.log(`  ${theme.icons.error}  ${theme.error("Cannot delete the default branch index.")}\n`);
+      process.exit(1);
+    }
+
+    if (!branchManager.hasBranchIndex(branchName)) {
+      console.log(`  ${theme.icons.warning}  No index found for branch "${branchName}".\n`);
+      return;
+    }
+
+    await branchManager.deleteBranchIndex(branchName);
+    console.log(`  ${theme.icons.success}  Deleted branch index: ${theme.primary.bold(branchName)}\n`);
     return;
   }
 
@@ -894,6 +1063,9 @@ async function main(): Promise<void> {
       break;
     case "project":
       await runProjectCommand(args);
+      break;
+    case "branch":
+      await runBranchCommand(args);
       break;
     case "connect":
       await runConnectCommand(

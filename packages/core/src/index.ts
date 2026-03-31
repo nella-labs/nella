@@ -1,7 +1,7 @@
 /**
  * Nella Core
  *
- * Reliability layer for coding agents — addresses four problems:
+ * Codebase intelligence for coding agents — addresses four areas:
  *
  * 1. Hallucination Reduction
  *    - Code verification against indexed codebase (imports, symbols, APIs)
@@ -95,6 +95,22 @@ export {
   dependencyGraphToArchgraphModel,
 } from "./indexing";
 
+export {
+  // Branch-aware indexing
+  BranchIndexManager,
+  createBranchIndexManager,
+} from "./indexing/branch-manager";
+
+export type {
+  BranchIndexConfig,
+} from "./indexing/branch-manager";
+
+// =============================================================================
+// Git Utilities
+// =============================================================================
+
+export * as gitUtils from "./utils/git";
+
 export type {
   // Types
   IndexManagerConfig,
@@ -156,6 +172,8 @@ export type {
   IWorkspaceRegistry,
   RegistrySettings,
   WorkspaceEvent,
+  GitBranchTracking,
+  BranchIndexInfo,
   // Options
   WorkspaceOptions,
   SharedContext,
