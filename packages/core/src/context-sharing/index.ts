@@ -59,3 +59,20 @@ export {
   type ContextManagerOptions,
   type ContextEventHandler,
 } from "./manager";
+
+// Agent Registry
+export {
+  AgentRegistry,
+  type AgentRegistryOptions,
+} from "./agent-registry";
+
+export type {
+  AgentPresence,
+  AgentTask,
+  AgentDecision,
+  AgentRegistryEvent,
+  FileConflict,
+  AgentType,
+  AgentStatus,
+  TaskStatus,
+} from "./agent-types";

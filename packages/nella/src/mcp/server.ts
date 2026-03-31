@@ -2,7 +2,7 @@
 /**
  * Nella MCP Server
  *
- * Model Context Protocol server that exposes Nella's reliability layer
+ * Model Context Protocol server that exposes Nella's codebase intelligence
  * to AI agents like Claude.
  *
  * Usage:
@@ -25,6 +25,7 @@ import { parseWorkspaceArg } from "./utils/args";
 import { getValidSession } from "../auth";
 import { registerContextTools, handleContextTool } from "./tools/context";
 import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
+import { registerAgentTools, handleAgentTool } from "./tools/agents";
 import { registerHeartbeatTool, handleHeartbeat, createChallengeState } from "./tools/heartbeat";
 import type { ChallengeState } from "./tools/heartbeat";
 
@@ -130,7 +131,7 @@ export interface ServerContext {
 export async function startMcpServer(args: { workspace?: string; help?: boolean }): Promise<void> {
   if (args.help) {
     console.error(`
-Nella MCP Server - Reliability layer for AI coding agents
+Nella MCP Server - Codebase intelligence for AI coding agents
 
 Usage:
   nella mcp --workspace <path>  Start server with workspace path
@@ -196,6 +197,7 @@ Example:
   const allTools: Tool[] = [
     ...registerContextTools(),
     ...registerIndexingTools(),
+    ...registerAgentTools(),
     registerHeartbeatTool(),
   ];
 
@@ -222,6 +224,12 @@ Example:
         if (indexingResult !== null) {
           await logUsage(name, Date.now() - start, !indexingResult.isError, indexingResult as CallToolResult, toolArgs);
           return indexingResult as CallToolResult;
+        }
+
+        const agentResult = await handleAgentTool(name, toolArgs || {}, serverContext);
+        if (agentResult !== null) {
+          await logUsage(name, Date.now() - start, !agentResult.isError, agentResult as CallToolResult, toolArgs);
+          return agentResult as CallToolResult;
         }
 
         // Heartbeat tool (challenge-response)

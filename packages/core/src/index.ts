@@ -115,6 +115,26 @@ export * as gitUtils from "./utils/git";
 // GitHub Integration
 // =============================================================================
 
+// =============================================================================
+// Context Sharing (Multi-Agent Coordination)
+// =============================================================================
+
+export {
+  AgentRegistry,
+} from "./context-sharing";
+
+export type {
+  AgentPresence,
+  AgentTask,
+  AgentDecision,
+  AgentRegistryEvent,
+  FileConflict,
+  AgentType,
+  AgentStatus,
+  TaskStatus,
+  AgentRegistryOptions,
+} from "./context-sharing";
+
 export { GitHubService, WebhookHandler } from "./github";
 
 export type {
