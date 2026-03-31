@@ -23,13 +23,7 @@ On Windows, you may need to restart your terminal or add npm's global bin to you
 
 ### Optional dependency warnings
 
-Messages like `usearch not available, falling back to brute-force` are normal. Optional dependencies provide performance improvements but aren't required:
-
-| Warning | Meaning | Impact |
-|---------|---------|--------|
-| `usearch not available` | HNSW vector index unavailable | Vector search uses brute-force cosine similarity (slower at scale) |
-| `better-sqlite3 not available` | SQLite rate limiter unavailable | Rate limiting uses in-memory backend (resets on restart) |
-| `onnxruntime-node not available` | Local embeddings unavailable | Embedding requires API calls (Nella cloud) |
+Some optional native dependencies may show warnings during installation — these are safe to ignore and won't affect core functionality.
 
 ## MCP Server Issues
 
@@ -92,11 +86,11 @@ Full indexing is I/O-bound by embedding API calls. Tips:
 | Use Nella cloud embeddings (`nella auth login`) | Higher rate limits |
 | Incremental re-indexing | 20x faster for unchanged codebases |
 | Use include/exclude globs | Skip large generated files |
-| Install `usearch` for HNSW | Faster vector search (not faster indexing) |
+| Install optional native dependencies | Faster vector search (not faster indexing) |
 
 ### Search results are irrelevant
 
-Hybrid search combines semantic (vector) and lexical (BM25) results. If results are poor:
+Hybrid search combines multiple search techniques for better results. If results are poor:
 
 1. **For exact symbol lookups** — Use lexical search mode directly (it's <2ms and exact)
 2. **For natural language queries** — Semantic search depends on embedding quality and chunk boundaries
@@ -104,24 +98,14 @@ Hybrid search combines semantic (vector) and lexical (BM25) results. If results 
 
 ### Large index size on disk
 
-A typical monorepo index is ~500MB. Breakdown:
-
-| File | ~Size | Reducible? |
-|------|-------|-----------|
-| `vectors.json` | 140 MB | Future: binary format |
-| `chunks.json` | 133 MB | Future: compression |
-| `embeddings.cache.json` | 131 MB | Delete to re-embed (costs API calls) |
-| `lexical.json` | 2.6 MB | No |
-
-Add `.nella/index/` to your `.gitignore` — indexes should not be committed.
+A typical monorepo index can be several hundred megabytes. Add `.nella/index/` to your `.gitignore` — indexes should not be committed. You can rebuild the index at any time with `nella_index --force`.
 
 ### Code verifier false positives
 
 The code verifier may flag valid symbols as "missing" when:
 
-1. **Chunk boundary issue** — A large class declaration is split across chunks, and the export gets separated from the class body
-2. **Re-exports** — Symbols re-exported via `export * from` may not resolve if the re-export chain crosses multiple files
-3. **Dynamic exports** — Computed or conditional exports aren't tracked
+1. **Re-exports** — Symbols re-exported via `export * from` may not resolve if the re-export chain crosses multiple files
+2. **Dynamic exports** — Computed or conditional exports aren't tracked
 
 ## Authentication Issues
 
@@ -153,7 +137,7 @@ If you see `Error: rate limit exceeded`:
 
 ### Assumptions not persisting
 
-Context is stored in `.nella/sessions/{sessionId}.json`. Check that:
+Context is stored locally in your project's `.nella/` directory. Check that:
 
 1. The `.nella/` directory exists and is writable
 2. The session ID is consistent across calls (a new session starts fresh)
@@ -174,7 +158,7 @@ No. Nella only reads your codebase for indexing and search. The only files Nella
 
 ### What languages does Nella support?
 
-The indexing/search features use TypeScript's compiler API for AST-based chunking, so they work best with TypeScript/JavaScript. Other languages are indexed as plain text chunks.
+The indexing/search features use advanced code parsing, so they work best with TypeScript/JavaScript. Other languages are indexed as plain text.
 
 ## Related Docs
 

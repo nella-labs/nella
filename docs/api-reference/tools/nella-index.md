@@ -26,11 +26,7 @@ nella_index({
 Index complete.
 
 - Files indexed: 42
-- Chunks created: 318
-- Embeddings: 318
-- Tokens processed: 87124
-
-Storage: /path/to/project/.nella/index
+- Index ready
 ```
 
 ## Notes

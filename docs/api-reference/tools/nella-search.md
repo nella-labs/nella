@@ -2,8 +2,6 @@
 
 Search the indexed workspace with hybrid, semantic, or lexical retrieval.
 
-The MCP tool forwards its arguments into the core index manager search API after translating `topK` to `limit`, `language` to `filter.fileTypes`, and `filePattern` to `filter.paths`.
-
 ## Parameters
 
 | Parameter | Type | Required | Description |

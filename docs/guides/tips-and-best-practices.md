@@ -1,6 +1,6 @@
 # Tips & Best Practices
 
-Practical tips for getting the most out of Nella — from always-on agent reliability to constraint authoring and team workflows.
+Practical tips for getting the most out of Nella — from always-on codebase intelligence to constraint authoring and team workflows.
 
 ## Always-On Nella
 
@@ -15,9 +15,9 @@ Create a `Claude.md` file in your project root:
 ```markdown
 # Project Instructions
 
-## Nella — Always-On Reliability
+## Nella — Always-On Intelligence
 
-This project uses Nella for code reliability. Follow these rules on EVERY task:
+This project uses Nella for codebase intelligence. Follow these rules on EVERY task:
 
 1. **Before making changes:** Call `nella_search` to understand the relevant code and `nella_get_context` to review session state.
 2. **Track assumptions:** Call `nella_add_assumption` to document any assumptions you're making about the codebase.
@@ -39,9 +39,9 @@ For every code change, follow this sequence:
 Create a `.cursorrules` file in your project root:
 
 ```text
-# Nella — Always-On Reliability
+# Nella — Always-On Intelligence
 
-This project uses Nella for code reliability. On EVERY task:
+This project uses Nella for codebase intelligence. On EVERY task:
 
 1. Before making changes: Call nella_search to find relevant code and nella_get_context to review session state.
 2. Document assumptions: Call nella_add_assumption for any assumptions about the codebase.
@@ -55,9 +55,9 @@ Workflow: nella_search → nella_get_context → nella_add_assumption → make c
 Create `.github/copilot-instructions.md` in your repository:
 
 ```markdown
-# Nella — Always-On Reliability
+# Nella — Always-On Intelligence
 
-This project uses Nella for code reliability. Follow these rules on every task:
+This project uses Nella for codebase intelligence. Follow these rules on every task:
 
 1. Before making changes, call `nella_search` to find relevant code and `nella_get_context` to review session state.
 2. Document assumptions with `nella_add_assumption`.
@@ -272,7 +272,7 @@ Use context tools to keep track of what happened over long tasks:
 4. nella_get_context — review the full session state
 ```
 
-Context persists across sessions via `.nella/context/` in your project directory.
+Context persists across sessions automatically.
 
 ## Performance Tips
 

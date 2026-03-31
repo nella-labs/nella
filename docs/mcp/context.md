@@ -8,7 +8,7 @@ Context tracking solves the "amnesia problem" — AI agents forget what they've 
 
 ## Session Context
 
-Every MCP session maintains a `ContextManager` that tracks:
+Every MCP session maintains context that tracks:
 
 | Category | Description | MCP Tool |
 |----------|-------------|----------|
@@ -60,14 +60,7 @@ Nella snapshots `package.json` at session start and can detect drift:
 
 ## Persistence
 
-Context is stored in `.nella/session.json` in the workspace:
-
-```
-.nella/
-├── session.json      # Current session state
-```
-
-Sessions survive across multiple conversations. When a new MCP connection starts, the previous session's context is loaded.
+Context is persisted in your project directory. Sessions survive across multiple conversations. When a new MCP connection starts, the previous session's context is loaded.
 
 ## Related Docs
 

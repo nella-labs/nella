@@ -13,10 +13,10 @@ Context tools keep a local Nella session grounded in what has already changed, w
 
 ## Shared Behavior
 
-- `nella_add_assumption.relatedFiles` supports exact paths and glob patterns. The core assumption tracker matches these with `minimatch`.
+- `nella_add_assumption.relatedFiles` supports exact paths and glob patterns.
 - `nella_check_assumptions` returns `isError: true` when any recorded assumption has been invalidated.
 - `nella_check_dependencies` returns `isError: true` when it detects dependency changes.
-- `nella_get_context` is the entry point for the session trust chain: it returns the trust token, HMAC integrity guidance, and the heartbeat challenge used by [`nella_heartbeat`](./nella-heartbeat.md).
+- `nella_get_context` is the entry point for the session trust chain: it returns trust verification metadata and the heartbeat challenge used by [`nella_heartbeat`](./nella-heartbeat.md).
 
 ## Typical Flow
 

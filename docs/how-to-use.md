@@ -37,7 +37,7 @@ Once connected, your AI agent has access to these tools:
 
 ### Search
 
-- **`nella_search`** — Hybrid search (semantic + BM25) across your indexed codebase
+- **`nella_search`** — Hybrid search across your indexed codebase
 - **`nella_index`** — Re-index when the codebase changes
 
 ### Context tracking

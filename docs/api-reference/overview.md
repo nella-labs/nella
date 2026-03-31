@@ -55,7 +55,7 @@ nella mcp --workspace /path/to/project
 
 - `nella_search.filePattern` is a case-insensitive substring filter on indexed file paths. It does not support glob syntax.
 - `nella_search.language` is forwarded as a file-type filter. Language names like `typescript` and raw extensions like `ts` both work.
-- `nella_add_assumption.relatedFiles` accepts exact paths or glob patterns because the underlying assumption tracker matches them with `minimatch`.
+- `nella_add_assumption.relatedFiles` accepts exact paths or glob patterns.
 - `nella_check_assumptions` sets `isError: true` when assumptions were invalidated.
 - `nella_check_dependencies` sets `isError: true` when dependency changes are detected.
 - `nella_get_context` includes the session trust token, integrity guidance, and the current heartbeat challenge.

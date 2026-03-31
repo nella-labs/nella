@@ -1,10 +1,10 @@
 # Introduction
 
-Nella is a **reliability layer for AI coding agents** — an MCP server that helps your AI agent understand your codebase and maintain context across sessions.
+Nella is a **codebase intelligence layer for AI coding agents** — an MCP server that helps your AI agent understand your codebase and maintain context across sessions.
 
 ## The Problem
 
-AI coding agents are powerful, but they suffer from fundamental reliability issues:
+AI coding agents are powerful, but they suffer from fundamental limitations:
 
 | Problem | What Happens | Consequence |
 |---------|--------------|-------------|

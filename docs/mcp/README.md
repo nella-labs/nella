@@ -81,10 +81,10 @@ Indexing and search:
 All tool calls are validated against JSON Schema before execution. Invalid arguments return structured error messages with field-level details.
 
 ### Session Persistence
-Context is automatically persisted to `.nella/session.json` in your workspace, so assumptions and dependency snapshots survive across conversations.
+Context is automatically persisted in your workspace, so assumptions and dependency snapshots survive across conversations.
 
 ### Usage Logging
-Both local and hosted servers record tool usage opportunistically when a valid hosted session is available.
+Usage is logged for analytics.
 
 ### Trust Chain Protection
 `nella_get_context` issues a challenge and `nella_heartbeat` continues the chain, helping clients confirm they are still interacting with the same trusted session.

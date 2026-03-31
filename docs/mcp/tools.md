@@ -31,7 +31,7 @@ Returns session state for the current workspace, including recent changes, assum
 **Behavior**
 
 - Includes session statistics, hotspot files, active assumptions, and recent invalidations when present.
-- Also returns the session trust token, HMAC integrity guidance, and the current heartbeat challenge.
+- Also returns the session trust token, integrity verification metadata, and the current heartbeat challenge.
 
 See [`nella_get_context`](../api-reference/tools/nella-get-context.md) for the full per-tool reference.
 
@@ -45,7 +45,7 @@ Records an assumption about the codebase so later changes can invalidate it auto
 |-----------|------|----------|-------------|
 | `type` | `string` | Yes | One of `schema`, `interface`, `dependency`, `behavior`, `config`, `structure`, `other`. |
 | `description` | `string` | Yes | Human-readable assumption text. |
-| `relatedFiles` | `string[]` | No | Files or glob patterns related to the assumption. Matching uses `minimatch` in the core assumption tracker. |
+| `relatedFiles` | `string[]` | No | Files or glob patterns related to the assumption. |
 | `confidence` | `number` | No | Confidence from `0` to `1`. Default: `0.8`. |
 
 See [`nella_add_assumption`](../api-reference/tools/nella-add-assumption.md).
@@ -115,7 +115,7 @@ Searches the indexed workspace with `hybrid`, `semantic`, or `lexical` retrieval
 **Behavior**
 
 - Requires a non-empty index; otherwise the tool returns an error telling you to run `nella_index`.
-- Returns wrapped code chunks with relative paths, line ranges, type/language metadata, symbol names when available, and injection warnings or HMAC integrity markers when present.
+- Returns wrapped code chunks with relative paths, line ranges, type/language metadata, symbol names when available, and injection warnings or integrity markers when present.
 
 See [`nella_search`](../api-reference/tools/nella-search.md).
 
