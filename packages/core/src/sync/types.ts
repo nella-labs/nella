@@ -489,6 +489,28 @@ export interface SyncAdapter {
 
   /** Pull remote changes */
   pullChanges?(workspaceId: string, since: Date): Promise<SyncChange[]>;
+
+  // -------------------------------------------------------------------------
+  // Branch Operations (optional, for branch-aware sync)
+  // -------------------------------------------------------------------------
+
+  /** Create a branch index record */
+  createBranchIndex?(workspaceId: string, branch: string, parentBranch: string): Promise<void>;
+
+  /** Delete a branch index record */
+  deleteBranchIndex?(workspaceId: string, branch: string): Promise<void>;
+
+  /** Get chunks for a specific branch */
+  getBranchChunks?(workspaceId: string, branch: string): Promise<Chunk[]>;
+
+  /** Upsert chunks for a specific branch */
+  upsertBranchChunks?(workspaceId: string, branch: string, chunks: UpsertChunkParams[]): Promise<number>;
+
+  /** Branch-aware vector search */
+  vectorSearchBranch?(params: VectorSearchParams & { branch: string }): Promise<SearchResult[]>;
+
+  /** Branch-aware hybrid search */
+  hybridSearchBranch?(params: HybridSearchParams & { branch: string }): Promise<SearchResult[]>;
 }
 
 // ============================================================================

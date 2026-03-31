@@ -145,3 +145,93 @@ CREATE TRIGGER github_repo_links_updated_at
   BEFORE UPDATE ON github_repo_links
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
+
+-- =============================================================================
+-- Agent Presence (cross-machine discovery)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_presence (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  agent_id TEXT NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'claude',
+  branch TEXT,
+  current_task TEXT,
+  active_files TEXT[] DEFAULT '{}',
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'idle', 'busy', 'disconnected')),
+  capabilities TEXT[] DEFAULT '{}',
+  last_heartbeat TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT unique_agent_workspace UNIQUE (agent_id, workspace_id)
+);
+
+ALTER TABLE agent_presence ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users see agents in their workspaces" ON agent_presence
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users manage own agents" ON agent_presence
+  FOR ALL USING (auth.uid() = user_id);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE agent_presence;
+
+-- =============================================================================
+-- Shared Tasks (cross-machine coordination)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  description TEXT NOT NULL,
+  assigned_agent TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'failed', 'blocked')),
+  parent_task_id UUID REFERENCES agent_tasks(id) ON DELETE SET NULL,
+  files TEXT[] DEFAULT '{}',
+  branch TEXT,
+  priority INTEGER DEFAULT 5,
+  dependencies UUID[] DEFAULT '{}',
+  result JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+ALTER TABLE agent_tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own tasks" ON agent_tasks
+  FOR ALL USING (auth.uid() = user_id);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE agent_tasks;
+
+CREATE TRIGGER agent_tasks_updated_at
+  BEFORE UPDATE ON agent_tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at();
+
+-- =============================================================================
+-- Shared Decisions (cross-machine visibility)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_decisions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  agent_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  rationale TEXT NOT NULL,
+  alternatives TEXT[] DEFAULT '{}',
+  affected_files TEXT[] DEFAULT '{}',
+  branch TEXT,
+  acknowledged BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE agent_decisions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users see own decisions" ON agent_decisions
+  FOR ALL USING (auth.uid() = user_id);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE agent_decisions;

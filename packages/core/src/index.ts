@@ -135,6 +135,16 @@ export type {
   AgentRegistryOptions,
 } from "./context-sharing";
 
+// =============================================================================
+// Cloud Sync (Branch + Agent)
+// =============================================================================
+
+export { BranchCloudSync } from "./sync/cloud/branch-sync";
+export type { BranchCloudSyncConfig, CloudObjectStorage } from "./sync/cloud/branch-sync";
+
+export { AgentStateSync } from "./sync/cloud/agent-sync";
+export type { AgentStateSyncConfig, IndexUpdateNotification } from "./sync/cloud/agent-sync";
+
 export { GitHubService, WebhookHandler } from "./github";
 
 export type {
