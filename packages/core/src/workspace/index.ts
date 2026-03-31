@@ -14,6 +14,8 @@ export type {
   WorkspaceEvent,
   GitBranchTracking,
   BranchIndexInfo,
+  IndexMode,
+  CloudIndexPolicy,
 } from "./types";
 
 export {

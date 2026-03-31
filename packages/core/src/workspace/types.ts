@@ -65,23 +65,61 @@ export interface WorkspaceConfig {
   // Index settings
   autoIndex: boolean;
   indexOnChange: boolean;
-  
+
+  /**
+   * Where the index is stored and searched.
+   * - "local": Index stored on disk only (default, safest)
+   * - "cloud": Index synced to GCP Cloud SQL + Cloud Storage
+   *
+   * Cloud mode requires the org to have enabled cloud indexing for this
+   * repo. Use local by default; orgs opt-in specific repos for cloud.
+   */
+  indexMode: IndexMode;
+
   // Include/exclude patterns
   include: string[];
   exclude: string[];
-  
+
   // Embedding settings
   embedder: EmbedderConfig;
-  
+
   // Chunking settings
   chunking?: {
     maxTokens: number;
     overlap: number;
     strategy: "ast" | "recursive" | "fixed";
   };
-  
+
   // Search settings
   search: SearchConfig;
+}
+
+/**
+ * Index storage mode.
+ * - "local": All index data stays on the developer's machine (default)
+ * - "cloud": Index is synced to GCP for cross-machine search and
+ *   GitHub-triggered auto-indexing. Requires org-level opt-in.
+ */
+export type IndexMode = "local" | "cloud";
+
+/**
+ * Organization-level cloud indexing policy.
+ * Controls which repos within an org are allowed to use cloud indexing.
+ */
+export interface CloudIndexPolicy {
+  /** Whether cloud indexing is enabled for this org at all */
+  enabled: boolean;
+  /**
+   * Allowlisted repo patterns (owner/repo or glob).
+   * Empty = all repos allowed when enabled.
+   * Example: ["acme/frontend", "acme/api-*"]
+   */
+  allowedRepos: string[];
+  /**
+   * Denylisted repos (overrides allowlist).
+   * Example: ["acme/secrets-vault"]
+   */
+  deniedRepos: string[];
 }
 
 export interface EmbedderConfig {
@@ -103,6 +141,7 @@ const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, 
 export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   autoIndex: true,
   indexOnChange: true,
+  indexMode: "local",
   include: [
     "**/*.ts",
     "**/*.tsx",

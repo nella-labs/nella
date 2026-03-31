@@ -224,6 +224,8 @@ export type {
   WorkspaceEvent,
   GitBranchTracking,
   BranchIndexInfo,
+  IndexMode,
+  CloudIndexPolicy,
   // Options
   WorkspaceOptions,
   SharedContext,
