@@ -11,6 +11,8 @@ export * from "./validators";
 export * from "./metrics";
 export * from "./reports";
 export * from "./injection";
+export * from "./search-quality";
+export * from "./context-tracking";
 
 import { allScenarios, initializeScenarios } from "./scenarios";
 import { Task, TaskCategory, TaskDifficulty } from "./types";

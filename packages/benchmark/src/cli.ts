@@ -478,6 +478,22 @@ async function main() {
     return;
   }
 
+  if (rawArgs[0] === "search-quality") {
+    const { runSearchQualityBenchmark } = await import("./search-quality");
+    const verbose = rawArgs.includes("--verbose");
+    const outputDir = rawArgs.includes("-o") ? rawArgs[rawArgs.indexOf("-o") + 1] : undefined;
+    await runSearchQualityBenchmark({ verbose, outputDir });
+    return;
+  }
+
+  if (rawArgs[0] === "context-tracking") {
+    const { runContextTrackingBenchmark } = await import("./context-tracking");
+    const verbose = rawArgs.includes("--verbose");
+    const outputDir = rawArgs.includes("-o") ? rawArgs[rawArgs.indexOf("-o") + 1] : undefined;
+    await runContextTrackingBenchmark({ verbose, outputDir });
+    return;
+  }
+
   const args = parseArgs();
 
   // Dashboard-only mode
