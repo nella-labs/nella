@@ -319,7 +319,7 @@ export interface AgentConfig {
   apiKey: string;
   maxTokens?: number;
   
-  /** Whether Nella reliability layer is enabled for this agent */
+  /** Whether Nella codebase intelligence is enabled for this agent */
   nellaEnabled?: boolean;
 }
 

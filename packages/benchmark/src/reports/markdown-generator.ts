@@ -45,11 +45,11 @@ export function generateSummaryMarkdown(options: MarkdownGeneratorOptions): stri
   if (isMixedBenchmark) {
     const nellaRuns = runs.filter((r) => r.nellaEnabled);
     const nonNellaRuns = runs.filter((r) => !r.nellaEnabled);
-    markdown += `> 🛡️ **Nella Comparison Benchmark**: Testing agent performance with and without Nella reliability layer.\n`;
+    markdown += `> 🛡️ **Nella Comparison Benchmark**: Testing agent performance with and without Nella codebase intelligence.\n`;
     markdown += `> - Runs with Nella: ${nellaRuns.length}\n`;
     markdown += `> - Runs without Nella: ${nonNellaRuns.length}\n\n`;
   } else if (hasNellaRuns) {
-    markdown += `> 🛡️ All runs in this benchmark used **Nella reliability layer**.\n\n`;
+    markdown += `> 🛡️ All runs in this benchmark used **Nella codebase intelligence**.\n\n`;
   }
 
   // Task results table - show Nella status in agent column header

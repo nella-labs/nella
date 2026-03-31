@@ -80,9 +80,9 @@ export interface PromptBuilderOptions {
 
 // Nella tool descriptions for agents
 const NELLA_TOOLS_DESCRIPTION = `
-## Nella Reliability Tools (Available)
+## Nella Intelligence Tools (Available)
 
-You have access to Nella tools that help ensure your changes are safe and correct:
+You have access to Nella tools that give you real codebase understanding:
 
 ### Before Making Changes
 - \`nella_should_refuse(taskId, prompt)\` - Check if this task should be refused
