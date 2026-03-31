@@ -105,3 +105,43 @@ CREATE TRIGGER context_set_expires
 
 -- REMOVED 2026-03-15: user_stats view unused — references removed api_keys/agents tables
 -- CREATE OR REPLACE VIEW user_stats AS ...;
+
+-- =============================================================================
+-- GitHub Repository Links
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS github_repo_links (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  repo_id BIGINT NOT NULL,
+  default_branch TEXT DEFAULT 'main',
+  webhook_id BIGINT,
+  webhook_secret TEXT NOT NULL,
+  installation_id BIGINT NOT NULL,
+  events TEXT[] DEFAULT '{"push","pull_request"}',
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'pending', 'error', 'disconnected')),
+  org_id UUID,
+  project_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  CONSTRAINT unique_workspace_repo UNIQUE (workspace_id, repo_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_repo_links_user ON github_repo_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_repo_links_workspace ON github_repo_links(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_repo_links_repo_id ON github_repo_links(repo_id);
+
+ALTER TABLE github_repo_links ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own repo links" ON github_repo_links
+  FOR ALL USING (auth.uid() = user_id);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE github_repo_links;
+
+CREATE TRIGGER github_repo_links_updated_at
+  BEFORE UPDATE ON github_repo_links
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at();

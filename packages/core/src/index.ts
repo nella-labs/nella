@@ -111,6 +111,26 @@ export type {
 
 export * as gitUtils from "./utils/git";
 
+// =============================================================================
+// GitHub Integration
+// =============================================================================
+
+export { GitHubService, WebhookHandler } from "./github";
+
+export type {
+  GitHubRepoLink,
+  GitHubWebhookEvent,
+  GitHubWebhookPayload,
+  GitHubFileChange,
+  GitHubAppConfig,
+  GitHubIndexAction,
+  GitHubIndexJobData,
+  JobQueue,
+  RepoLinkStore,
+  WebhookHandlerDeps,
+  WebhookResult,
+} from "./github";
+
 export type {
   // Types
   IndexManagerConfig,
