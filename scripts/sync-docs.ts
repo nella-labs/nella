@@ -21,6 +21,9 @@ import * as path from "path";
 const SOURCE_DIR = path.resolve(__dirname, "../docs");
 const TARGET_DIR = path.resolve(__dirname, "../../nella-website/apps/docs/src/content/docs");
 
+const ADMIN_SOURCE_DIR = path.resolve(__dirname, "../.private/docs");
+const ADMIN_TARGET_DIR = path.resolve(__dirname, "../../nella-website/apps/app/src/content/admin-docs");
+
 interface SyncMapping {
   source: string;
   target: string;
@@ -183,6 +186,15 @@ const SYNC_MAPPINGS: SyncMapping[] = [
   {
     source: "troubleshooting.md",
     target: "troubleshooting/index.mdx",
+    transform: transformGeneric,
+  },
+];
+
+// Admin-only docs synced to the authenticated app
+const ADMIN_SYNC_MAPPINGS: SyncMapping[] = [
+  {
+    source: "guides/securing-agents-against-injection.md",
+    target: "guides/securing-agents-against-injection.mdx",
     transform: transformGeneric,
   },
 ];
@@ -426,9 +438,9 @@ interface SyncOptions {
   verbose?: boolean;
 }
 
-function syncFile(mapping: SyncMapping, options: SyncOptions = {}): boolean {
-  const sourcePath = path.join(SOURCE_DIR, mapping.source);
-  const targetPath = path.join(TARGET_DIR, mapping.target);
+function syncFile(mapping: SyncMapping, options: SyncOptions = {}, sourceDir = SOURCE_DIR, targetDir = TARGET_DIR): boolean {
+  const sourcePath = path.join(sourceDir, mapping.source);
+  const targetPath = path.join(targetDir, mapping.target);
 
   // Check if source exists
   if (!fs.existsSync(sourcePath)) {
@@ -464,10 +476,10 @@ function syncFile(mapping: SyncMapping, options: SyncOptions = {}): boolean {
     return true;
   }
 
-  // Ensure target directory exists
-  const targetDir = path.dirname(targetPath);
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
+  // Ensure target parent directory exists
+  const targetParent = path.dirname(targetPath);
+  if (!fs.existsSync(targetParent)) {
+    fs.mkdirSync(targetParent, { recursive: true });
   }
 
   // Write transformed content
@@ -500,10 +512,40 @@ function syncAll(options: SyncOptions = {}): void {
     }
   }
 
-  console.log("\n📊 Summary:");
+  console.log("\n📊 Public docs summary:");
   console.log(`   Synced: ${syncedCount}`);
   console.log(`   Skipped: ${skippedCount}`);
   console.log(`   Errors: ${errorCount}`);
+
+  // Sync admin docs
+  if (fs.existsSync(ADMIN_SOURCE_DIR)) {
+    console.log(`\n🔒 Syncing admin documentation...\n`);
+    console.log(`   Source: ${ADMIN_SOURCE_DIR}`);
+    console.log(`   Target: ${ADMIN_TARGET_DIR}\n`);
+
+    let adminSyncedCount = 0;
+    let adminSkippedCount = 0;
+    let adminErrorCount = 0;
+
+    for (const mapping of ADMIN_SYNC_MAPPINGS) {
+      try {
+        const synced = syncFile(mapping, options, ADMIN_SOURCE_DIR, ADMIN_TARGET_DIR);
+        if (synced) {
+          adminSyncedCount++;
+        } else {
+          adminSkippedCount++;
+        }
+      } catch (error) {
+        console.error(`❌ Error syncing admin ${mapping.source}:`, error);
+        adminErrorCount++;
+      }
+    }
+
+    console.log("\n📊 Admin docs summary:");
+    console.log(`   Synced: ${adminSyncedCount}`);
+    console.log(`   Skipped: ${adminSkippedCount}`);
+    console.log(`   Errors: ${adminErrorCount}`);
+  }
 
   if (options.dryRun) {
     console.log("\n   (Dry run - no files were modified)");
@@ -534,6 +576,16 @@ if (watch) {
       syncAll({ dryRun, verbose });
     }
   });
+
+  // Watch admin docs directory
+  if (fs.existsSync(ADMIN_SOURCE_DIR)) {
+    fs.watch(ADMIN_SOURCE_DIR, { recursive: true }, (eventType, filename) => {
+      if (filename && (filename.endsWith(".md") || filename.endsWith(".mdx"))) {
+        console.log(`\n📝 Admin change detected: ${filename}`);
+        syncAll({ dryRun, verbose });
+      }
+    });
+  }
 } else {
   syncAll({ dryRun, verbose });
 }
