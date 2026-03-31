@@ -13,8 +13,10 @@ import {
   MODEL_DIMENSIONS,
   scanContent,
   formatInjectionWarning,
+  BranchIndexManager,
+  gitUtils,
 } from "@usenella/core";
-import type { IndexManagerConfig, IndexEvent } from "@usenella/core";
+import type { IndexManagerConfig, IndexEvent, BranchIndexInfo } from "@usenella/core";
 import type { ServerContext } from "../server";
 import { getValidSession } from "../../auth";
 import {
@@ -57,6 +59,10 @@ Returns stats on files indexed, chunks created, and embeddings generated.`,
             type: "array",
             items: { type: "string" },
             description: "Additional glob patterns to exclude (e.g., ['**/tests/**', '**/docs/**']). Merged with .gitignore and .nellaignore.",
+          },
+          branch: {
+            type: "string",
+            description: "Git branch to index. If omitted, indexes the current branch. For non-default branches, only changed files are indexed (overlay model).",
           },
         },
       },
@@ -107,19 +113,35 @@ Search modes:
             type: "string",
             description: "Filter by file path pattern (e.g., 'src/components/**')",
           },
+          branch: {
+            type: "string",
+            description: "Git branch to search. Searches the branch overlay + parent. If omitted, searches the current branch.",
+          },
         },
         required: ["query"],
+      },
+    },
+    {
+      name: "nella_branch_info",
+      description: `Get branch indexing information for the workspace.
+
+Returns the current git branch, default branch, and all branch indexes with their status, stats, and parent relationships. Useful for understanding which branches have been indexed.`,
+      inputSchema: {
+        type: "object",
+        properties: {},
       },
     },
   ];
 }
 
 // =============================================================================
-// Shared IndexManager cache
+// Shared IndexManager / BranchIndexManager cache
 // =============================================================================
 
 let cachedManager: ReturnType<typeof createIndexManager> | null = null;
 let cachedWorkspacePath: string | null = null;
+let cachedBranchManager: BranchIndexManager | null = null;
+let cachedBranchWorkspacePath: string | null = null;
 
 async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typeof createIndexManager>> {
   if (cachedManager && cachedWorkspacePath === workspacePath) {
@@ -178,6 +200,59 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   return cachedManager;
 }
 
+async function getOrCreateBranchManager(workspacePath: string): Promise<BranchIndexManager> {
+  if (cachedBranchManager && cachedBranchWorkspacePath === workspacePath) {
+    return cachedBranchManager;
+  }
+
+  const isRepo = await gitUtils.isGitRepo(workspacePath);
+  if (!isRepo) {
+    throw new Error("Workspace is not a git repository. Branch operations require git.");
+  }
+
+  const defaultBranch = await gitUtils.getDefaultBranch(workspacePath);
+  const storagePath = path.join(workspacePath, ".nella", "index");
+
+  // Resolve embedder config
+  const session = await getValidSession();
+  let embedderConfig: IndexManagerConfig["embedder"];
+  if (session) {
+    embedderConfig = {
+      provider: "nella",
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
+      apiKey: session.access_token,
+      apiBase: "https://app.getnella.dev/api",
+    };
+  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+    embedderConfig = {
+      provider: "azure",
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
+    };
+  } else {
+    throw new Error(
+      "No embedding provider configured. Run 'nella auth login' or set AZURE_EMBEDDING_API_KEY.",
+    );
+  }
+
+  cachedBranchManager = new BranchIndexManager({
+    workspaceId: path.basename(workspacePath),
+    workspacePath,
+    baseStoragePath: storagePath,
+    defaultBranch,
+    indexConfig: {
+      ...DEFAULT_INDEX_CONFIG,
+      chunking: { maxTokens: 512, overlap: 50, strategy: "ast" },
+      embedder: embedderConfig,
+      search: { vectorWeight: 0.4, lexicalWeight: 0.6, rerankEnabled: true, topK: 5 },
+      exclude: [...DEFAULT_INDEX_CONFIG.exclude, "**/.nella/**"],
+    },
+  });
+  cachedBranchWorkspacePath = workspacePath;
+  return cachedBranchManager;
+}
+
 // =============================================================================
 // Tool Handler
 // =============================================================================
@@ -192,6 +267,8 @@ export async function handleIndexingTool(
       return handleIndex(args, context);
     case "nella_search":
       return handleSearch(args, context);
+    case "nella_branch_info":
+      return handleBranchInfo(context);
     default:
       return null;
   }
@@ -208,10 +285,36 @@ async function handleIndex(
   const force = (args.force as boolean) || false;
   const paths = args.paths as string[] | undefined;
   const exclude = args.exclude as string[] | undefined;
-
-  const manager = await getOrCreateManager(context.workspacePath);
+  const branch = args.branch as string | undefined;
 
   try {
+    // Branch-aware indexing when branch is specified or workspace is a git repo
+    if (branch || await gitUtils.isGitRepo(context.workspacePath)) {
+      const branchManager = await getOrCreateBranchManager(context.workspacePath);
+      const targetBranch = branch || await branchManager.detectCurrentBranch();
+      const metadata = await branchManager.indexBranch(targetBranch, { force, paths, exclude });
+      const stats = metadata.stats;
+
+      return {
+        content: [{
+          type: "text",
+          text: [
+            `Index complete (branch: ${targetBranch}).`,
+            ``,
+            `- Files indexed: ${stats.filesIndexed}`,
+            `- Chunks created: ${stats.chunksCount}`,
+            `- Embeddings: ${stats.embeddingsCount}`,
+            `- Tokens processed: ${stats.totalTokens}`,
+            metadata.branchId ? `- Branch overlay: ${metadata.branchId} (parent: ${metadata.parentBranchId || "none"})` : "",
+            ``,
+            `Storage: ${path.join(context.workspacePath, ".nella", "index")}`,
+          ].filter(Boolean).join("\n"),
+        }],
+      };
+    }
+
+    // Non-git fallback: original flat index behavior
+    const manager = await getOrCreateManager(context.workspacePath);
     const metadata = await manager.index({ force, paths, exclude });
     const stats = metadata.stats;
 
@@ -253,6 +356,28 @@ async function handleSearch(
   const topK = (args.topK as number) || 5;
   const language = args.language as string | undefined;
   const filePattern = args.filePattern as string | undefined;
+  const branch = args.branch as string | undefined;
+
+  // Branch-aware search
+  if (branch || await gitUtils.isGitRepo(context.workspacePath)) {
+    try {
+      const branchManager = await getOrCreateBranchManager(context.workspacePath);
+      const targetBranch = branch || await branchManager.detectCurrentBranch();
+      // Delegate to branch search handler below
+      const searchQuery = {
+        query, mode, limit: topK,
+        filter: {
+          fileTypes: language ? [language] : undefined,
+          paths: filePattern ? [filePattern] : undefined,
+        },
+      };
+      const response = await branchManager.searchBranch(targetBranch, searchQuery);
+      // Fall through to shared formatting below (response variable reused)
+      return formatSearchResponse(response, query, detail, context);
+    } catch {
+      // If branch search fails (e.g., no index), fall back to flat manager
+    }
+  }
 
   const manager = await getOrCreateManager(context.workspacePath);
   const status = manager.getStatus();
@@ -278,107 +403,155 @@ async function handleSearch(
       },
     });
 
-    if (response.results.length === 0) {
-      return {
-        content: [{
-          type: "text",
-          text: `No results found for "${query}". Try broader terms, check spelling, or run nella_index if the workspace hasn't been indexed recently.`,
-        }],
-      };
-    }
+    return formatSearchResponse(response, query, detail, context);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      content: [{ type: "text", text: `Search failed: ${message}` }],
+      isError: true,
+    };
+  }
+}
 
-    // Build header with confidence guidance
-    let header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms, ${(response.confidence * 100).toFixed(0)}%):`;
+// =============================================================================
+// Search Response Formatter (shared by flat and branch search)
+// =============================================================================
 
-    if (response.suggestion === "low_confidence") {
-      header += `\n> Low confidence. Try: reindex, more specific terms, or mode: "lexical".`;
-    } else if (response.suggestion === "query_unclear") {
-      header += `\n> Query may be too broad. Try specific function/class names.`;
-    }
+function formatSearchResponse(
+  response: import("@usenella/core").SearchResponse,
+  query: string,
+  detail: "compact" | "full",
+  context: ServerContext,
+): { content: Array<{ type: "text"; text: string }> } {
+  if (response.results.length === 0) {
+    return {
+      content: [{
+        type: "text",
+        text: `No results found for "${query}". Try broader terms, check spelling, or run nella_index if the workspace hasn't been indexed recently.`,
+      }],
+    };
+  }
 
-    const compact = detail === "compact";
+  let header = `Found ${response.results.length} results for "${query}" (${response.searchTime}ms, ${(response.confidence * 100).toFixed(0)}%):`;
+  if (response.suggestion === "low_confidence") {
+    header += `\n> Low confidence. Try: reindex, more specific terms, or mode: "lexical".`;
+  } else if (response.suggestion === "query_unclear") {
+    header += `\n> Query may be too broad. Try specific function/class names.`;
+  }
 
-    if (compact) {
-      // Compact mode: numbered list of file:line pointers, no code blocks
-      const lines: string[] = [];
-      for (let i = 0; i < response.results.length; i++) {
-        const result = response.results[i];
-        const relPath = path.relative(context.workspacePath, result.chunk.filePath);
-        const [startLine, endLine] = result.chunk.lines;
-        const score = (result.score * 100).toFixed(1);
-        const symbolNames = result.chunk.symbols.map((s) => s.name).join(", ");
-        const symbolKinds = [...new Set(result.chunk.symbols.map((s) => s.kind))].join(", ");
-        const symbolSuffix = symbolNames ? ` — ${symbolNames} [${symbolKinds}]` : "";
-        lines.push(`${i + 1}. ${relPath}:${startLine}-${endLine} (${score}%)${symbolSuffix}`);
-      }
-
-      const output = wrapSearchResponse(header, lines, {
-        sessionToken: context.sessionToken,
-        hmacKey: context.hmacKey,
-        compact: true,
-      });
-
-      return {
-        content: [{ type: "text", text: output }],
-      };
-    }
-
-    // Full mode: existing behavior with code blocks and security wrapping
-    const nonce = generateNonce();
-    const totalResults = response.results.length;
-    const wrappedResults: string[] = [];
-
+  if (detail === "compact") {
+    const lines: string[] = [];
     for (let i = 0; i < response.results.length; i++) {
       const result = response.results[i];
       const relPath = path.relative(context.workspacePath, result.chunk.filePath);
       const [startLine, endLine] = result.chunk.lines;
       const score = (result.score * 100).toFixed(1);
-      const trustLevel = result.chunk.source?.trustLevel || "workspace";
-
-      // L2: Scan content for injection patterns
-      const scan = scanContent(result.chunk.content);
-      const injectionWarning = formatInjectionWarning(scan);
-
-      // Format the result content
-      const resultLines: string[] = [];
-      resultLines.push(`## ${relPath}:${startLine}-${endLine} (${score}% match)`);
-      resultLines.push(`Type: ${result.chunk.type} | Language: ${result.chunk.language}`);
-      if (result.chunk.symbols.length > 0) {
-        resultLines.push(`Symbols: ${result.chunk.symbols.map((s) => s.name).join(", ")}`);
-      }
-      resultLines.push("```" + result.chunk.language);
-      resultLines.push(result.chunk.content);
-      resultLines.push("```");
-
-      const wrapped = wrapSearchResult(
-        resultLines.join("\n"),
-        {
-          filePath: relPath,
-          lines: result.chunk.lines,
-          trustLevel,
-          resultIndex: i,
-          totalResults,
-          injectionWarning,
-        },
-        nonce,
-        context.hmacKey,
-      );
-
-      wrappedResults.push(wrapped.content);
+      const symbolNames = result.chunk.symbols.map((s) => s.name).join(", ");
+      const symbolKinds = [...new Set(result.chunk.symbols.map((s) => s.kind))].join(", ");
+      const symbolSuffix = symbolNames ? ` — ${symbolNames} [${symbolKinds}]` : "";
+      lines.push(`${i + 1}. ${relPath}:${startLine}-${endLine} (${score}%)${symbolSuffix}`);
     }
 
-    const output = wrapSearchResponse(header, wrappedResults, {
+    const output = wrapSearchResponse(header, lines, {
       sessionToken: context.sessionToken,
       hmacKey: context.hmacKey,
+      compact: true,
     });
+    return { content: [{ type: "text", text: output }] };
+  }
+
+  // Full mode
+  const nonce = generateNonce();
+  const totalResults = response.results.length;
+  const wrappedResults: string[] = [];
+
+  for (let i = 0; i < response.results.length; i++) {
+    const result = response.results[i];
+    const relPath = path.relative(context.workspacePath, result.chunk.filePath);
+    const [startLine, endLine] = result.chunk.lines;
+    const score = (result.score * 100).toFixed(1);
+    const trustLevel = result.chunk.source?.trustLevel || "workspace";
+    const scan = scanContent(result.chunk.content);
+    const injectionWarning = formatInjectionWarning(scan);
+
+    const resultLines: string[] = [];
+    resultLines.push(`## ${relPath}:${startLine}-${endLine} (${score}% match)`);
+    resultLines.push(`Type: ${result.chunk.type} | Language: ${result.chunk.language}`);
+    if (result.chunk.symbols.length > 0) {
+      resultLines.push(`Symbols: ${result.chunk.symbols.map((s) => s.name).join(", ")}`);
+    }
+    resultLines.push("```" + result.chunk.language);
+    resultLines.push(result.chunk.content);
+    resultLines.push("```");
+
+    const wrapped = wrapSearchResult(
+      resultLines.join("\n"),
+      { filePath: relPath, lines: result.chunk.lines, trustLevel, resultIndex: i, totalResults, injectionWarning },
+      nonce,
+      context.hmacKey,
+    );
+    wrappedResults.push(wrapped.content);
+  }
+
+  const output = wrapSearchResponse(header, wrappedResults, {
+    sessionToken: context.sessionToken,
+    hmacKey: context.hmacKey,
+  });
+  return { content: [{ type: "text", text: output }] };
+}
+
+// =============================================================================
+// Branch Info Handler
+// =============================================================================
+
+async function handleBranchInfo(
+  context: ServerContext,
+): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
+  try {
+    const isRepo = await gitUtils.isGitRepo(context.workspacePath);
+    if (!isRepo) {
+      return {
+        content: [{
+          type: "text",
+          text: "Not a git repository. Branch indexing is not available.",
+        }],
+      };
+    }
+
+    const currentBranch = await gitUtils.getCurrentBranch(context.workspacePath);
+    const defaultBranch = await gitUtils.getDefaultBranch(context.workspacePath);
+    const remoteUrl = await gitUtils.getRemoteUrl(context.workspacePath);
+
+    const branchManager = await getOrCreateBranchManager(context.workspacePath);
+    const branches = branchManager.listBranches();
+
+    const lines: string[] = [
+      `Git Branch Info`,
+      ``,
+      `- Current branch: ${currentBranch}`,
+      `- Default branch: ${defaultBranch}`,
+      remoteUrl ? `- Remote: ${remoteUrl}` : `- Remote: (none)`,
+      ``,
+      `Branch Indexes (${branches.length}):`,
+    ];
+
+    for (const info of branches) {
+      const current = info.name === currentBranch ? " *" : "";
+      const parent = info.parentBranch !== info.name ? ` (parent: ${info.parentBranch})` : "";
+      lines.push(`- ${info.name}${current}: ${info.indexStatus} | ${info.stats.filesIndexed} files, ${info.stats.chunksCount} chunks${parent}`);
+    }
+
+    if (branches.length === 0) {
+      lines.push(`  (none — run nella_index to create one)`);
+    }
 
     return {
-      content: [{ type: "text", text: output }],
+      content: [{ type: "text", text: lines.join("\n") }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      content: [{ type: "text", text: `Search failed: ${message}` }],
+      content: [{ type: "text", text: `Branch info failed: ${message}` }],
       isError: true,
     };
   }
