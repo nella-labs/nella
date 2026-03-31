@@ -1,4 +1,6 @@
 import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
 import chalk from "chalk";
 import { agents, detectInstalledAgents, getAgent, getAllAgentNames } from "./agents";
 import { writeAgentConfig } from "./installer";
@@ -283,6 +285,71 @@ export async function runConnectCommand(args: ConnectArgs, logo: string, _taglin
     if (p.isCancel(confirmed) || !confirmed) {
       p.cancel("Connection cancelled");
       process.exit(0);
+    }
+  }
+
+  // ── Step 5.5: Auto-register workspace ──
+  // When running nella connect from a repo, register it as a workspace
+  {
+    const workspacePath = process.cwd();
+    const registryPath = path.join(os.homedir(), ".nella", "workspaces.json");
+    const registryDir = path.dirname(registryPath);
+
+    if (!fs.existsSync(registryDir)) {
+      fs.mkdirSync(registryDir, { recursive: true });
+    }
+
+    let registry: { workspaces: Array<Record<string, unknown>>; activeWorkspaceId: string | null } = {
+      workspaces: [],
+      activeWorkspaceId: null,
+    };
+
+    if (fs.existsSync(registryPath)) {
+      try {
+        registry = JSON.parse(fs.readFileSync(registryPath, "utf-8"));
+        if (!registry.workspaces) registry.workspaces = [];
+      } catch {
+        // Start fresh
+      }
+    }
+
+    // Check if workspace already registered
+    const existing = registry.workspaces.find(
+      (w) => w.path === workspacePath,
+    );
+
+    if (!existing) {
+      const crypto = require("crypto");
+      const workspaceName = path.basename(workspacePath);
+      const hash = crypto.createHash("sha256").update(workspacePath).digest("hex").slice(0, 8);
+      const workspaceId = `ws_${hash}_${Date.now().toString(36)}`;
+
+      registry.workspaces.push({
+        id: workspaceId,
+        name: workspaceName,
+        path: workspacePath,
+        createdAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+        indexStatus: "none",
+        stats: { filesIndexed: 0, chunksCount: 0, totalTokens: 0 },
+      });
+      registry.activeWorkspaceId = workspaceId;
+
+      // Create workspace storage directory
+      const storagePath = path.join(registryDir, "workspaces", workspaceId);
+      for (const sub of ["index", "sessions"]) {
+        const dir = path.join(storagePath, sub);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      }
+
+      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + "\n");
+      p.log.info(`Workspace registered: ${pc.cyan(workspaceName)} ${pc.dim(`(${workspaceId})`)}`);
+    } else {
+      // Update lastAccessed and set as active
+      existing.lastAccessed = new Date().toISOString();
+      registry.activeWorkspaceId = existing.id as string;
+      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + "\n");
+      p.log.info(`Workspace: ${pc.cyan(existing.name as string)} ${pc.dim("(already registered)")}`);
     }
   }
 
