@@ -185,22 +185,23 @@ jobs:
               return status(v);
             };
 
-            // Only required failures should trigger issue reopening
+            // Only required failures trigger issue reopening
             const requiredFailed = [
               checks.mcp_health,
               checks.npm_nella,
-            ].some(v => !ok(v));
+            ].some(v => !ok(v)) ||
+              (!ok(checks.azure_embeddings) && embeddingsSkipped !== "true");
+            // Optional failures (rerank) show in report but don't reopen the issue
             const optionalFailed =
-              (!ok(checks.azure_embeddings) && embeddingsSkipped !== "true") ||
               (!ok(checks.azure_rerank) && rerankSkipped !== "true");
-            const anyFailed = requiredFailed || optionalFailed;
+            const anyFailed = requiredFailed;
 
             const body = [
               `## 🏥 Infrastructure Health Report`,
               ``,
               `**Last checked:** ${now}`,
               `**Workflow run:** [#${context.runNumber}](${runUrl})`,
-              `**Overall status:** ${anyFailed ? "🔴 Issues detected" : "🟢 All systems operational"}`,
+              `**Overall status:** ${anyFailed ? "🔴 Issues detected" : optionalFailed ? "🟡 Optional services degraded" : "🟢 All systems operational"}`,
               ``,
               `---`,
               ``,
