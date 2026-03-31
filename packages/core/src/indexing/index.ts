@@ -254,49 +254,70 @@ export class IndexManager {
       }
     }
 
-    // Generate embeddings for all chunks
+    // Save chunking + lexical progress before starting embeddings.
+    // If the embedding API fails mid-way, at least the chunked data is on disk.
+    this.lexicalIndex.save();
+    this.saveChunks();
+    this.saveFileHashes();
+
+    // Generate embeddings for all chunks, saving after each batch so
+    // progress survives API failures (rate limits, timeouts, etc.).
     const chunksToEmbed = Array.from(this.chunks.values()).filter((c) => !c.embedding);
 
     if (chunksToEmbed.length > 0) {
-      // Token-aware batching to avoid exceeding API limits (e.g. OpenAI 8192 token limit).
       const maxBatchTokens = 7500;
       const maxBatchSize = 50;
       let i = 0;
-      while (i < chunksToEmbed.length) {
-        const batch: CodeChunk[] = [];
-        let batchTokens = 0;
-        while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
-          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
-          if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
-          batchTokens += chunkTokens;
-          batch.push(chunksToEmbed[i]);
-          i++;
+      try {
+        while (i < chunksToEmbed.length) {
+          const batch: CodeChunk[] = [];
+          let batchTokens = 0;
+          while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
+            const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
+            if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
+            batchTokens += chunkTokens;
+            batch.push(chunksToEmbed[i]);
+            i++;
+          }
+
+          // Enrich chunk content with metadata for better semantic embeddings
+          const texts = batch.map((c) => this.enrichChunkContent(c));
+          const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
+          actualApiTokens += tokensUsed;
+          totalCost += cost;
+
+          this.emit({
+            type: "index:embed",
+            workspaceId: this.config.workspaceId,
+            batchSize: batch.length,
+            tokensUsed,
+            cost,
+          });
+
+          // Store embeddings
+          for (let j = 0; j < batch.length; j++) {
+            const chunk = batch[j];
+            chunk.embedding = embeddings[j];
+            this.vectorStore.add(chunk.id, embeddings[j]);
+          }
+
+          // Persist after each batch so progress survives failures
+          this.embedder.saveCache();
+          this.vectorStore.save();
+          this.saveChunks();
         }
-
-        // Enrich chunk content with metadata for better semantic embeddings
-        const texts = batch.map((c) => this.enrichChunkContent(c));
-        const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
-        actualApiTokens += tokensUsed;
-        totalCost += cost;
-
-        this.emit({
-          type: "index:embed",
-          workspaceId: this.config.workspaceId,
-          batchSize: batch.length,
-          tokensUsed,
-          cost,
-        });
-
-        // Store embeddings
-        for (let j = 0; j < batch.length; j++) {
-          const chunk = batch[j];
-          chunk.embedding = embeddings[j];
-          this.vectorStore.add(chunk.id, embeddings[j]);
-        }
+      } catch (embeddingError) {
+        // Save whatever progress was made before re-throwing
+        this.embedder.saveCache();
+        this.vectorStore.save();
+        this.saveChunks();
+        this.saveFileHashes();
+        this.savePartialMetadata(files.length, estimatedTokens, actualApiTokens, totalCost, startTime);
+        throw embeddingError;
       }
     }
 
-    // Save all indexes and embedding cache (once, after all batches)
+    // Final save
     this.embedder.saveCache();
     this.vectorStore.save();
     this.lexicalIndex.save();
@@ -596,6 +617,38 @@ export class IndexManager {
   private saveMetadata(): void {
     const metadataPath = path.join(this.config.storagePath, "metadata.json");
     fs.writeFileSync(metadataPath, JSON.stringify(this.metadata, null, 2));
+  }
+
+  /**
+   * Save metadata with partial stats when indexing fails mid-way.
+   * This lets the next run resume from where it left off (chunks without
+   * embeddings are re-embedded, chunks with embeddings are kept).
+   */
+  private savePartialMetadata(
+    filesIndexed: number,
+    estimatedTokens: number,
+    actualApiTokens: number,
+    totalCost: number,
+    startTime: number,
+  ): void {
+    this.metadata = {
+      workspaceId: this.config.workspaceId,
+      workspacePath: this.config.workspacePath,
+      createdAt: this.metadata?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: "1.0.0",
+      stats: {
+        filesIndexed,
+        chunksCount: this.chunks.size,
+        totalTokens: actualApiTokens,
+        estimatedTokens,
+        embeddingsCount: this.vectorStore.size,
+        totalCost,
+        durationMs: Date.now() - startTime,
+      },
+      config: this.config,
+    };
+    this.saveMetadata();
   }
 
   private loadChunks(): void {
