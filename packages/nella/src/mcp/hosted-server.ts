@@ -47,6 +47,7 @@ import Redis from "ioredis";
 let pkgVersion = "0.0.0";
 try { pkgVersion = require("../../package.json").version; } catch {}
 import { registerContextTools, handleContextTool } from "./tools/context";
+import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
 import type { ServerContext } from "./server";
 
 // =============================================================================
@@ -560,6 +561,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
   // Collect all tools
   const allTools: Tool[] = [
     ...registerContextTools(),
+    ...registerIndexingTools(),
   ];
 
   log("info", "Nella hosted MCP server starting", { port, tools: allTools.length });
@@ -650,6 +652,18 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           if (contextResult !== null) {
             resultContent = contextResult as CallToolResult;
             success = !resultContent.isError;
+          }
+
+          if (resultContent === null) {
+            const indexingResult = await handleIndexingTool(
+              name,
+              toolArgs || {},
+              serverContext
+            );
+            if (indexingResult !== null) {
+              resultContent = indexingResult as CallToolResult;
+              success = !resultContent.isError;
+            }
           }
 
           if (resultContent === null) {
