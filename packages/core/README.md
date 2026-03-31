@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 
-Reliability layer for coding agents. Enforces behavioral contracts that prevent agents from making unsafe or incorrect changes.
+Codebase intelligence for coding agents. Provides grounded search, persistent context, assumption tracking, and dependency awareness.
 
 ## Features
 

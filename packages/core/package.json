@@ -1,7 +1,7 @@
 {
   "name": "@usenella/core",
   "version": "0.0.0",
-  "description": "Reliability layer for coding agents - enforces constraints, validates changes, detects when to refuse",
+  "description": "Codebase intelligence for coding agents - grounded search, persistent context, assumption tracking, and dependency awareness",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,10 +30,10 @@
   "keywords": [
     "coding-agent",
     "ai",
-    "reliability",
-    "constraints",
-    "validation",
-    "safety"
+    "codebase-intelligence",
+    "code-understanding",
+    "context-tracking",
+    "grounded-search"
   ],
   "author": "Nella Labs",
   "license": "Apache-2.0",

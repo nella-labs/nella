@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Health Check](https://github.com/nella-labs/nella/actions/workflows/health-check.yml/badge.svg)](https://github.com/nella-labs/nella/actions/workflows/health-check.yml)
 
-**Reliability layer for coding agents.** Nella makes agent-made code changes safer, verifiable, and auditable.
+**Codebase intelligence for AI coding agents.** Nella gives agents real codebase understanding, persistent context, and grounded search.
 
 ## What is Nella?
 
@@ -15,7 +15,7 @@ Nella is a framework that sits between AI coding agents and your codebase. It pr
 
 ## Why Nella?
 
-LLMs used as coding agents suffer from fundamental reliability problems. Nella addresses them:
+LLMs used as coding agents suffer from fundamental limitations. Nella addresses them:
 
 | Problem | What Happens | How Nella Solves It |
 |---------|-------------|---------------------|

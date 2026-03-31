@@ -1,5 +1,5 @@
 /**
- * Nella - Reliability layer for coding agents
+ * Nella - Codebase intelligence for AI coding agents
  *
  * CLI + MCP Server unified package
  */

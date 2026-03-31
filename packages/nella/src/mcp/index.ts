@@ -1,7 +1,7 @@
 /**
  * Nella MCP Server
  *
- * Model Context Protocol server that exposes Nella's reliability layer
+ * Model Context Protocol server that exposes Nella's codebase intelligence
  * to AI agents. This package provides the MCP interface - the actual
  * logic lives in @nella-labs/core.
  *

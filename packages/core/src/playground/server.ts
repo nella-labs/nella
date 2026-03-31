@@ -613,7 +613,7 @@ export class PlaygroundServer {
         <body>
           <div class="container">
             <h1>⚡ Nella Playground</h1>
-            <p class="tagline">Reliability layer for coding agents</p>
+            <p class="tagline">Codebase intelligence for AI agents</p>
             <div class="status">● Server Running</div>
             
             <div class="endpoints">
