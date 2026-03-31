@@ -122,6 +122,45 @@ WITH (m = 16, ef_construction = 64);
 -- CREATE INDEX IF NOT EXISTS idx_index_stats_workspace_date ON index_stats(...);
 
 -- ============================================================================
+-- Branch Indexes Table
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS branch_indexes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    branch_name TEXT NOT NULL,
+    parent_branch TEXT NOT NULL DEFAULT 'main',
+    fork_commit TEXT,
+    head_commit TEXT,
+    index_status TEXT NOT NULL DEFAULT 'none'
+        CHECK (index_status IN ('ready', 'indexing', 'stale', 'none', 'error')),
+    stats JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT branch_indexes_name_check CHECK (char_length(branch_name) > 0),
+    CONSTRAINT branch_indexes_unique UNIQUE (workspace_id, branch_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_branch_indexes_workspace ON branch_indexes(workspace_id);
+
+-- Add branch_name to chunks for branch-aware cloud search
+-- Default 'main' for backward compatibility with existing data
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS branch_name TEXT NOT NULL DEFAULT 'main';
+CREATE INDEX IF NOT EXISTS idx_chunks_workspace_branch ON chunks(workspace_id, branch_name);
+
+-- Add default_branch and active_branch to workspaces
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS default_branch TEXT DEFAULT 'main';
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS active_branch TEXT DEFAULT 'main';
+
+-- Trigger for branch_indexes updated_at
+DROP TRIGGER IF EXISTS branch_indexes_updated_at ON branch_indexes;
+CREATE TRIGGER branch_indexes_updated_at
+    BEFORE UPDATE ON branch_indexes
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================================
 -- Functions
 -- ============================================================================
 
