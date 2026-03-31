@@ -313,6 +313,19 @@ export class WorkspaceRegistry {
   }
 
   /**
+   * Get branch-specific index path.
+   * Default branch stores at index/main/, feature branches at index/branches/<name>/.
+   */
+  getBranchIndexPath(workspaceId: string, branch: string): string {
+    const basePath = this.getIndexPath(workspaceId);
+    if (branch === "main" || branch === "master") {
+      return path.join(basePath, "main");
+    }
+    const sanitized = branch.replace(/[^a-zA-Z0-9_-]/g, "_");
+    return path.join(basePath, "branches", sanitized);
+  }
+
+  /**
    * Update index status
    */
   updateIndexStatus(

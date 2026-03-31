@@ -16,11 +16,14 @@ import type {
   WorkspaceEntry,
   WorkspaceConfig,
   WorkspaceEvent,
+  BranchIndexInfo,
 } from "./types";
 import { DEFAULT_WORKSPACE_CONFIG } from "./types";
 import { WorkspaceRegistry, getWorkspaceRegistry } from "./registry";
 import { IndexManager, DEFAULT_INDEX_CONFIG, type IndexManagerConfig } from "../indexing";
+import { BranchIndexManager } from "../indexing/branch-manager";
 import type { SearchQuery, SearchResponse, VerifyCodeRequest, VerifyCodeResult } from "../indexing/types";
+import * as git from "../utils/git";
 import { FileWatcher, type BatchChangeEvent, type WatcherOptions } from "./file-watcher";
 
 // =============================================================================
@@ -62,6 +65,7 @@ export class Workspace {
   private registry: WorkspaceRegistry;
   private entry: WorkspaceEntry;
   private indexManager: IndexManager | null = null;
+  private branchManager: BranchIndexManager | null = null;
   private sharedContext: SharedContext | null = null;
   private eventHandlers: WorkspaceEventHandler[] = [];
   private fileWatcher: FileWatcher | null = null;
@@ -316,6 +320,197 @@ export class Workspace {
     });
 
     this.entry = this.registry.get(this.entry.id)!;
+  }
+
+  // =============================================================================
+  // Branch Management
+  // =============================================================================
+
+  /**
+   * Get or create BranchIndexManager for this workspace.
+   * Only available when workspace is in a git repo.
+   */
+  async getBranchManager(): Promise<BranchIndexManager> {
+    if (!this.branchManager) {
+      const isRepo = await git.isGitRepo(this.entry.path);
+      if (!isRepo) {
+        throw new Error("Workspace is not in a git repository");
+      }
+
+      const workspaceConfig = this.entry.config || DEFAULT_WORKSPACE_CONFIG;
+      const defaultBranch = this.entry.git?.defaultBranch
+        || await git.getDefaultBranch(this.entry.path);
+
+      this.branchManager = new BranchIndexManager({
+        workspaceId: this.entry.id,
+        workspacePath: this.entry.path,
+        baseStoragePath: this.indexPath,
+        defaultBranch,
+        indexConfig: {
+          ...DEFAULT_INDEX_CONFIG,
+          include: workspaceConfig.include ?? DEFAULT_INDEX_CONFIG.include,
+          exclude: workspaceConfig.exclude ?? DEFAULT_INDEX_CONFIG.exclude,
+          embedder: {
+            ...DEFAULT_INDEX_CONFIG.embedder,
+            ...workspaceConfig.embedder,
+          },
+          chunking: {
+            ...DEFAULT_INDEX_CONFIG.chunking,
+            ...workspaceConfig.chunking,
+          },
+          search: {
+            ...DEFAULT_INDEX_CONFIG.search,
+            ...workspaceConfig.search,
+          },
+        },
+      });
+
+      // Initialize git tracking if not set
+      if (!this.entry.git) {
+        const remoteUrl = await git.getRemoteUrl(this.entry.path);
+        const activeBranch = await git.getCurrentBranch(this.entry.path);
+        this.registry.update(this.entry.id, {
+          git: {
+            remoteUrl: remoteUrl || undefined,
+            defaultBranch,
+            activeBranch,
+            branches: {},
+          },
+        });
+        this.entry = this.registry.get(this.entry.id)!;
+      }
+    }
+
+    return this.branchManager;
+  }
+
+  /**
+   * Index the current git branch.
+   * Auto-detects branch and uses overlay for non-default branches.
+   */
+  async indexCurrentBranch(options?: { force?: boolean }): Promise<void> {
+    const branchManager = await this.getBranchManager();
+    const branch = await branchManager.detectCurrentBranch();
+
+    this.emit({ type: "workspace:index:start", workspaceId: this.entry.id });
+
+    try {
+      const metadata = await branchManager.indexBranch(branch, options);
+
+      // Update registry with branch info
+      const branchInfo = branchManager.getBranchInfo(branch);
+      if (branchInfo && this.entry.git) {
+        const branches = { ...this.entry.git.branches, [branch]: branchInfo };
+        this.registry.update(this.entry.id, {
+          git: { ...this.entry.git, activeBranch: branch, branches },
+        });
+        this.entry = this.registry.get(this.entry.id)!;
+      }
+
+      // Also update top-level stats
+      this.registry.updateIndexStatus(this.entry.id, "ready", {
+        filesIndexed: metadata.stats.filesIndexed,
+        chunksCount: metadata.stats.chunksCount,
+        totalTokens: metadata.stats.totalTokens,
+      });
+      this.entry = this.registry.get(this.entry.id)!;
+
+      this.emit({ type: "workspace:index:complete", workspaceId: this.entry.id });
+    } catch (error) {
+      this.registry.updateIndexStatus(this.entry.id, "error");
+      this.emit({
+        type: "workspace:index:error",
+        workspaceId: this.entry.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Search the current branch index (with overlay fallthrough to parent).
+   */
+  async searchCurrentBranch(query: SearchQuery): Promise<SearchResponse> {
+    const branchManager = await this.getBranchManager();
+    const branch = await branchManager.detectCurrentBranch();
+    return branchManager.searchBranch(branch, query);
+  }
+
+  /**
+   * Switch the active branch index.
+   */
+  async switchBranch(branch: string): Promise<void> {
+    const branchManager = await this.getBranchManager();
+    const previous = this.entry.git?.activeBranch || "main";
+
+    // Ensure branch index exists (create if needed)
+    if (!branchManager.hasBranchIndex(branch)) {
+      await branchManager.createBranchIndex(branch);
+    }
+
+    // Update registry
+    if (this.entry.git) {
+      this.registry.update(this.entry.id, {
+        git: { ...this.entry.git, activeBranch: branch },
+      });
+      this.entry = this.registry.get(this.entry.id)!;
+    }
+
+    this.emit({
+      type: "workspace:branch:switched",
+      workspaceId: this.entry.id,
+      from: previous,
+      to: branch,
+    });
+  }
+
+  /**
+   * Merge a branch index into its target (defaults to default branch).
+   */
+  async mergeBranch(source: string, target?: string): Promise<void> {
+    const branchManager = await this.getBranchManager();
+    const targetBranch = target || this.entry.git?.defaultBranch || "main";
+
+    await branchManager.mergeBranchIndex(source, targetBranch);
+
+    this.emit({
+      type: "workspace:branch:merged",
+      workspaceId: this.entry.id,
+      branch: source,
+      into: targetBranch,
+    });
+  }
+
+  /**
+   * Delete a branch index.
+   */
+  async deleteBranch(branch: string): Promise<void> {
+    const branchManager = await this.getBranchManager();
+    await branchManager.deleteBranchIndex(branch);
+
+    // Remove from registry
+    if (this.entry.git) {
+      const branches = { ...this.entry.git.branches };
+      delete branches[branch];
+      this.registry.update(this.entry.id, {
+        git: { ...this.entry.git, branches },
+      });
+      this.entry = this.registry.get(this.entry.id)!;
+    }
+
+    this.emit({
+      type: "workspace:branch:deleted",
+      workspaceId: this.entry.id,
+      branch,
+    });
+  }
+
+  /**
+   * List all branch indexes for this workspace.
+   */
+  async listBranches(): Promise<BranchIndexInfo[]> {
+    const branchManager = await this.getBranchManager();
+    return branchManager.listBranches();
   }
 
   // =============================================================================
