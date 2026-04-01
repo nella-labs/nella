@@ -115,7 +115,7 @@ export interface IndexConfig {
 export const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-3-small": 1536,
   "text-embedding-3-large": 3072,
-  "voyage-code-3": 1024,
+  "voyage-code-3": 2048,
 };
 
 export const DEFAULT_EMBEDDING_MODEL = "voyage-code-3";
@@ -250,6 +250,8 @@ export interface VerifyIssue {
 export interface EmbeddingRequest {
   texts: string[];
   model?: string;
+  /** Voyage AI input type: "document" for indexing, "query" for search queries. */
+  inputType?: "document" | "query";
 }
 
 export interface EmbeddingResponse {
