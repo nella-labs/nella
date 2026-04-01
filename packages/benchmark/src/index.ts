@@ -10,9 +10,26 @@ export * from "./runner";
 export * from "./validators";
 export * from "./metrics";
 export * from "./reports";
-export * from "./injection";
+export {
+  // Re-export injection module, renaming conflicting getScenarios
+  getScenarios as getInjectionScenarios,
+  getScenarioById as getInjectionScenarioById,
+  runAgentBenchmark,
+  detectInjectionSuccess,
+  detectInjectionFlagged,
+  runTrial,
+} from "./injection";
+export type {
+  AttackScenario,
+  AgentTrialResult,
+  AgentBenchmarkResults,
+  AgentBenchmarkOptions,
+  TrialConfig,
+} from "./injection";
 export * from "./search-quality";
-export * from "./context-tracking";
+export {
+  getScenarios as getContextScenarios,
+} from "./context-tracking";
 
 import { allScenarios, initializeScenarios } from "./scenarios";
 import { Task, TaskCategory, TaskDifficulty } from "./types";
