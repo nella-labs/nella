@@ -263,12 +263,13 @@ export class IndexManager {
     // Restore embeddings from cache for chunks that were embedded in a
     // previous (possibly failed) session. This avoids re-processing
     // hundreds of batches at "0 tokens" just to hit the cache.
+    const expectedDims = this.config.embedder.dimensions;
     let restoredFromCache = 0;
     for (const chunk of this.chunks.values()) {
       if (chunk.embedding) continue;
       const enriched = this.enrichChunkContent(chunk);
       const cached = this.embedder.getFromCache(enriched);
-      if (cached) {
+      if (cached && cached.length === expectedDims) {
         chunk.embedding = cached;
         this.vectorStore.add(chunk.id, cached);
         restoredFromCache++;
