@@ -136,7 +136,7 @@ class VoyageReranker {
     const apiKey = process.env.VOYAGE_API_KEY;
     const endpoint = process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
     if (!apiKey) {
-      throw new Error("VOYAGE_API_KEY not set");
+      throw new Error("Reranking service not configured");
     }
 
     const request: VoyageRerankRequest = {
@@ -159,7 +159,7 @@ class VoyageReranker {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Voyage rerank API error: ${response.status} ${error}`);
+      throw new Error(`Reranking service error: ${response.status}`);
     }
 
     const data = await response.json() as VoyageRerankResponse;
