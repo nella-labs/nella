@@ -260,8 +260,31 @@ export class IndexManager {
     this.saveChunks();
     this.saveFileHashes();
 
-    // Generate embeddings for all chunks, saving after each batch so
-    // progress survives API failures (rate limits, timeouts, etc.).
+    // Restore embeddings from cache for chunks that were embedded in a
+    // previous (possibly failed) session. This avoids re-processing
+    // hundreds of batches at "0 tokens" just to hit the cache.
+    let restoredFromCache = 0;
+    for (const chunk of this.chunks.values()) {
+      if (chunk.embedding) continue;
+      const enriched = this.enrichChunkContent(chunk);
+      const cached = this.embedder.getFromCache(enriched);
+      if (cached) {
+        chunk.embedding = cached;
+        this.vectorStore.add(chunk.id, cached);
+        restoredFromCache++;
+      }
+    }
+    if (restoredFromCache > 0) {
+      this.emit({
+        type: "index:embed",
+        workspaceId: this.config.workspaceId,
+        batchSize: restoredFromCache,
+        tokensUsed: 0,
+        cost: 0,
+      });
+    }
+
+    // Generate embeddings only for chunks NOT in cache (truly new content).
     const chunksToEmbed = Array.from(this.chunks.values()).filter((c) => !c.embedding);
 
     if (chunksToEmbed.length > 0) {
@@ -285,6 +308,17 @@ export class IndexManager {
           const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
           actualApiTokens += tokensUsed;
           totalCost += cost;
+
+          // If the server returned different dimensions than expected (e.g. provider
+          // changed server-side), reinitialize the vector store to match.
+          const actualDims = embeddings[0]?.length;
+          if (actualDims && actualDims !== this.config.embedder.dimensions) {
+            this.config.embedder.dimensions = actualDims;
+            this.vectorStore = createVectorStore({ dimensions: actualDims });
+            if (this.config.storagePath) {
+              this.vectorStore.initPersistence(path.join(this.config.storagePath, "vectors.json"));
+            }
+          }
 
           this.emit({
             type: "index:embed",
