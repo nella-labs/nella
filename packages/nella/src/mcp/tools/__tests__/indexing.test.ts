@@ -25,12 +25,13 @@ describe("Indexing Tool Handlers", () => {
   // ===========================================================================
 
   describe("registerIndexingTools", () => {
-    it("registers nella_index and nella_search", () => {
+    it("registers nella_index, nella_search, and nella_branch_info", () => {
       const tools = registerIndexingTools();
 
-      assert.equal(tools.length, 2);
+      assert.equal(tools.length, 3);
       assert.equal(tools[0].name, "nella_index");
       assert.equal(tools[1].name, "nella_search");
+      assert.equal(tools[2].name, "nella_branch_info");
     });
 
     it("nella_index has correct input schema", () => {

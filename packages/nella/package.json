@@ -1,6 +1,6 @@
 {
   "name": "@getnella/mcp",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Nella MCP Server — codebase intelligence for AI coding agents. Grounded search, persistent context, and deep code understanding via the Model Context Protocol.",
   "type": "commonjs",
   "bin": {

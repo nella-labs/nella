@@ -59,6 +59,8 @@ export interface ConnectArgs {
 const AGENT_ALIASES: Record<string, AgentType> = {
   claude: "claude-desktop",
   vscode: "vscode",
+  copilot: "github-copilot",
+  "gh-copilot": "github-copilot",
   cursor: "cursor",
 };
 
