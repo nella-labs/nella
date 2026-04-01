@@ -373,8 +373,13 @@ export class Embedder {
     };
   }
 
-  private getFromCache(text: string, model: string): number[] | null {
-    return this.sqliteCache?.get(text, model) ?? this.jsonCache?.get(text, model) ?? null;
+  /**
+   * Look up an embedding in the cache without calling the API.
+   * Returns null if not cached.
+   */
+  getFromCache(text: string, model?: string): number[] | null {
+    const m = model ?? this.config.model;
+    return this.sqliteCache?.get(text, m) ?? this.jsonCache?.get(text, m) ?? null;
   }
 
   private setInCache(text: string, model: string, embedding: number[]): void {
@@ -467,7 +472,7 @@ export class Embedder {
     const endpoint = this.config.endpoint || process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
 
     if (!apiKey) {
-      throw new Error("VOYAGE_API_KEY not set");
+      throw new Error("Embedding service not configured");
     }
 
     // voyage-code-3 context: 32K tokens; ~2 chars/token safety factor
@@ -493,7 +498,7 @@ export class Embedder {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Voyage AI API error: ${response.status} ${error}`);
+      throw new Error(`Embedding service error: ${response.status}`);
     }
 
     const data = await response.json() as {
@@ -546,12 +551,24 @@ export class Embedder {
     const data = await response.json() as {
       data: { embedding: number[] }[];
       usage: { total_tokens: number };
+      dimensions?: number;
     };
+
+    // Auto-detect dimensions from server response
+    const serverDims = data.dimensions || data.data?.[0]?.embedding?.length;
+    if (serverDims && serverDims !== this.config.dimensions) {
+      this.config.dimensions = serverDims;
+    }
 
     return {
       embeddings: data.data.map((d) => d.embedding),
       tokens: data.usage.total_tokens,
     };
+  }
+
+  /** Get the current configured dimensions */
+  getDimensions(): number {
+    return this.config.dimensions;
   }
 
   /**
