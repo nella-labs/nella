@@ -77,53 +77,48 @@ jobs:
     name: AI API Keys
     runs-on: ubuntu-latest
     outputs:
-      azure_embeddings: ${{ steps.azure-embeddings.outcome }}
-      azure_embeddings_skipped: ${{ steps.azure-embeddings.outputs.skipped }}
-      azure_rerank: ${{ steps.azure-rerank.outcome }}
-      azure_rerank_skipped: ${{ steps.azure-rerank.outputs.skipped }}
+      voyage_embeddings: ${{ steps.voyage-embeddings.outcome }}
+      voyage_embeddings_skipped: ${{ steps.voyage-embeddings.outputs.skipped }}
+      voyage_rerank: ${{ steps.voyage-rerank.outcome }}
+      voyage_rerank_skipped: ${{ steps.voyage-rerank.outputs.skipped }}
     steps:
-      - name: Check Azure Embeddings API
-        id: azure-embeddings
+      - name: Check Voyage Embeddings API
+        id: voyage-embeddings
         continue-on-error: true
         env:
-          AZURE_EMBEDDING_API_KEY: ${{ secrets.AZURE_EMBEDDING_API_KEY }}
-          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
-          AZURE_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_EMBEDDING_DEPLOYMENT }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
-          if [ -z "$AZURE_EMBEDDING_API_KEY" ] || [ -z "$AZURE_ENDPOINT" ]; then
-            echo "::notice::Azure Embeddings not configured"
+          if [ -z "$VOYAGE_API_KEY" ]; then
+            echo "::notice::Voyage Embeddings not configured"
             echo "skipped=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          DEPLOYMENT="${AZURE_EMBEDDING_DEPLOYMENT:-text-embedding-3-small}"
-          URL="${AZURE_ENDPOINT%/}/openai/deployments/${DEPLOYMENT}/embeddings?api-version=2024-06-01"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            -H "api-key: $AZURE_EMBEDDING_API_KEY" \
+            -H "Authorization: Bearer $VOYAGE_API_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"input":["health check"]}' \
-            "$URL")
-          echo "Azure Embeddings API response: HTTP $STATUS"
-          [ "$STATUS" = "200" ] || { echo "::error::Azure Embeddings returned HTTP $STATUS"; exit 1; }
+            -d '{"input":["health check"],"model":"voyage-code-3","input_type":"query","truncation":true}' \
+            "https://ai.mongodb.com/v1/embeddings")
+          echo "Voyage Embeddings API response: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::Voyage Embeddings returned HTTP $STATUS"; exit 1; }
 
-      - name: Check Azure Cohere Rerank API
-        id: azure-rerank
+      - name: Check Voyage Rerank API
+        id: voyage-rerank
         continue-on-error: true
         env:
-          AZURE_RERANK_API_KEY: ${{ secrets.AZURE_RERANK_API_KEY }}
-          AZURE_RERANK_ENDPOINT: ${{ secrets.AZURE_RERANK_ENDPOINT }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
         run: |
-          if [ -z "$AZURE_RERANK_API_KEY" ] || [ -z "$AZURE_RERANK_ENDPOINT" ]; then
-            echo "::notice::Azure Cohere rerank not configured (optional)"
+          if [ -z "$VOYAGE_API_KEY" ]; then
+            echo "::notice::Voyage rerank not configured (optional)"
             echo "skipped=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            -H "Authorization: Bearer $AZURE_RERANK_API_KEY" \
+            -H "Authorization: Bearer $VOYAGE_API_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"model":"Cohere-rerank-v4.0-pro","query":"test","documents":["hello"],"top_n":1}' \
-            "$AZURE_RERANK_ENDPOINT")
-          echo "Azure Cohere Rerank API response: HTTP $STATUS"
-          [ "$STATUS" = "200" ] || { echo "::error::Azure Cohere Rerank returned HTTP $STATUS"; exit 1; }
+            -d '{"model":"rerank-2.5","query":"test","documents":["hello"],"top_k":1}' \
+            "https://ai.mongodb.com/v1/rerank")
+          echo "Voyage Rerank API response: HTTP $STATUS"
+          [ "$STATUS" = "200" ] || { echo "::error::Voyage Rerank returned HTTP $STATUS"; exit 1; }
 
   # ---------------------------------------------------------------------------
   # npm Registry — verify published packages are accessible
@@ -163,16 +158,16 @@ jobs:
             const checks = {
               // GCP Cloud Run
               mcp_health:        "${{ needs.check-gcp-services.outputs.mcp_health }}",
-              // AI APIs (Azure)
-              azure_embeddings:  "${{ needs.check-ai-apis.outputs.azure_embeddings }}",
-              azure_rerank:      "${{ needs.check-ai-apis.outputs.azure_rerank }}",
+              // AI APIs (Voyage AI)
+              voyage_embeddings: "${{ needs.check-ai-apis.outputs.voyage_embeddings }}",
+              voyage_rerank:     "${{ needs.check-ai-apis.outputs.voyage_rerank }}",
               // npm packages
               npm_nella:         "${{ needs.check-npm-packages.outputs.nella }}",
             };
 
             // Optional provider skip flags
-            const embeddingsSkipped = "${{ needs.check-ai-apis.outputs.azure_embeddings_skipped }}";
-            const rerankSkipped = "${{ needs.check-ai-apis.outputs.azure_rerank_skipped }}";
+            const embeddingsSkipped = "${{ needs.check-ai-apis.outputs.voyage_embeddings_skipped }}";
+            const rerankSkipped = "${{ needs.check-ai-apis.outputs.voyage_rerank_skipped }}";
 
             const ok = (v) => v === "success";
             const icon = (v) => ok(v) ? "x" : " ";
@@ -190,10 +185,10 @@ jobs:
               checks.mcp_health,
               checks.npm_nella,
             ].some(v => !ok(v)) ||
-              (!ok(checks.azure_embeddings) && embeddingsSkipped !== "true");
+              (!ok(checks.voyage_embeddings) && embeddingsSkipped !== "true");
             // Optional failures (rerank) show in report but don't reopen the issue
             const optionalFailed =
-              (!ok(checks.azure_rerank) && rerankSkipped !== "true");
+              (!ok(checks.voyage_rerank) && rerankSkipped !== "true");
             const anyFailed = requiredFailed;
 
             const body = [
@@ -208,9 +203,9 @@ jobs:
               `### GCP Cloud Run`,
               `- [${icon(checks.mcp_health)}] **nella-mcp** (/health) — ${status(checks.mcp_health)}`,
               ``,
-              `### AI / ML APIs (Azure)`,
-              `- [${optIcon(checks.azure_embeddings, embeddingsSkipped)}] **Azure OpenAI** (Embeddings) — ${optStatus(checks.azure_embeddings, embeddingsSkipped)}`,
-              `- [${optIcon(checks.azure_rerank, rerankSkipped)}] **Azure Cohere** (Reranking, optional) — ${optStatus(checks.azure_rerank, rerankSkipped)}`,
+              `### AI / ML APIs (Voyage AI)`,
+              `- [${optIcon(checks.voyage_embeddings, embeddingsSkipped)}] **Voyage AI** (Embeddings) — ${optStatus(checks.voyage_embeddings, embeddingsSkipped)}`,
+              `- [${optIcon(checks.voyage_rerank, rerankSkipped)}] **Voyage AI** (Reranking, optional) — ${optStatus(checks.voyage_rerank, rerankSkipped)}`,
               ``,
               `### npm Packages`,
               `- [${icon(checks.npm_nella)}] **@getnella/mcp** — ${status(checks.npm_nella)}`,

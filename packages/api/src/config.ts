@@ -25,12 +25,16 @@ const envSchema = z.object({
   JWT_SECRET: z.string().optional(),
   API_KEY_SALT: z.string().optional(),
 
-  // Azure OpenAI (embeddings)
+  // Voyage AI via MongoDB Atlas (embeddings + reranking)
+  VOYAGE_API_KEY: z.string().optional(),
+  VOYAGE_ENDPOINT: z.string().optional().default("https://ai.mongodb.com/v1"),
+
+  // Azure OpenAI (embeddings) — legacy fallback
   AZURE_EMBEDDING_API_KEY: z.string().optional(),
   AZURE_ENDPOINT: z.string().optional(),
   AZURE_EMBEDDING_DEPLOYMENT: z.string().optional(),
 
-  // Azure AI Cohere (reranking)
+  // Azure AI Cohere (reranking) — legacy fallback
   AZURE_RERANK_API_KEY: z.string().optional(),
   AZURE_RERANK_ENDPOINT: z.string().optional(),
 
