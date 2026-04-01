@@ -33,20 +33,20 @@ interface RankedResult {
   lexicalScore: number;
   rrfScore: number;
   rerankedScore?: number;
-  relevanceScore?: number;  // Cohere relevance score
+  relevanceScore?: number;  // Voyage relevance score
 }
 
-// Cohere API types
-interface CohereRerankRequest {
+// Voyage AI rerank API types
+interface VoyageRerankRequest {
   model: string;
   query: string;
   documents: string[];
-  top_n?: number;
+  top_k?: number;
   return_documents?: boolean;
 }
 
-interface CohereRerankResponse {
-  results: {
+interface VoyageRerankResponse {
+  data: {
     index: number;
     relevance_score: number;
   }[];
@@ -98,45 +98,44 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
   minScore: 0.0,
   rerankEnabled: true,
   rerankTopK: 20,
-  rerankModel: "Cohere-rerank-v4.0-pro",
+  rerankModel: "rerank-2.5",
 };
 
 // =============================================================================
-// Cohere Reranker
+// Voyage AI Reranker
 // =============================================================================
 
-class CohereReranker {
+class VoyageReranker {
   /** Check env vars fresh each time (credentials may rotate mid-session). */
   isAvailable(): boolean {
-    return !!(process.env.AZURE_RERANK_API_KEY && process.env.AZURE_RERANK_ENDPOINT);
+    return !!process.env.VOYAGE_API_KEY;
   }
 
   async rerank(
     query: string,
     documents: { id: string; text: string }[],
     model?: string,
-    topN?: number
+    topK?: number
   ): Promise<{ id: string; score: number }[]> {
-    const apiKey = process.env.AZURE_RERANK_API_KEY;
-    const endpoint = process.env.AZURE_RERANK_ENDPOINT;
-    if (!apiKey || !endpoint) {
-      throw new Error("Azure rerank not configured — set AZURE_RERANK_API_KEY and AZURE_RERANK_ENDPOINT");
+    const apiKey = process.env.VOYAGE_API_KEY;
+    const endpoint = process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
+    if (!apiKey) {
+      throw new Error("VOYAGE_API_KEY not set");
     }
 
-    const request: CohereRerankRequest = {
-      model: model || "Cohere-rerank-v4.0-pro",
+    const request: VoyageRerankRequest = {
+      model: model || "rerank-2.5",
       query,
       documents: documents.map((d) => d.text),
-      top_n: topN ?? documents.length,
+      top_k: topK ?? documents.length,
       return_documents: false,
     };
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${endpoint.replace(/\/$/, "")}/rerank`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "X-Client-Name": "nella-core",
       },
       body: JSON.stringify(request),
       signal: AbortSignal.timeout(10_000),
@@ -144,89 +143,15 @@ class CohereReranker {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Azure Cohere rerank API error: ${response.status} ${error}`);
+      throw new Error(`Voyage rerank API error: ${response.status} ${error}`);
     }
 
-    const data = await response.json() as CohereRerankResponse;
+    const data = await response.json() as VoyageRerankResponse;
 
-    return data.results.map((r) => ({
+    return data.data.map((r) => ({
       id: documents[r.index].id,
       score: r.relevance_score,
     }));
-  }
-}
-
-// =============================================================================
-// Local Fallback Reranker (Cross-encoder simulation)
-// =============================================================================
-
-class LocalReranker {
-  /**
-   * Simple term-overlap based reranking
-   * In production, this would use a local cross-encoder model
-   */
-  async rerank(
-    query: string,
-    documents: { id: string; text: string }[],
-    topN?: number
-  ): Promise<{ id: string; score: number }[]> {
-    const queryTerms = this.tokenize(query);
-    
-    const scored = documents.map((doc) => {
-      const docTerms = this.tokenize(doc.text);
-      const score = this.calculateRelevance(queryTerms, docTerms, doc.text);
-      return { id: doc.id, score };
-    });
-
-    // Sort by score descending
-    scored.sort((a, b) => b.score - a.score);
-
-    return topN ? scored.slice(0, topN) : scored;
-  }
-
-  private tokenize(text: string): Set<string> {
-    return new Set(
-      text
-        .toLowerCase()
-        .split(/[\s\.,;:!?\-_'"()\[\]{}|\\/<>@#$%^&*+=`~]+/)
-        .filter((t) => t.length > 2)
-    );
-  }
-
-  private calculateRelevance(queryTerms: Set<string>, docTerms: Set<string>, docText: string): number {
-    let score = 0;
-    const docLower = docText.toLowerCase();
-
-    // Term overlap score
-    let matchCount = 0;
-    for (const term of queryTerms) {
-      if (docTerms.has(term)) {
-        matchCount++;
-        // Boost for exact phrase matches
-        if (docLower.includes(term)) {
-          score += 0.1;
-        }
-      }
-    }
-
-    // Jaccard-like overlap
-    const unionSize = new Set([...queryTerms, ...docTerms]).size;
-    const overlapScore = unionSize > 0 ? matchCount / unionSize : 0;
-    score += overlapScore;
-
-    // Position boost - earlier matches are better
-    for (const term of queryTerms) {
-      const pos = docLower.indexOf(term);
-      if (pos !== -1) {
-        score += (1 - pos / docLower.length) * 0.1;
-      }
-    }
-
-    // Length normalization - prefer concise matches
-    const lengthPenalty = Math.max(0, 1 - (docText.length - 500) / 2000);
-    score *= (0.5 + lengthPenalty * 0.5);
-
-    return score;
   }
 }
 
@@ -240,8 +165,7 @@ export class HybridSearcher {
   private lexicalIndex: LexicalIndex;
   private embedder: Embedder;
   private chunks: Map<string, CodeChunk> = new Map();
-  private cohereReranker: CohereReranker;
-  private localReranker: LocalReranker;
+  private voyageReranker: VoyageReranker;
 
   constructor(
     vectorStore: VectorStore,
@@ -253,15 +177,14 @@ export class HybridSearcher {
     this.lexicalIndex = lexicalIndex;
     this.embedder = embedder;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.cohereReranker = new CohereReranker();
-    this.localReranker = new LocalReranker();
+    this.voyageReranker = new VoyageReranker();
   }
 
   /**
-   * Check if reranking is available (Azure Cohere deployment configured)
+   * Check if reranking is available (Voyage AI configured)
    */
   isRerankingAvailable(): boolean {
-    return this.cohereReranker.isAvailable();
+    return this.voyageReranker.isAvailable();
   }
 
   /**
@@ -527,17 +450,15 @@ export class HybridSearcher {
     try {
       let reranked: { id: string; score: number }[];
 
-      if (this.cohereReranker.isAvailable()) {
-        // Use Cohere reranker
-        reranked = await this.cohereReranker.rerank(
-          query,
-          documents,
-          this.config.rerankModel
-        );
-      } else {
-        // Use local fallback reranker
-        reranked = await this.localReranker.rerank(query, documents);
+      if (!this.voyageReranker.isAvailable()) {
+        return results;
       }
+
+      reranked = await this.voyageReranker.rerank(
+        query,
+        documents,
+        this.config.rerankModel
+      );
 
       // Update scores
       const scoreMap = new Map(reranked.map((r) => [r.id, r.score]));
@@ -559,7 +480,7 @@ export class HybridSearcher {
       return [...toRerank, ...rest];
     } catch (error) {
       const reason = error instanceof Error && error.name === "TimeoutError"
-        ? "Cohere reranking timed out (10s)"
+        ? "Voyage reranking timed out (10s)"
         : "Reranking failed";
       console.warn(`${reason}, falling back to RRF scores:`, error);
       return results;
@@ -574,7 +495,7 @@ export class HybridSearcher {
     const symbols = chunk.symbols.map((s) => s.name).join(", ");
     const header = symbols ? `[${chunk.type}: ${symbols}]\n` : "";
     
-    // Truncate content if too long (Cohere has limits)
+    // Truncate content if too long (reranker has limits)
     const maxLength = 4000;
     const content = chunk.content.length > maxLength
       ? chunk.content.slice(0, maxLength) + "..."
@@ -675,7 +596,7 @@ export class HybridSearcher {
   } {
     return {
       chunksRegistered: this.chunks.size,
-      rerankingAvailable: this.cohereReranker.isAvailable(),
+      rerankingAvailable: this.voyageReranker.isAvailable(),
       config: this.config,
     };
   }

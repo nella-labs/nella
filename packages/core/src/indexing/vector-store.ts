@@ -369,7 +369,7 @@ class BruteForceBackend implements VectorBackend {
 // =============================================================================
 
 const DEFAULT_CONFIG: VectorStoreConfig = {
-  dimensions: 1536,
+  dimensions: 1024,
   maxElements: 100000,
   efConstruction: 200,
   efSearch: 100,

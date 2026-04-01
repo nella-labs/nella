@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     end_line INTEGER NOT NULL,
     chunk_type TEXT NOT NULL DEFAULT 'block',
     symbol_name TEXT,
-    embedding vector(384),  -- MiniLM-L6-v2 dimension
+    embedding vector(1024),  -- voyage-code-3 dimension
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
