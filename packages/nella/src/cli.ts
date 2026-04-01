@@ -772,21 +772,19 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
         apiBase: "https://app.getnella.dev/api",
       };
     } else if (process.env.VOYAGE_API_KEY) {
-      console.log(`  ${theme.muted("Using Voyage AI embeddings (MongoDB Atlas)")}\n`);
       embedderConfig = {
         provider: "voyage",
         model: DEFAULT_EMBEDDING_MODEL,
         dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       };
     } else if (process.env.AZURE_EMBEDDING_API_KEY) {
-      console.log(`  ${theme.muted("Using Azure OpenAI embeddings")}\n`);
       embedderConfig = {
         provider: "azure",
         model: "text-embedding-3-small",
         dimensions: 1536,
       };
     } else {
-      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("or set VOYAGE_API_KEY first.")}\n`);
+      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
       process.exit(1);
     }
   } else {
@@ -859,8 +857,6 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
         `   Files indexed:    ${theme.primary.bold(String(stats.filesIndexed))}`,
         `   Chunks created:   ${theme.primary.bold(String(stats.chunksCount))}`,
         `   Embeddings:       ${theme.primary.bold(String(stats.embeddingsCount))}`,
-        `   API tokens:       ${theme.primary.bold(String(stats.totalTokens))}`,
-        ...(stats.totalCost != null ? [`   Cost:             ${theme.primary.bold("$" + stats.totalCost.toFixed(4))}`] : []),
         ...(stats.durationMs != null ? [`   Duration:         ${theme.primary.bold((stats.durationMs / 1000).toFixed(1) + "s")}`] : []),
         "",
         `   Storage: ${theme.muted(path.relative(workspacePath, storagePath) + "/")}`,
