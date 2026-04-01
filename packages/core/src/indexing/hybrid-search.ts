@@ -52,6 +52,22 @@ interface VoyageRerankResponse {
   }[];
 }
 
+// Cohere rerank API types (Azure fallback)
+interface CohereRerankRequest {
+  model: string;
+  query: string;
+  documents: string[];
+  top_n?: number;
+  return_documents?: boolean;
+}
+
+interface CohereRerankResponse {
+  results: {
+    index: number;
+    relevance_score: number;
+  }[];
+}
+
 // =============================================================================
 // Language → file extension mapping
 // =============================================================================
@@ -156,6 +172,59 @@ class VoyageReranker {
 }
 
 // =============================================================================
+// Azure Cohere Reranker (fallback)
+// =============================================================================
+
+class CohereReranker {
+  isAvailable(): boolean {
+    return !!(process.env.AZURE_RERANK_API_KEY && process.env.AZURE_RERANK_ENDPOINT);
+  }
+
+  async rerank(
+    query: string,
+    documents: { id: string; text: string }[],
+    model?: string,
+    topN?: number
+  ): Promise<{ id: string; score: number }[]> {
+    const apiKey = process.env.AZURE_RERANK_API_KEY;
+    const endpoint = process.env.AZURE_RERANK_ENDPOINT;
+    if (!apiKey || !endpoint) {
+      throw new Error("Azure rerank not configured");
+    }
+
+    const request: CohereRerankRequest = {
+      model: model || "Cohere-rerank-v4.0-pro",
+      query,
+      documents: documents.map((d) => d.text),
+      top_n: topN ?? documents.length,
+      return_documents: false,
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(request),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Azure Cohere rerank API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json() as CohereRerankResponse;
+
+    return data.results.map((r) => ({
+      id: documents[r.index].id,
+      score: r.relevance_score,
+    }));
+  }
+}
+
+// =============================================================================
 // Hybrid Searcher Class
 // =============================================================================
 
@@ -166,6 +235,7 @@ export class HybridSearcher {
   private embedder: Embedder;
   private chunks: Map<string, CodeChunk> = new Map();
   private voyageReranker: VoyageReranker;
+  private cohereReranker: CohereReranker;
 
   constructor(
     vectorStore: VectorStore,
@@ -177,6 +247,7 @@ export class HybridSearcher {
     this.lexicalIndex = lexicalIndex;
     this.embedder = embedder;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.cohereReranker = new CohereReranker();
     this.voyageReranker = new VoyageReranker();
   }
 
@@ -184,7 +255,7 @@ export class HybridSearcher {
    * Check if reranking is available (Voyage AI configured)
    */
   isRerankingAvailable(): boolean {
-    return this.voyageReranker.isAvailable();
+    return this.voyageReranker.isAvailable() || this.cohereReranker.isAvailable();
   }
 
   /**
@@ -450,15 +521,13 @@ export class HybridSearcher {
     try {
       let reranked: { id: string; score: number }[];
 
-      if (!this.voyageReranker.isAvailable()) {
+      if (this.voyageReranker.isAvailable()) {
+        reranked = await this.voyageReranker.rerank(query, documents, this.config.rerankModel);
+      } else if (this.cohereReranker.isAvailable()) {
+        reranked = await this.cohereReranker.rerank(query, documents);
+      } else {
         return results;
       }
-
-      reranked = await this.voyageReranker.rerank(
-        query,
-        documents,
-        this.config.rerankModel
-      );
 
       // Update scores
       const scoreMap = new Map(reranked.map((r) => [r.id, r.score]));
@@ -596,7 +665,7 @@ export class HybridSearcher {
   } {
     return {
       chunksRegistered: this.chunks.size,
-      rerankingAvailable: this.voyageReranker.isAvailable(),
+      rerankingAvailable: this.isRerankingAvailable(),
       config: this.config,
     };
   }
