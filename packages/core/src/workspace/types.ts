@@ -123,7 +123,7 @@ export interface CloudIndexPolicy {
 }
 
 export interface EmbedderConfig {
-  provider: "azure";
+  provider: "azure" | "voyage";
   model: string;
   dimensions?: number;
 }
@@ -135,8 +135,8 @@ export interface SearchConfig {
   topK?: number;
 }
 
-const _DEFAULT_MODEL = "text-embedding-3-small";
-const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, "text-embedding-3-large": 3072 };
+const _DEFAULT_MODEL = "voyage-code-3";
+const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, "text-embedding-3-large": 3072, "voyage-code-3": 1024 };
 
 export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   autoIndex: true,
@@ -158,7 +158,7 @@ export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
     "**/.git/**",
   ],
   embedder: {
-    provider: "azure",
+    provider: "voyage",
     model: _DEFAULT_MODEL,
     dimensions: _DEFAULT_DIMS[_DEFAULT_MODEL],
   },

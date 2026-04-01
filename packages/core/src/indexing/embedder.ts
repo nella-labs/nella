@@ -1,7 +1,7 @@
 /**
  * Embedder Module
  *
- * Handles embedding generation via Azure OpenAI (text-embedding-3-small).
+ * Handles embedding generation via Voyage AI (voyage-code-3) or Azure OpenAI.
  * Includes SQLite caching to avoid redundant API calls.
  */
 
@@ -16,9 +16,9 @@ import type { EmbedderConfig, EmbeddingRequest, EmbeddingResponse } from "./type
 // =============================================================================
 
 const DEFAULT_CONFIG: EmbedderConfig = {
-  provider: "azure",
-  model: "text-embedding-3-small",
-  dimensions: 1536,
+  provider: "voyage",
+  model: "voyage-code-3",
+  dimensions: 1024,
   batchSize: 128,
   maxRetries: 3,
 };
@@ -29,6 +29,7 @@ const AZURE_API_VERSION = "2024-06-01";
 const PRICING: Record<string, number> = {
   "text-embedding-3-small": 0.02,
   "text-embedding-3-large": 0.13,
+  "voyage-code-3": 0.18,
 };
 
 // =============================================================================
@@ -393,6 +394,9 @@ export class Embedder {
         if (this.config.provider === "nella") {
           return await this.callNellaAPI(texts, model);
         }
+        if (this.config.provider === "voyage") {
+          return await this.callVoyageAPI(texts, model);
+        }
         return await this.callAzureAPI(texts, model);
       } catch (error) {
         if (attempt === this.config.maxRetries - 1) {
@@ -446,6 +450,54 @@ export class Embedder {
 
     const data = await response.json() as {
       data: { embedding: number[] }[];
+      usage: { total_tokens: number };
+    };
+
+    return {
+      embeddings: data.data.map((d) => d.embedding),
+      tokens: data.usage.total_tokens,
+    };
+  }
+
+  /**
+   * Call Voyage AI API (via MongoDB Atlas or direct)
+   */
+  private async callVoyageAPI(texts: string[], model: string): Promise<{ embeddings: number[][]; tokens: number }> {
+    const apiKey = this.config.apiKey || process.env.VOYAGE_API_KEY;
+    const endpoint = this.config.endpoint || process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
+
+    if (!apiKey) {
+      throw new Error("VOYAGE_API_KEY not set");
+    }
+
+    // voyage-code-3 context: 32K tokens; ~2 chars/token safety factor
+    const maxChars = 16000 * 2;
+    const truncatedTexts = texts.map((t) => t.length > maxChars ? t.slice(0, maxChars) : t);
+
+    const url = `${endpoint.replace(/\/$/, "")}/embeddings`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        input: truncatedTexts,
+        model,
+        input_type: "document",
+        truncation: true,
+        output_dimension: this.config.dimensions,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Voyage AI API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json() as {
+      data: { embedding: number[]; index: number }[];
       usage: { total_tokens: number };
     };
 

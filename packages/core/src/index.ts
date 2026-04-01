@@ -261,6 +261,21 @@ export {
   createTelemetryManager,
   ToolRegistry,
   createToolRegistry,
+  // Result isolation (prompt injection defense)
+  generateNonce,
+  stripToken,
+  wrapSearchResult,
+  wrapSearchResponse,
+  SEARCH_PREAMBLE,
+  SEARCH_PREAMBLE_COMPACT,
+  SEARCH_EPILOGUE,
+  SEARCH_EPILOGUE_COMPACT,
+  // Content redactor (prompt injection defense)
+  redactContent,
+  generateTripwire,
+  injectTripwire,
+  DEFAULT_PASS_THRESHOLD,
+  DEFAULT_REDACT_THRESHOLD,
 } from "./mcp";
 
 export type {
@@ -280,6 +295,7 @@ export type {
   McpEvent,
   ToolHandlerConfig,
   McpEventHandler,
+  DefenseConfig,
   ToolCategory,
   ToolExample,
   ProgressCallback,
@@ -293,6 +309,12 @@ export type {
   ToolMetrics,
   ToolRegistryEntry,
   ToolFilter,
+  // Result isolation types
+  ResultIsolationOptions,
+  WrappedResult,
+  // Content redactor types
+  RedactionResult,
+  RedactorConfig,
 } from "./mcp";
 
 // =============================================================================

@@ -78,7 +78,7 @@ export interface IndexMetadata {
 export interface IndexConfig {
   // Embedding settings
   embedder: {
-    provider: "azure" | "nella";
+    provider: "azure" | "nella" | "voyage";
     model: string;
     dimensions: number;
     apiKey?: string;
@@ -115,13 +115,14 @@ export interface IndexConfig {
 export const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-3-small": 1536,
   "text-embedding-3-large": 3072,
+  "voyage-code-3": 1024,
 };
 
-export const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+export const DEFAULT_EMBEDDING_MODEL = "voyage-code-3";
 
 export const DEFAULT_INDEX_CONFIG: IndexConfig = {
   embedder: {
-    provider: "azure",
+    provider: "voyage",
     model: DEFAULT_EMBEDDING_MODEL,
     dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
   },
@@ -259,7 +260,7 @@ export interface EmbeddingResponse {
 }
 
 export interface EmbedderConfig {
-  provider: "azure" | "nella";
+  provider: "azure" | "nella" | "voyage";
   apiKey?: string;
   endpoint?: string;
   deployment?: string;

@@ -60,7 +60,7 @@ export class SearchService {
         strategy: "ast" as any,
       },
       embedder: {
-        provider: "azure",
+        provider: "voyage",
         model: DEFAULT_EMBEDDING_MODEL,
         dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       },
