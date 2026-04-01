@@ -291,52 +291,58 @@ export class IndexManager {
     if (chunksToEmbed.length > 0) {
       const maxBatchTokens = 7500;
       const maxBatchSize = 50;
+      const concurrency = 4; // Fire up to 4 API calls in parallel
+
+      // Build all batches upfront
+      const batches: CodeChunk[][] = [];
       let i = 0;
+      while (i < chunksToEmbed.length) {
+        const batch: CodeChunk[] = [];
+        let batchTokens = 0;
+        while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
+          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
+          if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
+          batchTokens += chunkTokens;
+          batch.push(chunksToEmbed[i]);
+          i++;
+        }
+        batches.push(batch);
+      }
+
       try {
-        while (i < chunksToEmbed.length) {
-          const batch: CodeChunk[] = [];
-          let batchTokens = 0;
-          while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
-            const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
-            if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
-            batchTokens += chunkTokens;
-            batch.push(chunksToEmbed[i]);
-            i++;
-          }
+        // Process batches in parallel waves
+        for (let wave = 0; wave < batches.length; wave += concurrency) {
+          const waveBatches = batches.slice(wave, wave + concurrency);
 
-          // Enrich chunk content with metadata for better semantic embeddings
-          const texts = batch.map((c) => this.enrichChunkContent(c));
-          const { embeddings, tokensUsed, cost } = await this.embedder.embed({ texts });
-          actualApiTokens += tokensUsed;
-          totalCost += cost;
+          const results = await Promise.all(
+            waveBatches.map(async (batch) => {
+              const texts = batch.map((c) => this.enrichChunkContent(c));
+              return this.embedder.embed({ texts });
+            }),
+          );
 
-          // If the server returned different dimensions than expected (e.g. provider
-          // changed server-side), reinitialize the vector store to match.
-          const actualDims = embeddings[0]?.length;
-          if (actualDims && actualDims !== this.config.embedder.dimensions) {
-            this.config.embedder.dimensions = actualDims;
-            this.vectorStore = createVectorStore({ dimensions: actualDims });
-            if (this.config.storagePath) {
-              this.vectorStore.initPersistence(path.join(this.config.storagePath, "vectors.json"));
+          // Store results from all batches in this wave
+          for (let b = 0; b < waveBatches.length; b++) {
+            const batch = waveBatches[b];
+            const { embeddings, tokensUsed, cost } = results[b];
+            actualApiTokens += tokensUsed;
+            totalCost += cost;
+
+            this.emit({
+              type: "index:embed",
+              workspaceId: this.config.workspaceId,
+              batchSize: batch.length,
+              tokensUsed,
+              cost,
+            });
+
+            for (let j = 0; j < batch.length; j++) {
+              batch[j].embedding = embeddings[j];
+              this.vectorStore.add(batch[j].id, embeddings[j]);
             }
           }
 
-          this.emit({
-            type: "index:embed",
-            workspaceId: this.config.workspaceId,
-            batchSize: batch.length,
-            tokensUsed,
-            cost,
-          });
-
-          // Store embeddings
-          for (let j = 0; j < batch.length; j++) {
-            const chunk = batch[j];
-            chunk.embedding = embeddings[j];
-            this.vectorStore.add(chunk.id, embeddings[j]);
-          }
-
-          // Persist after each batch so progress survives failures
+          // Persist after each wave so progress survives failures
           this.embedder.saveCache();
           this.vectorStore.save();
           this.saveChunks();
