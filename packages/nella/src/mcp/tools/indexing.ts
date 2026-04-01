@@ -143,6 +143,41 @@ let cachedWorkspacePath: string | null = null;
 let cachedBranchManager: BranchIndexManager | null = null;
 let cachedBranchWorkspacePath: string | null = null;
 
+/**
+ * Resolve the embedder provider config.
+ * Priority: direct Voyage API (lowest latency) > Nella proxy > Azure.
+ */
+async function resolveEmbedderConfig(): Promise<IndexManagerConfig["embedder"]> {
+  if (process.env.VOYAGE_API_KEY) {
+    return {
+      provider: "voyage",
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
+    };
+  }
+
+  const session = await getValidSession();
+  if (session) {
+    return {
+      provider: "nella",
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
+      apiKey: session.access_token,
+      apiBase: "https://app.getnella.dev/api",
+    };
+  }
+
+  if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+    return {
+      provider: "azure",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
+  }
+
+  throw new Error("Not authenticated. Run 'nella auth login' to get started.");
+}
+
 async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typeof createIndexManager>> {
   if (cachedManager && cachedWorkspacePath === workspacePath) {
     return cachedManager;
@@ -150,36 +185,7 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
 
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
-
-  // Use Nella cloud embeddings when authenticated, fall back to Voyage AI, then Azure
-  const session = await getValidSession();
-  let embedderConfig: IndexManagerConfig["embedder"];
-  if (session) {
-    embedderConfig = {
-      provider: "nella",
-      model: DEFAULT_EMBEDDING_MODEL,
-      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
-      apiKey: session.access_token,
-      apiBase: "https://app.getnella.dev/api",
-    };
-  } else if (process.env.VOYAGE_API_KEY) {
-    embedderConfig = {
-      provider: "voyage",
-      model: DEFAULT_EMBEDDING_MODEL,
-      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
-    };
-  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
-    embedderConfig = {
-      provider: "azure",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    };
-  } else {
-    throw new Error(
-      "No embedding provider configured. Run 'nella auth login', set VOYAGE_API_KEY, " +
-      "or set AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT environment variables.",
-    );
-  }
+  const embedderConfig = await resolveEmbedderConfig();
 
   const config: IndexManagerConfig = {
     workspaceId,
@@ -218,36 +224,7 @@ async function getOrCreateBranchManager(workspacePath: string): Promise<BranchIn
 
   const defaultBranch = await gitUtils.getDefaultBranch(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
-
-  // Resolve embedder config
-  const session = await getValidSession();
-  let embedderConfig: IndexManagerConfig["embedder"];
-  if (session) {
-    embedderConfig = {
-      provider: "nella",
-      model: DEFAULT_EMBEDDING_MODEL,
-      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
-      apiKey: session.access_token,
-      apiBase: "https://app.getnella.dev/api",
-    };
-  } else if (process.env.VOYAGE_API_KEY) {
-    embedderConfig = {
-      provider: "voyage",
-      model: DEFAULT_EMBEDDING_MODEL,
-      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
-    };
-  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
-    embedderConfig = {
-      provider: "azure",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
-    };
-  } else {
-    throw new Error(
-      "No embedding provider configured. Run 'nella auth login', set VOYAGE_API_KEY, " +
-      "or set AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT.",
-    );
-  }
+  const embedderConfig = await resolveEmbedderConfig();
 
   cachedBranchManager = new BranchIndexManager({
     workspaceId: path.basename(workspacePath),
