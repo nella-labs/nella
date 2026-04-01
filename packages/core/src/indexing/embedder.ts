@@ -18,7 +18,7 @@ import type { EmbedderConfig, EmbeddingRequest, EmbeddingResponse } from "./type
 const DEFAULT_CONFIG: EmbedderConfig = {
   provider: "voyage",
   model: "voyage-code-3",
-  dimensions: 1024,
+  dimensions: 2048,
   batchSize: 128,
   maxRetries: 3,
 };
@@ -302,7 +302,7 @@ export class Embedder {
    * Generate embeddings for a list of texts
    */
   async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
-    const { texts, model = this.config.model } = request;
+    const { texts, model = this.config.model, inputType = "document" } = request;
 
     if (texts.length === 0) {
       return {
@@ -347,7 +347,7 @@ export class Embedder {
       const batch = uncachedTexts.slice(i, i + batchSize);
       const batchIndices = uncachedIndices.slice(i, i + batchSize);
 
-      const { embeddings, tokens } = await this.callAPI(batch, model);
+      const { embeddings, tokens } = await this.callAPI(batch, model, inputType);
       totalTokens += tokens;
 
       // Store results and cache
@@ -393,14 +393,14 @@ export class Embedder {
   /**
    * Call the embedding API
    */
-  private async callAPI(texts: string[], model: string): Promise<{ embeddings: number[][]; tokens: number }> {
+  private async callAPI(texts: string[], model: string, inputType: "document" | "query" = "document"): Promise<{ embeddings: number[][]; tokens: number }> {
     for (let attempt = 0; attempt < this.config.maxRetries; attempt++) {
       try {
         if (this.config.provider === "nella") {
           return await this.callNellaAPI(texts, model);
         }
         if (this.config.provider === "voyage") {
-          return await this.callVoyageAPI(texts, model);
+          return await this.callVoyageAPI(texts, model, inputType);
         }
         return await this.callAzureAPI(texts, model);
       } catch (error) {
@@ -467,7 +467,7 @@ export class Embedder {
   /**
    * Call Voyage AI API (via MongoDB Atlas or direct)
    */
-  private async callVoyageAPI(texts: string[], model: string): Promise<{ embeddings: number[][]; tokens: number }> {
+  private async callVoyageAPI(texts: string[], model: string, inputType: "document" | "query" = "document"): Promise<{ embeddings: number[][]; tokens: number }> {
     const apiKey = this.config.apiKey || process.env.VOYAGE_API_KEY;
     const endpoint = this.config.endpoint || process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
 
@@ -490,7 +490,7 @@ export class Embedder {
       body: JSON.stringify({
         input: truncatedTexts,
         model,
-        input_type: "document",
+        input_type: inputType,
         truncation: true,
         output_dimension: this.config.dimensions,
       }),
@@ -574,8 +574,12 @@ export class Embedder {
   /**
    * Get a single embedding
    */
-  async embedOne(text: string): Promise<{ embedding: number[]; tokensUsed: number; cost: number }> {
-    const response = await this.embed({ texts: [text] });
+  /**
+   * Embed a single text. Defaults to inputType "query" since this is
+   * typically used for search queries (HybridSearcher.search).
+   */
+  async embedOne(text: string, inputType: "document" | "query" = "query"): Promise<{ embedding: number[]; tokensUsed: number; cost: number }> {
+    const response = await this.embed({ texts: [text], inputType });
     return {
       embedding: response.embeddings[0],
       tokensUsed: response.tokensUsed,
