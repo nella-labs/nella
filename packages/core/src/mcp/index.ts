@@ -35,7 +35,33 @@ export {
   createMcpToolHandler,
   type ToolHandlerConfig,
   type McpEventHandler,
+  type DefenseConfig,
 } from "./handler";
+
+// Result Isolation (prompt injection defense — structural boundaries)
+export {
+  generateNonce,
+  stripToken,
+  wrapSearchResult,
+  wrapSearchResponse,
+  SEARCH_PREAMBLE,
+  SEARCH_PREAMBLE_COMPACT,
+  SEARCH_EPILOGUE,
+  SEARCH_EPILOGUE_COMPACT,
+  type ResultIsolationOptions,
+  type WrappedResult,
+} from "./result-isolation";
+
+// Content Redactor (prompt injection defense — surgical redaction)
+export {
+  redactContent,
+  generateTripwire,
+  injectTripwire,
+  DEFAULT_PASS_THRESHOLD,
+  DEFAULT_REDACT_THRESHOLD,
+  type RedactionResult,
+  type RedactorConfig,
+} from "./content-redactor";
 
 // Validation
 export {

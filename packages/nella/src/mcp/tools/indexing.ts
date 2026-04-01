@@ -151,7 +151,7 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
   const workspaceId = path.basename(workspacePath);
   const storagePath = path.join(workspacePath, ".nella", "index");
 
-  // Use Nella cloud embeddings when authenticated, fall back to Azure (requires env vars)
+  // Use Nella cloud embeddings when authenticated, fall back to Voyage AI, then Azure
   const session = await getValidSession();
   let embedderConfig: IndexManagerConfig["embedder"];
   if (session) {
@@ -162,15 +162,21 @@ async function getOrCreateManager(workspacePath: string): Promise<ReturnType<typ
       apiKey: session.access_token,
       apiBase: "https://app.getnella.dev/api",
     };
-  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+  } else if (process.env.VOYAGE_API_KEY) {
     embedderConfig = {
-      provider: "azure",
+      provider: "voyage",
       model: DEFAULT_EMBEDDING_MODEL,
       dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
     };
+  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+    embedderConfig = {
+      provider: "azure",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
   } else {
     throw new Error(
-      "No embedding provider configured. Either run 'nella auth login' for cloud embeddings, " +
+      "No embedding provider configured. Run 'nella auth login', set VOYAGE_API_KEY, " +
       "or set AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT environment variables.",
     );
   }
@@ -224,15 +230,22 @@ async function getOrCreateBranchManager(workspacePath: string): Promise<BranchIn
       apiKey: session.access_token,
       apiBase: "https://app.getnella.dev/api",
     };
-  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+  } else if (process.env.VOYAGE_API_KEY) {
     embedderConfig = {
-      provider: "azure",
+      provider: "voyage",
       model: DEFAULT_EMBEDDING_MODEL,
       dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
     };
+  } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+    embedderConfig = {
+      provider: "azure",
+      model: "text-embedding-3-small",
+      dimensions: 1536,
+    };
   } else {
     throw new Error(
-      "No embedding provider configured. Run 'nella auth login' or set AZURE_EMBEDDING_API_KEY.",
+      "No embedding provider configured. Run 'nella auth login', set VOYAGE_API_KEY, " +
+      "or set AZURE_EMBEDDING_API_KEY and AZURE_ENDPOINT.",
     );
   }
 

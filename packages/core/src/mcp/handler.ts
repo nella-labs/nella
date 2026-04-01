@@ -29,6 +29,9 @@ import { retryWithBackoff } from "./retry";
 import { ToolResultCache, type ToolResultCacheConfig } from "./cache";
 import { TelemetryManager, type TelemetryConfig } from "./telemetry";
 import { ToolRegistry } from "./registry";
+import { generateNonce, wrapSearchResult, wrapSearchResponse, stripToken } from "./result-isolation";
+import { scanContent, formatInjectionWarning } from "../indexing/content-scanner";
+import { redactContent, generateTripwire, injectTripwire } from "./content-redactor";
 import type { Workspace } from "../workspace";
 import type { Authenticator, AuthResult } from "../auth";
 import type { RateLimiter, RateLimitResult } from "../rate-limit";
@@ -45,8 +48,28 @@ const MAX_CHAIN_DEPTH = 3;
 // Types
 // =============================================================================
 
+/**
+ * Configuration for the prompt injection defense pipeline.
+ * When enabled, search results are scanned, optionally redacted,
+ * wrapped with boundary markers, and signed with HMAC.
+ */
+export interface DefenseConfig {
+  /** Enable prompt injection defense layers (default: false) */
+  enabled: boolean;
+  /** Per-session token for HMAC signing and token stripping */
+  sessionToken?: string;
+  /** HMAC key derived from sessionToken (auto-derived if sessionToken given) */
+  hmacKey?: Buffer;
+  /** Injection score threshold below which content passes through (default: 0.3) */
+  passThreshold?: number;
+  /** Injection score threshold above which injection spans are redacted (default: 0.6) */
+  redactThreshold?: number;
+}
+
 export interface ToolHandlerConfig {
   workspace: Workspace;
+  /** Prompt injection defense configuration */
+  defense?: DefenseConfig;
   authenticator?: Authenticator;
   rateLimiter?: RateLimiter;
   contextManager?: ContextManager;
@@ -87,6 +110,9 @@ export class McpToolHandler {
   private progress?: ProgressCallback;
   private validateInputs: boolean;
 
+  // --- Defense pipeline ---
+  private defense: DefenseConfig;
+
   constructor(config: ToolHandlerConfig) {
     this.workspace = config.workspace;
     this.authenticator = config.authenticator;
@@ -96,6 +122,7 @@ export class McpToolHandler {
     this.apiKey = config.apiKey;
     this.progress = config.progress;
     this.validateInputs = config.validateInputs !== false; // default true
+    this.defense = config.defense ?? { enabled: false };
 
     // Initialize cache
     if (config.cache === false) {
@@ -414,15 +441,36 @@ export class McpToolHandler {
 
   private async handleSearch(args: SearchToolArgs): Promise<McpToolResult> {
     const detail = args.detail || "compact";
-    const response = await this.workspace.search({
-      query: args.query,
-      limit: args.limit || 5,
-      mode: args.mode || "hybrid",
-      filter: {
-        fileTypes: args.fileTypes,
-        paths: args.paths,
-      },
-    });
+    const requestedMode = args.mode || "hybrid";
+
+    let response;
+    try {
+      response = await this.workspace.search({
+        query: args.query,
+        limit: args.limit || 5,
+        mode: requestedMode,
+        filter: {
+          fileTypes: args.fileTypes,
+          paths: args.paths,
+        },
+      });
+    } catch {
+      // Hybrid/semantic search may fail if embeddings aren't configured.
+      // Fall back to lexical search which only needs the BM25 index.
+      if (requestedMode !== "lexical") {
+        response = await this.workspace.search({
+          query: args.query,
+          limit: args.limit || 5,
+          mode: "lexical",
+          filter: {
+            fileTypes: args.fileTypes,
+            paths: args.paths,
+          },
+        });
+      } else {
+        throw new Error(`Search failed for query "${args.query}"`);
+      }
+    }
 
     if (response.results.length === 0) {
       const suggestion = response.suggestion !== "use_results"
@@ -438,6 +486,12 @@ export class McpToolHandler {
 
     const header = `Found ${response.results.length} results (confidence: ${(response.confidence * 100).toFixed(0)}%):`;
 
+    // ── Defense pipeline: scan, redact, wrap, sign ──
+    if (this.defense.enabled) {
+      return this.handleSearchDefended(response, header, detail, args);
+    }
+
+    // ── Undefended path (original behavior) ──
     if (detail === "compact") {
       const lines = response.results.map((r, i) => {
         const chunk = r.chunk;
@@ -476,6 +530,116 @@ export class McpToolHandler {
         },
       ],
     };
+  }
+
+  /**
+   * Defended search handler — applies the full injection defense pipeline:
+   * 1. Scan each result for injection patterns
+   * 2. Apply three-tier redaction (pass / warn / redact)
+   * 3. Inject tripwire canary for blind-copy detection
+   * 4. Wrap with boundary markers + HMAC signatures
+   * 5. Strip session tokens from output
+   */
+  private handleSearchDefended(
+    response: import("../indexing/types").SearchResponse,
+    header: string,
+    detail: "compact" | "full" | string,
+    args: SearchToolArgs,
+  ): McpToolResult {
+    const nonce = generateNonce();
+    const totalResults = response.results.length;
+    const tripwire = generateTripwire();
+    const redactorConfig = {
+      passThreshold: this.defense.passThreshold,
+      redactThreshold: this.defense.redactThreshold,
+    };
+
+    if (detail === "compact") {
+      // Compact mode: metadata lines with boundary wrapping
+      const lines: string[] = [];
+      for (let i = 0; i < response.results.length; i++) {
+        const result = response.results[i];
+        const chunk = result.chunk;
+        const startLine = chunk.lines?.[0];
+        const endLine = chunk.lines?.[1];
+        const lineRange = startLine ? `:${startLine}${endLine ? `-${endLine}` : ""}` : "";
+        const score = (result.score * 100).toFixed(1);
+        const symbolNames = chunk.symbols?.map((s) => s.name).join(", ") || "";
+        const symbolKinds = [...new Set(chunk.symbols?.map((s) => s.kind) || [])].join(", ");
+        const symbolSuffix = symbolNames ? ` — ${symbolNames} [${symbolKinds}]` : "";
+
+        // Scan content even in compact mode to detect warnings
+        const scan = scanContent(chunk.content);
+        const warningTag = scan.patterns.length > 0 ? " ⚠" : "";
+
+        lines.push(`${i + 1}. ${chunk.filePath}${lineRange} (${score}%)${symbolSuffix}${warningTag}`);
+      }
+
+      const output = wrapSearchResponse(header, lines, {
+        sessionToken: this.defense.sessionToken,
+        hmacKey: this.defense.hmacKey,
+        compact: true,
+      });
+
+      return { content: [{ type: "text", text: output }] };
+    }
+
+    // Full mode: complete defense pipeline
+    const wrappedResults: string[] = [];
+
+    for (let i = 0; i < response.results.length; i++) {
+      const result = response.results[i];
+      const chunk = result.chunk;
+      const trustLevel = chunk.source?.trustLevel || "workspace";
+      const score = (result.score * 100).toFixed(1);
+
+      // Step 1: Scan content for injection patterns
+      const scan = scanContent(chunk.content);
+
+      // Step 2: Apply three-tier redaction
+      const redaction = redactContent(chunk.content, scan, redactorConfig);
+
+      // Determine which content to show
+      let displayContent = redaction.redacted ? redaction.content : chunk.content;
+
+      // Step 3: Inject tripwire canary
+      displayContent = injectTripwire(displayContent, tripwire, chunk.language);
+
+      // Build result lines
+      const resultLines: string[] = [];
+      resultLines.push(`## ${chunk.filePath}:${chunk.lines?.[0] ?? 0}-${chunk.lines?.[1] ?? 0} (${score}% match)`);
+      resultLines.push(`Type: ${chunk.type} | Language: ${chunk.language}`);
+      if (chunk.symbols?.length) {
+        resultLines.push(`Symbols: ${chunk.symbols.map((s) => s.name).join(", ")}`);
+      }
+      resultLines.push("```" + (chunk.language || ""));
+      resultLines.push(displayContent);
+      resultLines.push("```");
+
+      // Step 4: Wrap with boundary markers + HMAC
+      const wrapped = wrapSearchResult(
+        resultLines.join("\n"),
+        {
+          filePath: chunk.filePath,
+          lines: chunk.lines ?? [0, 0],
+          trustLevel,
+          resultIndex: i,
+          totalResults,
+          injectionWarning: redaction.warning,
+        },
+        nonce,
+        this.defense.hmacKey,
+      );
+      wrappedResults.push(wrapped.content);
+    }
+
+    // Step 5: Wrap full response with preamble + strip tokens + sign
+    const output = wrapSearchResponse(header, wrappedResults, {
+      sessionToken: this.defense.sessionToken,
+      hmacKey: this.defense.hmacKey,
+    });
+
+    return { content: [{ type: "text", text: output }] };
   }
 
   private async handleVerify(args: VerifyToolArgs): Promise<McpToolResult> {

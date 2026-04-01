@@ -122,6 +122,24 @@ export const agents: Record<AgentType, AgentConfig> = {
       return fs.existsSync(path.join(home, ".vscode"));
     },
   },
+  "github-copilot": {
+    name: "github-copilot",
+    displayName: "GitHub Copilot",
+    getConfigPath: getVsCodeConfigPath,
+    configKey: "servers",
+    supportedModes: ["hosted", "local"],
+    detectInstalled: () => {
+      // Copilot runs inside VS Code — check for the extension
+      const extensionsDir = path.join(home, ".vscode", "extensions");
+      try {
+        if (!fs.existsSync(extensionsDir)) return false;
+        const entries = fs.readdirSync(extensionsDir);
+        return entries.some((e) => e.startsWith("github.copilot-chat-") || e.startsWith("github.copilot-"));
+      } catch {
+        return false;
+      }
+    },
+  },
   cursor: {
     name: "cursor",
     displayName: "Cursor",

@@ -29,6 +29,7 @@ import {
   gitUtils,
 } from "@usenella/core";
 import type { IndexManagerConfig, IndexEvent, BranchIndexInfo } from "@usenella/core";
+import { DEFAULT_EMBEDDING_MODEL, MODEL_DIMENSIONS } from "@usenella/core";
 import { startMcpServer } from "./mcp/server";
 import { startHostedServer } from "./mcp/hosted-server";
 import {
@@ -765,10 +766,17 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
       console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
       embedderConfig = {
         provider: "nella",
-        model: "text-embedding-3-small",
-        dimensions: 1536,
+        model: DEFAULT_EMBEDDING_MODEL,
+        dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
         apiKey: session.access_token,
         apiBase: "https://app.getnella.dev/api",
+      };
+    } else if (process.env.VOYAGE_API_KEY) {
+      console.log(`  ${theme.muted("Using Voyage AI embeddings (MongoDB Atlas)")}\n`);
+      embedderConfig = {
+        provider: "voyage",
+        model: DEFAULT_EMBEDDING_MODEL,
+        dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       };
     } else if (process.env.AZURE_EMBEDDING_API_KEY) {
       console.log(`  ${theme.muted("Using Azure OpenAI embeddings")}\n`);
@@ -778,15 +786,15 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
         dimensions: 1536,
       };
     } else {
-      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
+      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("or set VOYAGE_API_KEY first.")}\n`);
       process.exit(1);
     }
   } else {
     // Dummy config for graph-only mode (embedder is never called)
     embedderConfig = {
-      provider: "azure",
-      model: "text-embedding-3-small",
-      dimensions: 1536,
+      provider: "voyage",
+      model: DEFAULT_EMBEDDING_MODEL,
+      dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
     };
   }
 

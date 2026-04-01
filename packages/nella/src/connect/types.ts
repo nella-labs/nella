@@ -2,6 +2,7 @@ export type AgentType =
   | "claude-desktop"
   | "claude-code"
   | "vscode"
+  | "github-copilot"
   | "cursor"
   | "windsurf"
   | "cline"
