@@ -618,7 +618,16 @@ export class VectorStore {
       try {
         const data = metaResult.data;
 
-        this.config = { ...this.config, ...data.config };
+        // If the persisted index has different dimensions than the current config
+        // (e.g., embedding model changed), the old data is incompatible — skip loading.
+        if (data.config?.dimensions && data.config.dimensions !== this.config.dimensions) {
+          console.warn(
+            `Vector store dimension mismatch: persisted=${data.config.dimensions}, current=${this.config.dimensions}. ` +
+            `Discarding old index — run nella_index --force to rebuild.`
+          );
+          return;
+        }
+
         this.entries.clear();
         this.chunkIdToVectorId.clear();
         this.idToNumericId.clear();
