@@ -136,7 +136,7 @@ export interface SearchConfig {
 }
 
 const _DEFAULT_MODEL = "voyage-code-3";
-const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, "text-embedding-3-large": 3072, "voyage-code-3": 1024 };
+const _DEFAULT_DIMS: Record<string, number> = { "text-embedding-3-small": 1536, "text-embedding-3-large": 3072, "voyage-code-3": 2048 };
 
 export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   autoIndex: true,
