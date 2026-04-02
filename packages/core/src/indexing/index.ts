@@ -293,14 +293,18 @@ export class IndexManager {
       const maxBatchSize = 50;
       const concurrency = 4; // Fire up to 4 API calls in parallel
 
-      // Build all batches upfront
+      // Build all batches upfront using ENRICHED content size (what the API
+      // actually receives), not raw chunk tokens. Enrichment prepends file path,
+      // symbols, and imports — typically 100-200 extra tokens per chunk — so raw
+      // token counts underestimate batch size and produce too many small batches.
       const batches: CodeChunk[][] = [];
       let i = 0;
       while (i < chunksToEmbed.length) {
         const batch: CodeChunk[] = [];
         let batchTokens = 0;
         while (i < chunksToEmbed.length && batch.length < maxBatchSize) {
-          const chunkTokens = chunksToEmbed[i].tokens || Math.ceil(chunksToEmbed[i].content.length / 3);
+          const enriched = this.enrichChunkContent(chunksToEmbed[i]);
+          const chunkTokens = Math.ceil(enriched.length / 3);
           if (batch.length > 0 && batchTokens + chunkTokens > maxBatchTokens) break;
           batchTokens += chunkTokens;
           batch.push(chunksToEmbed[i]);
