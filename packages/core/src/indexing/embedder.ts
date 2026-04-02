@@ -29,7 +29,7 @@ const AZURE_API_VERSION = "2024-06-01";
 const PRICING: Record<string, number> = {
   "text-embedding-3-small": 0.02,
   "text-embedding-3-large": 0.13,
-  "voyage-code-3": 0.18,
+  "voyage-code-3": 0.06,
 };
 
 // =============================================================================
