@@ -5,6 +5,7 @@
  *
  * Commands:
  *   nella index      - Index workspace for search & code verification
+ *   nella search     - Search the indexed codebase
  *   nella mcp        - Start MCP server for AI agent integration
  *   nella connect    - Configure Claude, VS Code & Cursor
  *   nella auth       - Login, logout, or check status
@@ -46,6 +47,13 @@ import {
   fetchProjects,
 } from "./auth";
 import { runConnectCommand } from "./connect";
+import {
+  resolveEmbedderConfig,
+  getOrCreateManager,
+  getOrCreateBranchManager,
+} from "./search-setup";
+import { isTelemetryEnabled, setTelemetryEnabled, getTelemetryStatus, hasShownNotice, markNoticeShown, resetTelemetryId } from "./telemetry";
+import { recordEvent } from "./telemetry-reporter";
 
 // =============================================================================
 // Theme & Styling
@@ -142,7 +150,7 @@ function divider(): string {
 // =============================================================================
 
 interface CliArgs {
-  command: "index" | "mcp" | "serve" | "connect" | "auth" | "org" | "project" | "branch" | "setup" | "help";
+  command: "index" | "search" | "mcp" | "serve" | "connect" | "auth" | "org" | "project" | "branch" | "setup" | "telemetry" | "help";
   force?: boolean;
   repoPath?: string;
   output?: "json" | "pretty";
@@ -164,10 +172,17 @@ interface CliArgs {
   subcommandArg?: string;
   // Graph flag
   graph?: boolean;
-  // Branch flag (for index command)
+  // Branch flag (for index/search commands)
   branch?: string;
   // Help flag (per-command)
   showHelp?: boolean;
+  // Search-specific args
+  searchQuery?: string;
+  searchMode?: "hybrid" | "semantic" | "lexical";
+  searchDetail?: "compact" | "full";
+  topK?: number;
+  language?: string;
+  filePattern?: string;
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -181,7 +196,7 @@ function parseArgs(args: string[]): CliArgs {
     const arg = args[i];
 
     // Commands
-    if (arg === "index" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "org" || arg === "project" || arg === "branch" || arg === "setup" || arg === "help") {
+    if (arg === "index" || arg === "search" || arg === "mcp" || arg === "serve" || arg === "connect" || arg === "auth" || arg === "org" || arg === "project" || arg === "branch" || arg === "setup" || arg === "telemetry" || arg === "help") {
       result.command = arg as CliArgs["command"];
 
       // Parse auth subcommand
@@ -205,6 +220,21 @@ function parseArgs(args: string[]): CliArgs {
             i++;
           }
         }
+      }
+
+      // Parse telemetry subcommand
+      if (arg === "telemetry" && i + 1 < args.length) {
+        const sub = args[i + 1];
+        if (sub && !sub.startsWith("-")) {
+          result.subcommand = sub;
+          i++;
+        }
+      }
+
+      // Parse search query (first non-flag arg after "search")
+      if (arg === "search" && i + 1 < args.length && !args[i + 1].startsWith("-")) {
+        result.searchQuery = args[i + 1];
+        i++;
       }
 
       i++;
@@ -262,6 +292,24 @@ function parseArgs(args: string[]): CliArgs {
       result.branch = args[++i];
     } else if (arg.startsWith("--branch=")) {
       result.branch = arg.slice("--branch=".length);
+    } else if (arg === "--detail") {
+      const val = args[++i];
+      if (val === "compact" || val === "full") result.searchDetail = val;
+    } else if (arg.startsWith("--detail=")) {
+      const val = arg.slice("--detail=".length);
+      if (val === "compact" || val === "full") result.searchDetail = val as "compact" | "full";
+    } else if (arg === "--top-k") {
+      result.topK = parseInt(args[++i], 10);
+    } else if (arg.startsWith("--top-k=")) {
+      result.topK = parseInt(arg.slice("--top-k=".length), 10);
+    } else if (arg === "--language" || arg === "-l") {
+      result.language = args[++i];
+    } else if (arg.startsWith("--language=")) {
+      result.language = arg.slice("--language=".length);
+    } else if (arg === "--file-pattern") {
+      result.filePattern = args[++i];
+    } else if (arg.startsWith("--file-pattern=")) {
+      result.filePattern = arg.slice("--file-pattern=".length);
     }
 
     i++;
@@ -937,6 +985,130 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
   }
 }
 
+// =============================================================================
+// Search Command — search indexed codebase
+// =============================================================================
+
+async function runSearchCommand(args: CliArgs): Promise<void> {
+  if (args.showHelp || !args.searchQuery) {
+    console.log(logo);
+    console.log(tagline);
+    console.log(`  ${theme.primary.bold("nella search")} — Search the indexed codebase\n`);
+    console.log(`  ${theme.primary.bold("Usage:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary('nella search "your query" [options]')}\n`);
+    console.log(`  ${theme.primary.bold("Options:")}\n`);
+    console.log(`    ${theme.accent("--mode")} ${theme.muted("<mode>")}              Search mode: hybrid, semantic, lexical (default: hybrid)`);
+    console.log(`    ${theme.accent("--detail")} ${theme.muted("<level>")}           Output detail: compact, full (default: compact)`);
+    console.log(`    ${theme.accent("--top-k")} ${theme.muted("<number>")}            Number of results (default: 5)`);
+    console.log(`    ${theme.accent("--language, -l")} ${theme.muted("<lang>")}      Filter by language (e.g. typescript, python)`);
+    console.log(`    ${theme.accent("--file-pattern")} ${theme.muted("<glob>")}      Filter by file path pattern (e.g. src/components/**)`);
+    console.log(`    ${theme.accent("--branch, -b")} ${theme.muted("<name>")}        Search a specific branch index`);
+    console.log(`    ${theme.accent("--workspace, -w")} ${theme.muted("<path>")}     Workspace path (default: cwd)`);
+    console.log("");
+    console.log(`  ${theme.primary.bold("Examples:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary('nella search "authentication flow"')}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary('nella search "handleSubmit" --mode lexical')}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary('nella search "database connection" --detail full --top-k 10')}`);
+    console.log("");
+    return;
+  }
+
+  const workspacePath = path.resolve(args.workspace || process.cwd());
+  const query = args.searchQuery;
+  const mode = (args.mode as "hybrid" | "semantic" | "lexical") || args.searchMode || "hybrid";
+  const detail = args.searchDetail || "compact";
+  const topK = args.topK || 5;
+  const language = args.language;
+  const filePattern = args.filePattern;
+  const branch = args.branch;
+
+  const searchFilter = {
+    fileTypes: language ? [language] : undefined,
+    paths: filePattern ? [filePattern] : undefined,
+  };
+
+  // Try branch-aware search first
+  if (branch || await gitUtils.isGitRepo(workspacePath)) {
+    try {
+      const branchManager = await getOrCreateBranchManager(workspacePath);
+      const targetBranch = branch || await branchManager.detectCurrentBranch();
+      const response = await branchManager.searchBranch(targetBranch, {
+        query, mode, limit: topK, filter: searchFilter,
+      });
+
+      printSearchResults(response, query, detail, workspacePath);
+      return;
+    } catch {
+      // Fall back to flat manager if branch search fails
+    }
+  }
+
+  // Flat index search
+  const manager = await getOrCreateManager(workspacePath);
+  const status = manager.getStatus();
+
+  if (!status.ready) {
+    console.log(`\n  ${theme.icons.warning}  ${theme.warning("Index is empty.")}`);
+    console.log(`\n  ${theme.muted("Run")} ${theme.primary.bold("nella index")} ${theme.muted("first to index the workspace.")}\n`);
+    process.exit(1);
+  }
+
+  try {
+    const response = await manager.search({
+      query, mode, limit: topK, filter: searchFilter,
+    });
+
+    printSearchResults(response, query, detail, workspacePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`\n  ${theme.icons.error}  ${theme.error.bold("Search failed:")}`);
+    console.log(`  ${theme.muted(message)}\n`);
+    process.exit(1);
+  }
+}
+
+function printSearchResults(
+  response: import("@usenella/core").SearchResponse,
+  query: string,
+  detail: "compact" | "full",
+  workspacePath: string,
+): void {
+  if (response.results.length === 0) {
+    console.log(`\n  ${theme.icons.warning}  ${theme.warning("No results")} for ${theme.bold(`"${query}"`)}`);
+    console.log(`\n  ${theme.muted("Try broader terms, check spelling, or run")} ${theme.primary.bold("nella index")} ${theme.muted("if the workspace hasn't been indexed recently.")}\n`);
+    return;
+  }
+
+  console.log(`\n  ${theme.icons.success}  Found ${theme.primary.bold(String(response.results.length))} results for ${theme.bold(`"${query}"`)}\n`);
+
+  for (let i = 0; i < response.results.length; i++) {
+    const result = response.results[i];
+    const relPath = path.relative(workspacePath, result.chunk.filePath);
+    const [startLine, endLine] = result.chunk.lines;
+    const score = (result.score * 100).toFixed(1);
+    const symbolNames = result.chunk.symbols.map((s) => s.name).join(", ");
+    const symbolKinds = [...new Set(result.chunk.symbols.map((s) => s.kind))].join(", ");
+    const symbolSuffix = symbolNames ? ` ${theme.muted("\u2014")} ${theme.secondary(symbolNames)} ${theme.muted(`[${symbolKinds}]`)}` : "";
+
+    console.log(`  ${theme.primary.bold(`${i + 1}.`)} ${theme.bold(relPath)}:${theme.accent(`${startLine}-${endLine}`)} ${theme.muted(`(${score}%)`)}`);
+    if (symbolSuffix) {
+      console.log(`     ${symbolSuffix}`);
+    }
+
+    if (detail === "full") {
+      const lang = result.chunk.language || "";
+      const lines = result.chunk.content.split("\n");
+      console.log(`     ${theme.muted("```" + lang)}`);
+      for (const line of lines) {
+        console.log(`     ${theme.dim(line)}`);
+      }
+      console.log(`     ${theme.muted("```")}`);
+    }
+
+    console.log("");
+  }
+}
+
 function showHelp(): void {
   console.log(logo);
   console.log(tagline);
@@ -958,6 +1130,7 @@ function showHelp(): void {
   const valTable = new Table({ chars: tableChars, style: tableStyle });
   valTable.push(
     [theme.primary("index"), theme.muted("Index workspace for search & code verification")],
+    [theme.primary("search"), theme.muted("Search the indexed codebase")],
   );
   console.log(valTable.toString());
   console.log("");
@@ -1023,12 +1196,87 @@ function showHelp(): void {
 // Main
 // =============================================================================
 
+// =============================================================================
+// Telemetry Command
+// =============================================================================
+
+async function runTelemetryCommand(args: CliArgs): Promise<void> {
+  console.log(logo);
+  console.log(tagline);
+
+  const sub = args.subcommand;
+
+  if (!sub || sub === "status" || args.showHelp) {
+    const status = getTelemetryStatus();
+    console.log(`  ${theme.primary.bold("nella telemetry")} — Manage anonymous usage analytics\n`);
+    console.log(`  ${theme.muted("Status:")}  ${status.enabled ? theme.success("Enabled") : theme.warning("Disabled")}${status.reason ? theme.dim(` (${status.reason})`) : ""}`);
+    console.log(`  ${theme.muted("ID:")}      ${theme.dim(status.id)}\n`);
+    console.log(`  ${theme.primary.bold("Commands:")}\n`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella telemetry status")}    ${theme.muted("Show current status")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella telemetry enable")}    ${theme.muted("Enable anonymous telemetry")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella telemetry disable")}   ${theme.muted("Disable anonymous telemetry")}`);
+    console.log(`    ${theme.muted("$")} ${theme.primary("nella telemetry reset")}     ${theme.muted("Regenerate anonymous ID")}\n`);
+    console.log(`  ${theme.muted("Environment variables:")}\n`);
+    console.log(`    ${theme.accent("NELLA_TELEMETRY_DISABLED=1")}   ${theme.muted("Disable telemetry")}`);
+    console.log(`    ${theme.accent("DO_NOT_TRACK=1")}               ${theme.muted("Disable telemetry (community standard)")}\n`);
+    console.log(`  ${theme.muted("Learn more:")} ${theme.info("https://getnella.dev/docs/telemetry")}\n`);
+    return;
+  }
+
+  if (sub === "enable") {
+    setTelemetryEnabled(true);
+    console.log(`  ${theme.icons.success}  ${theme.success("Telemetry enabled")} — anonymous usage data will be collected\n`);
+    return;
+  }
+
+  if (sub === "disable") {
+    setTelemetryEnabled(false);
+    console.log(`  ${theme.icons.success}  ${theme.success("Telemetry disabled")} — no usage data will be collected\n`);
+    return;
+  }
+
+  if (sub === "reset") {
+    resetTelemetryId();
+    const status = getTelemetryStatus();
+    console.log(`  ${theme.icons.success}  ${theme.success("Telemetry ID reset")}`);
+    console.log(`  ${theme.muted("New ID:")} ${theme.dim(status.id)}\n`);
+    return;
+  }
+
+  console.log(`  ${theme.icons.error}  ${theme.error(`Unknown subcommand: ${sub}`)}`);
+  console.log(`  ${theme.muted("Run")} ${theme.secondary("nella telemetry")} ${theme.muted("for usage")}\n`);
+}
+
+// =============================================================================
+// Main
+// =============================================================================
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+
+  // Show first-run telemetry notice (once, to stderr so it doesn't interfere with MCP)
+  if (!hasShownNotice() && args.command !== "telemetry") {
+    markNoticeShown();
+    if (isTelemetryEnabled()) {
+      console.error("");
+      console.error("  Nella collects anonymous usage data to improve the product.");
+      console.error("  Run `nella telemetry disable` or set NELLA_TELEMETRY_DISABLED=1 to opt out.");
+      console.error("  Learn more: https://getnella.dev/docs/telemetry");
+      console.error("");
+    }
+  }
+
+  // Track CLI command usage (anonymous)
+  if (args.command !== "help" && args.command !== "telemetry") {
+    recordEvent("cli_command", { command: args.command });
+  }
 
   switch (args.command) {
     case "index":
       await runIndexCommand(args);
+      break;
+    case "search":
+      await runSearchCommand(args);
       break;
     case "mcp":
       if (args.showHelp) {
@@ -1083,6 +1331,9 @@ async function main(): Promise<void> {
         { client: "claude-code", mode: "local", yes: true },
         logo, tagline,
       );
+      break;
+    case "telemetry":
+      await runTelemetryCommand(args);
       break;
 case "help":
     default:
