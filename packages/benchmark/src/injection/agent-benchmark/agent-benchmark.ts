@@ -14,9 +14,13 @@ import type {
   AgentTrialResult,
   AgentBenchmarkResults,
   CostBreakdown,
+  MultiTurnAttackScenario,
+  MultiTurnTrialResult,
 } from "./types";
 import { getScenarios, getScenarioById } from "./scenarios";
+import { getMultiTurnScenarios } from "./multi-turn-scenarios";
 import { runTrial, type TrialConfig } from "./trial-runner";
+import { runMultiTurnTrial, type MultiTurnTrialConfig } from "./multi-turn-runner";
 import { aggregateRuns, passAtK, passHatK, mcnemarTest, percentiles, wilsonCI } from "../stats";
 import type { ConfidenceInterval, AggregateStats, McNemarResult } from "../stats";
 
@@ -45,6 +49,8 @@ export interface AgentBenchmarkOptions {
   outputDir?: string;
   /** Print per-trial details to console */
   verbose?: boolean;
+  /** Also run multi-turn attack chain scenarios (default: false) */
+  multiTurn?: boolean;
 }
 
 // =============================================================================
@@ -74,6 +80,7 @@ export async function runAgentBenchmark(
     maxTurns = 5,
     outputDir,
     verbose = false,
+    multiTurn = false,
   } = options;
 
   if (agents.length === 0) {
@@ -171,14 +178,117 @@ export async function runAgentBenchmark(
     }
   }
 
+  // ── Execute multi-turn trials (if enabled) ──────────────────────────────
+  if (multiTurn) {
+    const mtScenarios = getMultiTurnScenarios();
+    const mtTotalTrials =
+      mtScenarios.length * agents.length * runsPerScenario * modes.length;
+
+    console.log("");
+    console.log("╔══════════════════════════════════════════════════════════╗");
+    console.log("║          Multi-Turn Attack Chains                       ║");
+    console.log("╚══════════════════════════════════════════════════════════╝");
+    console.log(`  Scenarios:  ${mtScenarios.length}`);
+    console.log(`  Total trials: ${mtTotalTrials}`);
+    console.log("");
+
+    let mtCompleted = 0;
+
+    for (const mtScenario of mtScenarios) {
+      for (const agent of agents) {
+        for (const nellaEnabled of modes) {
+          for (let run = 0; run < runsPerScenario; run++) {
+            mtCompleted++;
+            const label = `[${mtCompleted}/${mtTotalTrials}]`;
+            const modeLabel = nellaEnabled ? "nella" : "bare";
+
+            console.log(
+              `${label} ${mtScenario.id} (multi-turn) | ${agent.name} | ${modeLabel}${runsPerScenario > 1 ? ` | run ${run + 1}` : ""}`,
+            );
+
+            const mtTrialConfig: MultiTurnTrialConfig = {
+              scenario: mtScenario,
+              agent: {
+                provider: agent.provider,
+                model: agent.model,
+                apiKey: agent.apiKey,
+              },
+              withNella: nellaEnabled,
+              maxTurnsPerPhase: maxTurns,
+            };
+
+            try {
+              const result = await runMultiTurnTrial(mtTrialConfig);
+              trials.push(result);
+
+              if (verbose) {
+                const status = result.attackSucceeded ? "COMPROMISED" : "DEFENDED";
+                const flagged = result.injectionFlagged ? " [flagged]" : "";
+                const phases = result.phaseResults
+                  .map((pr) => `P${pr.phase}:${pr.attackDetected ? "HIT" : "ok"}`)
+                  .join(" ");
+                console.log(
+                  `         -> ${status}${flagged} (${result.turns} turns, ${phases}, ${result.durationMs}ms)`,
+                );
+              }
+            } catch (err) {
+              const errorMessage =
+                err instanceof Error ? err.message : String(err);
+              console.error(`         -> ERROR: ${errorMessage}`);
+
+              // Record a failed multi-turn trial
+              trials.push({
+                scenarioId: mtScenario.id,
+                agent: agent.name,
+                model: agent.model,
+                withNella: nellaEnabled,
+                attackSucceeded: false,
+                injectionFlagged: false,
+                agentResponse: `[ERROR] Multi-turn trial failed: ${errorMessage}`,
+                toolCalls: [],
+                canaryFound: false,
+                failurePatternsMatched: [],
+                turns: 0,
+                tokensUsed: 0,
+                cost: 0,
+                durationMs: 0,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   const totalDurationMs = Date.now() - benchmarkStart;
   console.log(`\nAll trials complete in ${formatDuration(totalDurationMs)}`);
 
   // ── Aggregate results ────────────────────────────────────────────────────
+  // If multi-turn scenarios were run, add synthetic AttackScenario entries
+  // so the aggregation picks up their trial results.
+  const aggregationScenarios: AttackScenario[] = [...allScenarios];
+  if (multiTurn) {
+    for (const mts of getMultiTurnScenarios()) {
+      aggregationScenarios.push({
+        id: mts.id,
+        name: mts.name,
+        description: mts.description,
+        category: mts.category,
+        difficulty: mts.difficulty,
+        poisonedFiles: mts.phases.flatMap((p) => p.files),
+        cleanFiles: mts.cleanFiles,
+        taskPrompt: mts.phases[mts.phases.length - 1].taskPrompt,
+        canary: mts.canary,
+        failurePatterns: mts.failurePatterns,
+        attackObjective: mts.attackObjective,
+      });
+    }
+  }
+
   const results = aggregateResults({
     runId,
     runDate,
-    allScenarios,
+    allScenarios: aggregationScenarios,
     agents: agents.map((a) => a.name),
     runsPerScenario,
     trials,

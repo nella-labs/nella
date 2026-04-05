@@ -317,6 +317,10 @@ interface InjectionAgentArgs {
   withNella: boolean;
   withoutNella: boolean;
   verbose: boolean;
+  multiTurn: boolean;
+  upload: boolean;
+  triggerSource: "manual" | "ci" | "scheduled";
+  compare: boolean;
 }
 
 function parseInjectionAgentArgs(argv: string[]): InjectionAgentArgs {
@@ -327,6 +331,10 @@ function parseInjectionAgentArgs(argv: string[]): InjectionAgentArgs {
     withNella: true,
     withoutNella: false,
     verbose: false,
+    multiTurn: false,
+    upload: false,
+    triggerSource: "manual",
+    compare: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -352,6 +360,18 @@ function parseInjectionAgentArgs(argv: string[]): InjectionAgentArgs {
       case "--without-nella":
         result.withoutNella = true;
         break;
+      case "--multi-turn":
+        result.multiTurn = true;
+        break;
+      case "--upload":
+        result.upload = true;
+        break;
+      case "--trigger-source":
+        result.triggerSource = argv[++i] as "manual" | "ci" | "scheduled";
+        break;
+      case "--compare":
+        result.compare = true;
+        break;
       case "--verbose":
         result.verbose = true;
         break;
@@ -372,6 +392,10 @@ Options:
   --output, -o <path>    Output directory
   --runs, -n <count>     Runs per scenario (default: 1)
   --without-nella        Also run without nella for A/B comparison
+  --multi-turn           Also run multi-turn attack chain scenarios
+  --upload               Upload results to Cloud SQL after benchmark
+  --trigger-source <src> Trigger source: manual, ci, scheduled (default: manual)
+  --compare              Generate cross-model comparison after run
   --verbose              Print per-trial results
   --help, -h             Show help
 
@@ -450,7 +474,7 @@ async function runInjectionAgent(argv: string[]) {
     process.exit(1);
   }
 
-  await runAgentBenchmark({
+  const results = await runAgentBenchmark({
     agents: args.agents,
     scenarios: args.scenarios,
     runsPerScenario: args.runs,
@@ -458,7 +482,128 @@ async function runInjectionAgent(argv: string[]) {
     withoutNella: args.withoutNella,
     outputDir: args.outputDir,
     verbose: args.verbose,
+    multiTurn: args.multiTurn,
   });
+
+  // Upload results to Cloud SQL if requested
+  if (args.upload) {
+    try {
+      const { initCloudSQL, uploadBenchmarkResults, disconnectCloudSQL } = await import("@usenella/core");
+
+      const connectionName = process.env.GCP_CLOUD_SQL_INSTANCE;
+      const host = process.env.GCP_DB_HOST;
+      if (!connectionName && !host) {
+        console.error("Upload failed: set GCP_CLOUD_SQL_INSTANCE or GCP_DB_HOST");
+        process.exit(1);
+      }
+
+      await initCloudSQL({
+        connectionName: connectionName || "",
+        host: host || undefined,
+        database: process.env.GCP_DB_NAME || "nella",
+        user: process.env.GCP_DB_USER || "nella_app",
+        password: process.env.GCP_DB_PASSWORD || "",
+      });
+
+      const rowId = await uploadBenchmarkResults({
+        feature: "prompt-injection-defense",
+        nellaVersion: process.env.npm_package_version,
+        runDate: results.runDate,
+        triggerSource: args.triggerSource,
+        agentAttackSuccessRate: {
+          withNella: results.attackSuccessRate.withNella,
+          withoutNella: results.attackSuccessRate.withoutNella,
+          reduction: results.attackSuccessRate.reduction,
+          withNellaCI: results.attackSuccessRateCI,
+        },
+        agentPerCategory: results.perCategory as unknown[],
+        agentPerScenario: results.perScenario as unknown[],
+        agentAgents: results.agents,
+        agentBenchmark: {
+          passAt1: results.passAt1,
+          passAt5: results.passAt5,
+          consistency: results.consistency,
+          mcnemar: results.mcnemar,
+          costEfficiency: results.costEfficiency,
+          latency: results.latency,
+        },
+      });
+
+      console.log(`\n  Uploaded to Cloud SQL: ${rowId}`);
+
+      await disconnectCloudSQL();
+    } catch (err) {
+      console.error(`Upload failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Generate comparison if --compare and multiple agents
+  if (args.compare && Object.keys(results.perAgent).length > 1) {
+    const { compareResults, printComparison, writeComparisonFiles } = await import(
+      "./injection/agent-benchmark/compare"
+    );
+    const report = compareResults([{ label: results.runId, data: results }]);
+    printComparison(report);
+    if (args.outputDir) {
+      writeComparisonFiles(args.outputDir, report);
+    }
+  }
+}
+
+// =============================================================================
+// Compare Subcommand
+// =============================================================================
+
+async function runCompare(argv: string[]) {
+  const resultPaths: string[] = [];
+  let outputDir = path.resolve(process.cwd(), "comparison-results");
+
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case "--results":
+      case "-r":
+        resultPaths.push(argv[++i]);
+        break;
+      case "--output":
+      case "-o":
+        outputDir = path.resolve(argv[++i]);
+        break;
+      case "--help":
+      case "-h":
+        console.log(`
+Nella Benchmark — Model Comparison
+
+Compares benchmark results from multiple runs/models side-by-side.
+
+Usage:
+  nella-benchmark compare [options]
+
+Options:
+  --results, -r <path>   Path to results.json (repeat for each run to compare)
+  --output, -o <path>    Output directory (default: ./comparison-results)
+  --help, -h             Show help
+
+Examples:
+  nella-benchmark compare -r run1/results.json -r run2/results.json
+  nella-benchmark compare -r claude-sonnet/results.json -r gpt-5.4/results.json -o comparison
+`);
+        process.exit(0);
+    }
+  }
+
+  if (resultPaths.length < 2) {
+    console.error("Need at least 2 --results files to compare.");
+    process.exit(1);
+  }
+
+  const { loadResultsFromFiles, compareResults, printComparison, writeComparisonFiles } = await import(
+    "./injection/agent-benchmark/compare"
+  );
+
+  const loaded = loadResultsFromFiles(resultPaths);
+  const report = compareResults(loaded);
+  printComparison(report);
+  writeComparisonFiles(outputDir, report);
 }
 
 // =============================================================================
@@ -475,6 +620,11 @@ async function main() {
 
   if (rawArgs[0] === "injection-agent") {
     await runInjectionAgent(rawArgs.slice(1));
+    return;
+  }
+
+  if (rawArgs[0] === "compare") {
+    await runCompare(rawArgs.slice(1));
     return;
   }
 
