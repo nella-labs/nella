@@ -45,138 +45,66 @@ const SYNC_MAPPINGS: SyncMapping[] = [
     target: "getting-started/installation.mdx",
     transform: transformGeneric,
   },
-  {
-    source: "getting-started/quick-start.md",
-    target: "getting-started/quick-start.mdx",
-    transform: transformGeneric,
-  },
 
   // =========================================================================
-  // MCP Tools
+  // Tools Reference
   // =========================================================================
   {
-    source: "mcp/tools.md",
-    target: "mcp-tools/overview.mdx",
+    source: "tools/overview.md",
+    target: "tools/overview.mdx",
     transform: transformToolsReference,
   },
+
+  // =========================================================================
+  // Core Concepts
+  // =========================================================================
   {
-    source: "api-reference/overview.md",
-    target: "api-reference/overview.mdx",
+    source: "core-concepts/workspace.md",
+    target: "core-concepts/workspace.mdx",
     transform: transformGeneric,
   },
   {
-    source: "api-reference/tools/context-tools.md",
-    target: "mcp-tools/context-tools.mdx",
+    source: "core-concepts/context-tracking.md",
+    target: "core-concepts/context-tracking.mdx",
     transform: transformGeneric,
   },
   {
-    source: "api-reference/tools/nella-index.md",
-    target: "mcp-tools/nella-index.mdx",
+    source: "core-concepts/security.md",
+    target: "core-concepts/security.mdx",
     transform: transformGeneric,
   },
   {
-    source: "api-reference/tools/nella-search.md",
-    target: "mcp-tools/nella-search.mdx",
+    source: "core-concepts/multi-project.md",
+    target: "core-concepts/multi-project.mdx",
     transform: transformGeneric,
   },
   {
-    source: "api-reference/tools/nella-get-context.md",
-    target: "mcp-tools/nella-get-context.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-add-assumption.md",
-    target: "mcp-tools/nella-add-assumption.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-check-assumptions.md",
-    target: "mcp-tools/nella-check-assumptions.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-check-dependencies.md",
-    target: "mcp-tools/nella-check-dependencies.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "api-reference/tools/nella-heartbeat.md",
-    target: "mcp-tools/nella-heartbeat.mdx",
+    source: "core-concepts/agent-setup.md",
+    target: "core-concepts/agent-setup.mdx",
     transform: transformGeneric,
   },
 
   // =========================================================================
-  // Configuration
+  // Reference
   // =========================================================================
   {
-    source: "configuration/overview.md",
-    target: "configuration/overview.mdx",
-    transform: transformGeneric,
-  },
-{
-    source: "configuration/validation.md",
-    target: "configuration/validation.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "user-guide/task-authoring.md",
-    target: "configuration/task-authoring.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Integrations
-  // =========================================================================
-  {
-    source: "integrations/claude-desktop.md",
-    target: "integrations/claude-desktop.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "integrations/cursor.md",
-    target: "integrations/cursor.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "integrations/vscode.md",
-    target: "integrations/vscode.mdx",
-    transform: transformGeneric,
-  },
-  {
-    source: "integrations/custom-client.md",
-    target: "integrations/custom-client.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // CLI
-  // =========================================================================
-  {
-    source: "cli/commands.md",
-    target: "cli/commands.mdx",
+    source: "reference/cli.md",
+    target: "reference/cli.mdx",
     transform: transformCliCommands,
   },
-
-  // =========================================================================
-  // Features
-  // =========================================================================
   {
-    source: "architecture/prompt-injection-defense.md",
-    target: "features/prompt-injection-defense.mdx",
-    transform: transformGeneric,
-  },
-
-  // =========================================================================
-  // Guides
-  // =========================================================================
-  {
-    source: "guides/tips-and-best-practices.md",
-    target: "guides/tips-and-best-practices.mdx",
+    source: "reference/configuration.md",
+    target: "reference/configuration.mdx",
     transform: transformGeneric,
   },
   {
-    source: "guides/securing-agents-against-injection.md",
-    target: "guides/securing-agents-against-injection.mdx",
+    source: "reference/benchmarks.md",
+    target: "reference/benchmarks.mdx",
+    transform: transformGeneric,
+  },
+  {
+    source: "reference/rest-api.md",
+    target: "reference/rest-api.mdx",
     transform: transformGeneric,
   },
 
@@ -369,26 +297,22 @@ function convertCallouts(content: string): string {
 }
 
 function fixRelativeLinks(content: string): string {
-  // Fix links to other docs sections and current website routes.
-  content = content.replace(/\]\(\.\.\/mcp\/tools(?:\.md)?\)/g, "](/mcp-tools/overview)");
-  content = content.replace(/\]\(\.\.\/mcp\/tools(?:\.md)?#/g, "](/mcp-tools/overview#");
-  content = content.replace(/\]\(\.\.\/mcp\//g, "](/mcp/");
-  content = content.replace(/\]\(\.\.\/core\//g, "](/core/");
-  content = content.replace(/\]\(\.\.\/architecture\/prompt-injection-defense(?:\.md)?\)/g, "](/features/prompt-injection-defense)");
-  content = content.replace(/\]\(\.\.\/architecture\/prompt-injection-defense(?:\.md)?#/g, "](/features/prompt-injection-defense#");
-  content = content.replace(/\]\(\.\.\/architecture\//g, "](/architecture/");
+  // Fix relative links to match the new website URL structure.
+  // Getting Started
   content = content.replace(/\]\(\.\.\/getting-started\//g, "](/getting-started/");
-  content = content.replace(/\]\(\.\.\/user-guide\//g, "](/configuration/");
-  content = content.replace(/\]\(\.\.\/configuration\//g, "](/configuration/");
-  content = content.replace(/\]\(\.\.\/api-reference\/overview(?:\.md)?\)/g, "](/api-reference/overview)");
-  content = content.replace(/\]\(\.\.\/api-reference\/overview(?:\.md)?#/g, "](/api-reference/overview#");
-  content = content.replace(/\]\(\.\.\/api-reference\/tools\//g, "](/mcp-tools/");
-  content = content.replace(/\]\(\.\.\/api-reference\//g, "](/api-reference/");
-  content = content.replace(/\]\(\.\/tools\//g, "](/mcp-tools/");
-  content = content.replace(/\]\(\.\.\/guides\//g, "](/guides/");
-  content = content.replace(/\]\(\.\.\/integrations\//g, "](/integrations/");
-  content = content.replace(/\]\(\.\.\/examples\//g, "](/examples/");
-  content = content.replace(/\]\(\.\.\/benchmark\//g, "](/benchmark/");
+
+  // Tools Reference
+  content = content.replace(/\]\(\.\.\/tools\/overview(?:\.md)?\)/g, "](/tools/overview)");
+  content = content.replace(/\]\(\.\.\/tools\/overview(?:\.md)?#/g, "](/tools/overview#");
+  content = content.replace(/\]\(\.\.\/tools\//g, "](/tools/");
+
+  // Core Concepts
+  content = content.replace(/\]\(\.\.\/core-concepts\//g, "](/core-concepts/");
+
+  // Reference
+  content = content.replace(/\]\(\.\.\/reference\//g, "](/reference/");
+
+  // Same-directory relative links
   content = content.replace(/\]\(\.\//g, "](");
 
   // Remove .md extensions
