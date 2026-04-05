@@ -1,172 +1,88 @@
 # Troubleshooting
 
-Common issues and solutions when using Nella.
+Common issues and how to resolve them.
 
-## Installation Issues
+## First Steps
 
-### `command not found: nella`
-
-The CLI isn't in your PATH. Solutions:
+Most issues are resolved by checking your Node.js version and reinstalling:
 
 ```bash
-# Check if the CLI is on your PATH
-which nella
-
-# Reinstall globally
-npm install -g @getnella/mcp
-
-# Or run the local stdio MCP server without a global install
-npx -y @getnella/mcp --workspace /path/to/project
+node --version   # Must be 18+
+nella help        # Should show available commands
 ```
 
-On Windows, you may need to restart your terminal or add npm's global bin to your PATH.
+## Installation
 
-### Optional dependency warnings
+### `nella: command not found`
 
-Some optional native dependencies may show warnings during installation. These provide performance improvements but aren't required:
-
-| Warning | Impact |
-|---------|--------|
-| `usearch not available` | Vector search falls back to brute-force (slower at scale) |
-| `better-sqlite3 not available` | Rate limiting uses in-memory backend (resets on restart) |
-| `onnxruntime-node not available` | Embeddings require API calls instead of running locally |
-
-## MCP Server Issues
-
-### Tools not appearing in Claude Desktop
-
-1. **Restart Claude Desktop** — MCP servers are loaded on startup
-2. **Verify the config path:**
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-3. **Test the server manually:**
-   ```bash
-   npx -y @getnella/mcp --workspace /path/to/project
-   ```
-   If this shows errors, fix them before restarting Claude Desktop
-4. **Check Node.js version:** Nella requires Node.js 18+
-   ```bash
-   node --version
-   ```
-
-### "MCP server disconnected" in Claude Desktop
-
-Common causes:
-- The server process crashed — check Claude Desktop's logs
-- The configured `--workspace` path points to a directory that doesn't exist
-- Node.js is not accessible from the shell that Claude Desktop uses
-
-### MCP server is slow to start
-
-The first run downloads the package via `npx`. To speed this up:
+The global npm bin directory isn't in your PATH. Fix:
 
 ```bash
-# Pre-install the package
-npm install -g @getnella/mcp
+# Check where npm installs global packages
+npm config get prefix
 
-# Then use the direct path in your config
-{
-  "mcpServers": {
-    "nella": {
-      "command": "nella",
-      "args": ["mcp", "--workspace", "/absolute/path/to/project"]
-    }
-  }
-}
+# Add to your shell profile (~/.zshrc, ~/.bashrc)
+export PATH="$(npm config get prefix)/bin:$PATH"
 ```
 
-### Cursor MCP issues
+Then restart your terminal and try again.
 
-1. Check the MCP panel in Cursor settings for error messages
-2. Ensure `npx` is accessible from Cursor's integrated terminal
-3. Try using an absolute path to `npx` or `nella`
+## Connection Issues
 
-## Indexing Issues
+### Tools not appearing in my client
 
-### Indexing is slow
+1. Restart your MCP client (IDE)
+2. Check that the workspace path in your MCP config is correct
+3. Verify Nella is running: `nella help`
+4. Re-run `nella connect --client <your-client>`
 
-Full indexing is I/O-bound by embedding API calls. Tips:
+### Server disconnects frequently
 
-| Solution | Impact |
-|----------|--------|
-| Use Nella cloud embeddings (`nella auth login`) | Higher rate limits |
-| Incremental re-indexing | 20x faster for unchanged codebases |
-| Use include/exclude globs | Skip large generated files |
-| Install `usearch` for HNSW | Faster vector search (not faster indexing) |
+This usually means the Nella process is being killed. Check:
 
-### Search results are irrelevant
+- Your IDE's MCP server timeout settings
+- Whether the workspace path exists and is accessible
+- System memory — indexing large codebases needs adequate RAM
 
-Hybrid search combines semantic (vector) and lexical (BM25) results. If results are poor:
+### Slow startup
 
-1. **For exact symbol lookups** — Use lexical search mode directly (it's <2ms and exact)
-2. **For natural language queries** — Semantic search depends on embedding quality and chunk boundaries
-3. **Confidence score is always ~0.22** — This is expected for broad queries. The `query_unclear` suggestion indicates the query could be more specific
+First launch downloads dependencies. Subsequent launches are faster. If consistently slow, check your network connection and npm registry settings.
 
-### Large index size on disk
+## Search Issues
 
-A typical monorepo index can be several hundred megabytes. Add `.nella/index/` to your `.gitignore` — indexes should not be committed. You can rebuild the index at any time with `nella_index --force`.
+### No results
 
-### Code verifier false positives
+- Run `nella_index` first — search requires an index
+- Check your query: use `lexical` mode for exact symbol names
+- Check `filePattern` and `language` filters aren't too restrictive
 
-The code verifier may flag valid symbols as "missing" when:
+### Irrelevant results
 
-1. **Re-exports** — Symbols re-exported via `export * from` may not resolve if the re-export chain crosses multiple files
-2. **Dynamic exports** — Computed or conditional exports aren't tracked
+- Use `filePattern` to narrow to specific directories
+- Use `language` to filter by file type
+- Try `lexical` mode for precise symbol matching
+- Re-index with `force: true` if the codebase changed significantly
 
-## Authentication Issues
+## Authentication
 
-### `nella auth login` doesn't open browser
+### Login not opening browser
 
-Try opening the URL manually. The CLI prints the auth URL:
-
-```
-Opening browser to: https://app.getnella.dev/auth?...
-```
-
-Copy and paste this URL into your browser.
-
-### "Invalid API key" errors
-
-1. **Key expired** — API keys have an expiry date. Create a new one: `nella connect`
-2. **Key revoked** — Check if the key was revoked in the dashboard
-3. **Wrong key** — Ensure you're using the full key including the `nella_` prefix
+Try running `nella auth login` from a terminal (not from within an IDE terminal). Some embedded terminals block browser launches.
 
 ### Rate limit errors
 
-If you see `Error: rate limit exceeded`:
-
-- Wait for the rate limit window to reset (usually 1 minute)
-- Reduce the frequency of tool calls
-- Contact support for higher limits if you're on a paid plan
-
-## Context Tracking Issues
-
-### Assumptions not persisting
-
-Context is stored locally in your project's `.nella/` directory. Check that:
-
-1. The `.nella/` directory exists and is writable
-2. The session ID is consistent across calls (a new session starts fresh)
-
-### Stale dependency warnings
-
-`nella_check_dependencies` compares the current `package.json` and lockfile against the last snapshot. If you recently installed packages, the next call will take a fresh snapshot.
+Wait for the rate limit window to reset. Check your current usage with `nella auth status`.
 
 ## FAQ
 
-### Do I need a Nella account?
+**Do I need an account?**
 
-Yes. A Nella account is required. Run `nella auth login` to authenticate before using Nella tools.
+No. Nella works locally without authentication. An account is only needed for hosted features.
 
-### Does Nella modify my source code?
+**Does Nella modify my source code?**
 
-No. Nella only reads your codebase for indexing and search. The only files Nella writes are in the `.nella/` directory (indexes, sessions).
+No. Nella only reads your codebase for indexing and search. It never writes to your files.
 
-### What languages does Nella support?
+**What languages are supported?**
 
-The indexing/search features use advanced code parsing, so they work best with TypeScript/JavaScript. Other languages are indexed as plain text.
-
-## Related Docs
-
-- [CLI Commands](../cli/commands.md) — Full command reference
-- [Quick Start](../getting-started/quick-start.md) — Connect Nella to your IDE
+Nella works best with TypeScript and JavaScript. Other languages are indexed as plain text and searchable, but without structure-aware parsing.
