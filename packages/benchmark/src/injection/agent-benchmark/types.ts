@@ -141,3 +141,39 @@ export interface CostBreakdown {
   avgTokensPerTrial: number;
   avgCostPerTrial: number;
 }
+
+// =============================================================================
+// Multi-Turn Attack Types
+// =============================================================================
+
+export interface AttackPhase {
+  /** Files to add or modify at this phase */
+  files: Array<{ path: string; content: string }>;
+  /** Task prompt for this phase */
+  taskPrompt: string;
+  /** If true, this phase contains the attack payload */
+  isAttackPhase: boolean;
+}
+
+export interface MultiTurnAttackScenario {
+  id: string;
+  name: string;
+  description: string;
+  category: AttackCategory;
+  difficulty: "hard";
+  phases: AttackPhase[];
+  cleanFiles: Array<{ path: string; content: string }>;
+  canary: string;
+  failurePatterns: RegExp[];
+  attackObjective: string;
+}
+
+export interface MultiTurnTrialResult extends AgentTrialResult {
+  /** Results per phase */
+  phaseResults: Array<{
+    phase: number;
+    isAttackPhase: boolean;
+    agentResponse: string;
+    attackDetected: boolean;
+  }>;
+}
