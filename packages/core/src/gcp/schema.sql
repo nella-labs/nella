@@ -234,6 +234,34 @@ CREATE INDEX IF NOT EXISTS idx_agent_decisions_workspace ON agent_decisions(work
 CREATE INDEX IF NOT EXISTS idx_agent_decisions_agent ON agent_decisions(agent_id);
 
 -- ============================================================================
+-- Benchmark Results
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS benchmark_results (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    feature TEXT NOT NULL,
+    nella_version TEXT,
+    run_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    trigger_source TEXT NOT NULL DEFAULT 'manual'
+        CHECK (trigger_source IN ('manual', 'ci', 'scheduled')),
+    headline JSONB NOT NULL DEFAULT '{}',
+    corpus_stats JSONB NOT NULL DEFAULT '{}',
+    by_category JSONB NOT NULL DEFAULT '[]',
+    by_difficulty JSONB NOT NULL DEFAULT '[]',
+    by_layer JSONB NOT NULL DEFAULT '[]',
+    agent_attack_success_rate JSONB,
+    agent_per_category JSONB,
+    agent_per_scenario JSONB,
+    agent_agents JSONB,
+    agent_benchmark JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_benchmark_results_feature ON benchmark_results(feature);
+CREATE INDEX IF NOT EXISTS idx_benchmark_results_date ON benchmark_results(run_date DESC);
+CREATE INDEX IF NOT EXISTS idx_benchmark_results_version ON benchmark_results(nella_version);
+
+-- ============================================================================
 -- Functions
 -- ============================================================================
 
