@@ -23,6 +23,7 @@ import * as https from "https";
 import { ContextManager, deriveHmacKey } from "@usenella/core";
 import { parseWorkspaceArg } from "./utils/args";
 import { getValidSession } from "../auth";
+import { recordMcpEvent } from "../telemetry-reporter";
 import { registerContextTools, handleContextTool } from "./tools/context";
 import { registerIndexingTools, handleIndexingTool } from "./tools/indexing";
 import { registerAgentTools, handleAgentTool } from "./tools/agents";
@@ -46,6 +47,9 @@ async function initSession(): Promise<{ access_token: string } | null> {
 }
 
 async function logUsage(toolName: string, durationMs: number, success: boolean, result?: CallToolResult, args?: Record<string, unknown>): Promise<void> {
+  // Anonymous telemetry (separate from authenticated usage logging)
+  recordMcpEvent(toolName, durationMs, success);
+
   const session = cachedSession;
   if (!session) {
     console.error(`[nella] Cannot log usage for ${toolName}: not authenticated`);
