@@ -13,6 +13,7 @@ import type {
   AttackCategory,
   AgentTrialResult,
   AgentBenchmarkResults,
+  CostBreakdown,
 } from "./types";
 import { getScenarios, getScenarioById } from "./scenarios";
 import { runTrial, type TrialConfig } from "./trial-runner";
@@ -363,12 +364,18 @@ function aggregateResults(input: AggregateInput): AgentBenchmarkResults {
     const agentTrials = trials.filter((t) => t.agent === agentName);
     const succeeded = agentTrials.filter((t) => t.attackSucceeded).length;
     const flagged = agentTrials.filter((t) => t.injectionFlagged).length;
+    const agentTokens = agentTrials.reduce((s, t) => s + t.tokensUsed, 0);
+    const agentCost = agentTrials.reduce((s, t) => s + t.cost, 0);
 
     perAgent[agentName] = {
       attackSuccessRate: safeRate(succeeded, agentTrials.length),
       totalTrials: agentTrials.length,
       succeeded,
       flagged,
+      totalTokens: agentTokens,
+      totalCost: agentCost,
+      avgTokensPerTrial: agentTrials.length > 0 ? agentTokens / agentTrials.length : 0,
+      avgCostPerTrial: agentTrials.length > 0 ? agentCost / agentTrials.length : 0,
     };
   }
 
@@ -400,12 +407,29 @@ function aggregateResults(input: AggregateInput): AgentBenchmarkResults {
   const totalCost = allTrials.reduce((s, t) => s + t.cost, 0);
   const totalTokens = allTrials.reduce((s, t) => s + t.tokensUsed, 0);
   const defendedCount = allTrials.filter((t) => !t.attackSucceeded).length;
+
+  const buildCostBreakdown = (subset: AgentTrialResult[]): CostBreakdown => {
+    const tokens = subset.reduce((s, t) => s + t.tokensUsed, 0);
+    const cost = subset.reduce((s, t) => s + t.cost, 0);
+    return {
+      totalTrials: subset.length,
+      totalTokens: tokens,
+      totalCost: cost,
+      avgTokensPerTrial: subset.length > 0 ? tokens / subset.length : 0,
+      avgCostPerTrial: subset.length > 0 ? cost / subset.length : 0,
+    };
+  };
+
   const costEfficiency = {
     totalCost,
     costPerScenario: allScenarios.length > 0 ? totalCost / allScenarios.length : 0,
     costPerDefense: defendedCount > 0 ? totalCost / defendedCount : 0,
     tokensPerScenario: allScenarios.length > 0 ? totalTokens / allScenarios.length : 0,
     totalTokens,
+    byMode: (input.withNella || input.withoutNella) ? {
+      withNella: buildCostBreakdown(nellaTrials),
+      withoutNella: buildCostBreakdown(bareTrials),
+    } : undefined,
   };
 
   // ── Latency percentiles ─────────────────────────────────────────────────
@@ -483,8 +507,33 @@ function printSummary(results: AgentBenchmarkResults): void {
   if (results.costEfficiency) {
     const ce = results.costEfficiency;
     console.log(
-      `\n  Cost: $${ce.totalCost.toFixed(2)} total | $${ce.costPerScenario.toFixed(2)}/scenario | ${Math.round(ce.tokensPerScenario)} tokens/scenario`,
+      `\n  Cost: $${ce.totalCost.toFixed(4)} total | $${ce.costPerScenario.toFixed(4)}/scenario | ${Math.round(ce.tokensPerScenario).toLocaleString()} tokens/scenario`,
     );
+
+    if (ce.byMode) {
+      const nella = ce.byMode.withNella;
+      const bare = ce.byMode.withoutNella;
+
+      if (nella.totalTrials > 0) {
+        console.log(
+          `    With Nella:    ${nella.totalTokens.toLocaleString()} tokens ($${nella.totalCost.toFixed(4)}) | avg ${Math.round(nella.avgTokensPerTrial).toLocaleString()} tokens/trial ($${nella.avgCostPerTrial.toFixed(4)}/trial)`,
+        );
+      }
+      if (bare.totalTrials > 0) {
+        console.log(
+          `    Without Nella: ${bare.totalTokens.toLocaleString()} tokens ($${bare.totalCost.toFixed(4)}) | avg ${Math.round(bare.avgTokensPerTrial).toLocaleString()} tokens/trial ($${bare.avgCostPerTrial.toFixed(4)}/trial)`,
+        );
+      }
+      if (nella.totalTrials > 0 && bare.totalTrials > 0 && bare.avgCostPerTrial > 0) {
+        const costOverhead = ((nella.avgCostPerTrial - bare.avgCostPerTrial) / bare.avgCostPerTrial) * 100;
+        const tokenOverhead = bare.avgTokensPerTrial > 0
+          ? ((nella.avgTokensPerTrial - bare.avgTokensPerTrial) / bare.avgTokensPerTrial) * 100
+          : 0;
+        console.log(
+          `    Overhead:      ${costOverhead >= 0 ? "+" : ""}${costOverhead.toFixed(1)}% cost | ${tokenOverhead >= 0 ? "+" : ""}${tokenOverhead.toFixed(1)}% tokens`,
+        );
+      }
+    }
   }
 
   // Latency
@@ -595,11 +644,11 @@ function generateSummaryMarkdown(results: AgentBenchmarkResults): string {
   if (Object.keys(results.perAgent).length > 0) {
     lines.push("## By Agent");
     lines.push("");
-    lines.push("| Agent | Trials | Compromised | Flagged | Attack Rate |");
-    lines.push("|-------|--------|-------------|---------|-------------|");
+    lines.push("| Agent | Trials | Compromised | Flagged | Attack Rate | Total Tokens | Avg Tokens/Trial | Total Cost | Avg Cost/Trial |");
+    lines.push("|-------|--------|-------------|---------|-------------|-------------|-----------------|-----------|---------------|");
     for (const [name, stats] of Object.entries(results.perAgent)) {
       lines.push(
-        `| ${name} | ${stats.totalTrials} | ${stats.succeeded} | ${stats.flagged} | ${pct(stats.attackSuccessRate)} |`,
+        `| ${name} | ${stats.totalTrials} | ${stats.succeeded} | ${stats.flagged} | ${pct(stats.attackSuccessRate)} | ${stats.totalTokens.toLocaleString()} | ${Math.round(stats.avgTokensPerTrial).toLocaleString()} | $${stats.totalCost.toFixed(4)} | $${stats.avgCostPerTrial.toFixed(4)} |`,
       );
     }
     lines.push("");
@@ -621,6 +670,69 @@ function generateSummaryMarkdown(results: AgentBenchmarkResults): string {
         .join(", ");
       lines.push(`| ${s.scenarioId} | ${s.category} | ${s.difficulty} | ${resultEntries} |`);
     }
+    lines.push("");
+  }
+
+  // Token & Cost Analysis
+  if (results.costEfficiency) {
+    const ce = results.costEfficiency;
+    lines.push("## Token & Cost Analysis");
+    lines.push("");
+
+    // Per-mode comparison table
+    if (ce.byMode && (ce.byMode.withNella.totalTrials > 0 || ce.byMode.withoutNella.totalTrials > 0)) {
+      const nella = ce.byMode.withNella;
+      const bare = ce.byMode.withoutNella;
+
+      lines.push("### With Nella vs Without Nella");
+      lines.push("");
+      lines.push("| Metric | With Nella | Without Nella | Difference |");
+      lines.push("|--------|-----------|--------------|------------|");
+
+      if (nella.totalTrials > 0 && bare.totalTrials > 0) {
+        const tokenDiff = nella.avgTokensPerTrial - bare.avgTokensPerTrial;
+        const tokenDiffPctVal = bare.avgTokensPerTrial > 0
+          ? (tokenDiff / bare.avgTokensPerTrial) * 100
+          : null;
+        const tokenDiffPct = tokenDiffPctVal !== null
+          ? `${tokenDiffPctVal >= 0 ? "+" : ""}${tokenDiffPctVal.toFixed(1)}%`
+          : "n/a";
+        const costDiff = nella.avgCostPerTrial - bare.avgCostPerTrial;
+        const costDiffPctVal = bare.avgCostPerTrial > 0
+          ? (costDiff / bare.avgCostPerTrial) * 100
+          : null;
+        const costDiffPct = costDiffPctVal !== null
+          ? `${costDiffPctVal >= 0 ? "+" : ""}${costDiffPctVal.toFixed(1)}%`
+          : "n/a";
+        const totalTokenDiff = nella.totalTokens - bare.totalTokens;
+        const totalCostDiff = nella.totalCost - bare.totalCost;
+
+        lines.push(`| Total Trials | ${nella.totalTrials} | ${bare.totalTrials} | — |`);
+        lines.push(`| Total Tokens | ${nella.totalTokens.toLocaleString()} | ${bare.totalTokens.toLocaleString()} | ${totalTokenDiff >= 0 ? "+" : ""}${totalTokenDiff.toLocaleString()} |`);
+        lines.push(`| Avg Tokens/Trial | ${Math.round(nella.avgTokensPerTrial).toLocaleString()} | ${Math.round(bare.avgTokensPerTrial).toLocaleString()} | ${tokenDiffPct} |`);
+        lines.push(`| Total Cost | $${nella.totalCost.toFixed(4)} | $${bare.totalCost.toFixed(4)} | ${totalCostDiff >= 0 ? "+$" : "-$"}${Math.abs(totalCostDiff).toFixed(4)} |`);
+        lines.push(`| Avg Cost/Trial | $${nella.avgCostPerTrial.toFixed(4)} | $${bare.avgCostPerTrial.toFixed(4)} | ${costDiffPct} |`);
+      } else {
+        // Only one mode has data
+        lines.push(`| Total Trials | ${nella.totalTrials > 0 ? nella.totalTrials : "—"} | ${bare.totalTrials > 0 ? bare.totalTrials : "—"} | — |`);
+        lines.push(`| Total Tokens | ${nella.totalTrials > 0 ? nella.totalTokens.toLocaleString() : "—"} | ${bare.totalTrials > 0 ? bare.totalTokens.toLocaleString() : "—"} | — |`);
+        lines.push(`| Avg Tokens/Trial | ${nella.totalTrials > 0 ? Math.round(nella.avgTokensPerTrial).toLocaleString() : "—"} | ${bare.totalTrials > 0 ? Math.round(bare.avgTokensPerTrial).toLocaleString() : "—"} | — |`);
+        lines.push(`| Total Cost | ${nella.totalTrials > 0 ? "$" + nella.totalCost.toFixed(4) : "—"} | ${bare.totalTrials > 0 ? "$" + bare.totalCost.toFixed(4) : "—"} | — |`);
+        lines.push(`| Avg Cost/Trial | ${nella.totalTrials > 0 ? "$" + nella.avgCostPerTrial.toFixed(4) : "—"} | ${bare.totalTrials > 0 ? "$" + bare.avgCostPerTrial.toFixed(4) : "—"} | — |`);
+      }
+      lines.push("");
+    }
+
+    // Overall cost summary
+    lines.push("### Cost Summary");
+    lines.push("");
+    lines.push("| Metric | Value |");
+    lines.push("|--------|-------|");
+    lines.push(`| Total Cost | $${ce.totalCost.toFixed(4)} |`);
+    lines.push(`| Total Tokens | ${ce.totalTokens.toLocaleString()} |`);
+    lines.push(`| Cost per Scenario | $${ce.costPerScenario.toFixed(4)} |`);
+    lines.push(`| Tokens per Scenario | ${Math.round(ce.tokensPerScenario).toLocaleString()} |`);
+    lines.push(`| Cost per Defense | $${ce.costPerDefense.toFixed(4)} |`);
     lines.push("");
   }
 
