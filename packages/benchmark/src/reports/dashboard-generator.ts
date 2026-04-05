@@ -430,7 +430,14 @@ export function generateDashboardHtml(data: AggregatedData): string {
           <canvas id="costChart"></canvas>
         </div>
       </div>
-      
+
+      <div class="card">
+        <h2>Nella Cost Comparison</h2>
+        <div class="chart-container">
+          <canvas id="nellaCostChart"></canvas>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Metrics Comparison (Radar)</h2>
         <div class="chart-container">
@@ -536,15 +543,19 @@ export function generateDashboardHtml(data: AggregatedData): string {
     function recalculateChartData(results) {
       const agents = [...new Set(results.map(r => r.agent))].sort();
       const agentStats = {};
-      
+
       for (const agent of agents) {
         agentStats[agent] = { passed: 0, total: 0, cost: 0, successCost: 0, tokens: 0, ttg: 0, vi: 0, da: 0, cvr: 0, sc: 0, btp: 0 };
       }
-      
+
+      // Nella vs non-Nella aggregation
+      const nellaStats = { cost: 0, tokens: 0, total: 0, passed: 0 };
+      const bareStats = { cost: 0, tokens: 0, total: 0, passed: 0 };
+
       for (const r of results) {
         const stats = agentStats[r.agent];
         if (!stats) continue;
-        
+
         stats.total++;
         if (r.passed) {
           stats.passed++;
@@ -558,8 +569,15 @@ export function generateDashboardHtml(data: AggregatedData): string {
         stats.da += r.metrics.da;
         stats.cvr += r.metrics.cvr;
         stats.sc += r.metrics.sc;
+
+        // Track nella vs bare
+        const mode = r.nellaEnabled ? nellaStats : bareStats;
+        mode.cost += r.metrics.estimatedCost;
+        mode.tokens += r.metrics.tokensUsed;
+        mode.total++;
+        if (r.passed) mode.passed++;
       }
-      
+
       return {
         agents,
         passRates: agents.map(a => agentStats[a].total > 0 ? (agentStats[a].passed / agentStats[a].total) * 100 : 0),
@@ -578,16 +596,36 @@ export function generateDashboardHtml(data: AggregatedData): string {
             s.btp / s.total,
           ]];
         })),
+        nellaCost: {
+          hasData: nellaStats.total > 0 && bareStats.total > 0,
+          nella: {
+            avgCost: nellaStats.total > 0 ? nellaStats.cost / nellaStats.total : 0,
+            avgTokens: nellaStats.total > 0 ? nellaStats.tokens / nellaStats.total : 0,
+            totalCost: nellaStats.cost,
+            totalTokens: nellaStats.tokens,
+            total: nellaStats.total,
+            passRate: nellaStats.total > 0 ? (nellaStats.passed / nellaStats.total) * 100 : 0,
+          },
+          bare: {
+            avgCost: bareStats.total > 0 ? bareStats.cost / bareStats.total : 0,
+            avgTokens: bareStats.total > 0 ? bareStats.tokens / bareStats.total : 0,
+            totalCost: bareStats.cost,
+            totalTokens: bareStats.tokens,
+            total: bareStats.total,
+            passRate: bareStats.total > 0 ? (bareStats.passed / bareStats.total) * 100 : 0,
+          },
+        },
       };
     }
     
     function applyFilters() {
       const results = getFilteredResults();
       filteredData = recalculateChartData(results);
-      
+
       // Update charts
       updatePassRateChart();
       updateCostChart();
+      updateNellaCostChart();
       updateRadarChart();
       updateTtgChart();
     }
@@ -604,6 +642,19 @@ export function generateDashboardHtml(data: AggregatedData): string {
       charts.cost.data.datasets[1].data = filteredData.avgSuccessCosts;
       charts.cost.data.datasets[2].data = filteredData.avgTokens.map(t => t / 1000);
       charts.cost.update();
+    }
+
+    function updateNellaCostChart() {
+      if (!charts.nellaCost) return;
+      const nc = filteredData.nellaCost;
+      if (!nc || !nc.hasData) {
+        charts.nellaCost.data.datasets.forEach(ds => { ds.data = [0, 0]; });
+        charts.nellaCost.update();
+        return;
+      }
+      charts.nellaCost.data.datasets[0].data = [nc.nella.avgCost, nc.bare.avgCost];
+      charts.nellaCost.data.datasets[1].data = [nc.nella.avgTokens / 1000, nc.bare.avgTokens / 1000];
+      charts.nellaCost.update();
     }
     
     function updateRadarChart() {
@@ -702,6 +753,76 @@ export function generateDashboardHtml(data: AggregatedData): string {
       });
     }
     
+    function createNellaCostChart() {
+      const ctx = document.getElementById('nellaCostChart');
+      if (!ctx) return;
+      const nc = rawData.nellaCost;
+      const hasData = nc && nc.hasData;
+      charts.nellaCost = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['With Nella', 'Without Nella'],
+          datasets: [
+            {
+              label: 'Avg Cost/Run ($)',
+              data: hasData ? [nc.nella.avgCost, nc.bare.avgCost] : [0, 0],
+              backgroundColor: [colors.blue, colors.red],
+              borderRadius: 4,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Avg Tokens/Run (K)',
+              data: hasData ? [nc.nella.avgTokens / 1000, nc.bare.avgTokens / 1000] : [0, 0],
+              backgroundColor: [
+                colors.blue.replace('0.8', '0.4'),
+                colors.red.replace('0.8', '0.4'),
+              ],
+              borderRadius: 4,
+              yAxisID: 'y1',
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: !hasData,
+              text: 'No comparison data (need both Nella and non-Nella runs)',
+              color: '#8b949e',
+            },
+            tooltip: {
+              callbacks: {
+                afterBody: function() {
+                  if (!hasData) return '';
+                  const costDiff = nc.nella.avgCost - nc.bare.avgCost;
+                  const costPct = nc.bare.avgCost > 0 ? ((costDiff / nc.bare.avgCost) * 100).toFixed(1) : 'n/a';
+                  return 'Cost overhead: ' + (costDiff >= 0 ? '+' : '') + costPct + '%';
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              type: 'linear',
+              position: 'left',
+              beginAtZero: true,
+              grid: { color: '#21262d' },
+              title: { display: true, text: 'Cost ($)' }
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              beginAtZero: true,
+              grid: { display: false },
+              title: { display: true, text: 'Tokens (K)' }
+            },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
     function createRadarChart() {
       const ctx = document.getElementById('radarChart');
       const datasets = rawData.agents.map((agent, i) => ({
@@ -909,6 +1030,7 @@ export function generateDashboardHtml(data: AggregatedData): string {
     // Initialize all charts
     createPassRateChart();
     createCostChart();
+    createNellaCostChart();
     createRadarChart();
     createTtgChart();
     createTimelineChart();
@@ -930,6 +1052,10 @@ function prepareChartData(data: AggregatedData) {
     agentStats[agent] = { passed: 0, total: 0, cost: 0, tokens: 0, ttg: 0, vi: 0, da: 0, cvr: 0, sc: 0, btp: 0 };
   }
 
+  // Nella vs non-Nella aggregation
+  const nellaStats = { cost: 0, tokens: 0, total: 0, passed: 0 };
+  const bareStats = { cost: 0, tokens: 0, total: 0, passed: 0 };
+
   // Aggregate stats
   for (const run of data.runs) {
     for (const result of run.results) {
@@ -946,6 +1072,13 @@ function prepareChartData(data: AggregatedData) {
       stats.da += result.metrics.da;
       stats.cvr += result.metrics.cvr;
       stats.sc += result.metrics.sc;
+
+      // Track nella vs bare
+      const mode = result.nellaEnabled ? nellaStats : bareStats;
+      mode.cost += result.metrics.estimatedCost;
+      mode.tokens += result.metrics.tokensUsed;
+      mode.total++;
+      if (result.passed) mode.passed++;
     }
   }
 
@@ -1008,6 +1141,25 @@ function prepareChartData(data: AggregatedData) {
     radarData,
     runIds,
     timeline,
+    nellaCost: {
+      hasData: nellaStats.total > 0 && bareStats.total > 0,
+      nella: {
+        avgCost: nellaStats.total > 0 ? nellaStats.cost / nellaStats.total : 0,
+        avgTokens: nellaStats.total > 0 ? nellaStats.tokens / nellaStats.total : 0,
+        totalCost: nellaStats.cost,
+        totalTokens: nellaStats.tokens,
+        total: nellaStats.total,
+        passRate: nellaStats.total > 0 ? (nellaStats.passed / nellaStats.total) * 100 : 0,
+      },
+      bare: {
+        avgCost: bareStats.total > 0 ? bareStats.cost / bareStats.total : 0,
+        avgTokens: bareStats.total > 0 ? bareStats.tokens / bareStats.total : 0,
+        totalCost: bareStats.cost,
+        totalTokens: bareStats.tokens,
+        total: bareStats.total,
+        passRate: bareStats.total > 0 ? (bareStats.passed / bareStats.total) * 100 : 0,
+      },
+    },
   };
 }
 

@@ -91,6 +91,10 @@ export interface AgentBenchmarkResults {
       totalTrials: number;
       succeeded: number;
       flagged: number;
+      totalTokens: number;
+      totalCost: number;
+      avgTokensPerTrial: number;
+      avgCostPerTrial: number;
     }
   >;
   trials: AgentTrialResult[];
@@ -111,6 +115,11 @@ export interface AgentBenchmarkResults {
     costPerDefense: number;
     tokensPerScenario: number;
     totalTokens: number;
+    /** Per-mode (nella vs bare) cost/token breakdown */
+    byMode?: {
+      withNella: CostBreakdown;
+      withoutNella: CostBreakdown;
+    };
   };
 
   // Latency
@@ -119,4 +128,16 @@ export interface AgentBenchmarkResults {
     p95Ms: number;
     p99Ms: number;
   };
+}
+
+// =============================================================================
+// Cost Breakdown
+// =============================================================================
+
+export interface CostBreakdown {
+  totalTrials: number;
+  totalTokens: number;
+  totalCost: number;
+  avgTokensPerTrial: number;
+  avgCostPerTrial: number;
 }

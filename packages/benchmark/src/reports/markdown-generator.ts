@@ -35,20 +35,18 @@ export function generateSummaryMarkdown(options: MarkdownGeneratorOptions): stri
   const taskIds = tasks.map((t) => t.id);
 
   // Check if we have both Nella and non-Nella runs
-  const hasNellaRuns = runs.some((r) => r.nellaEnabled);
-  const hasNonNellaRuns = runs.some((r) => !r.nellaEnabled);
-  const isMixedBenchmark = hasNellaRuns && hasNonNellaRuns;
+  const nellaRuns = runs.filter((r) => r.nellaEnabled);
+  const nonNellaRuns = runs.filter((r) => !r.nellaEnabled);
+  const isMixedBenchmark = nellaRuns.length > 0 && nonNellaRuns.length > 0;
 
   let markdown = `# Benchmark Results — ${runDate}\n\n`;
 
   // Show Nella comparison info if applicable
   if (isMixedBenchmark) {
-    const nellaRuns = runs.filter((r) => r.nellaEnabled);
-    const nonNellaRuns = runs.filter((r) => !r.nellaEnabled);
     markdown += `> 🛡️ **Nella Comparison Benchmark**: Testing agent performance with and without Nella codebase intelligence.\n`;
     markdown += `> - Runs with Nella: ${nellaRuns.length}\n`;
     markdown += `> - Runs without Nella: ${nonNellaRuns.length}\n\n`;
-  } else if (hasNellaRuns) {
+  } else if (nellaRuns.length > 0) {
     markdown += `> 🛡️ All runs in this benchmark used **Nella codebase intelligence**.\n\n`;
   }
 
@@ -123,6 +121,47 @@ export function generateSummaryMarkdown(options: MarkdownGeneratorOptions): stri
     markdown += `| ${agg.avgIc.toFixed(1)} `;
     markdown += `| ${agg.totalTokens.toLocaleString()} `;
     markdown += `| $${agg.totalCost.toFixed(2)} |\n`;
+  }
+
+  // Nella vs Non-Nella cost comparison (only for mixed benchmarks)
+  if (isMixedBenchmark) {
+    const nellaMetrics = nellaRuns.map((r) => r.metrics);
+    const nonNellaMetrics = nonNellaRuns.map((r) => r.metrics);
+    const nellaAgg = aggregateAgentMetrics(nellaMetrics);
+    const nonNellaAgg = aggregateAgentMetrics(nonNellaMetrics);
+
+    markdown += `\n## Token & Cost Comparison: Nella vs Non-Nella\n\n`;
+    markdown += `| Metric | With Nella | Without Nella | Difference |\n`;
+    markdown += `|--------|-----------|--------------|------------|\n`;
+
+    const tokenDiff = nellaAgg.totalTokens - nonNellaAgg.totalTokens;
+    const avgNellaTokens = nellaRuns.length > 0 ? nellaAgg.totalTokens / nellaRuns.length : 0;
+    const avgNonNellaTokens = nonNellaRuns.length > 0 ? nonNellaAgg.totalTokens / nonNellaRuns.length : 0;
+    const avgTokenDiffPctVal = avgNonNellaTokens > 0
+      ? ((avgNellaTokens - avgNonNellaTokens) / avgNonNellaTokens) * 100
+      : null;
+    const avgTokenDiffPct = avgTokenDiffPctVal !== null
+      ? `${avgTokenDiffPctVal >= 0 ? "+" : ""}${avgTokenDiffPctVal.toFixed(1)}%`
+      : "—";
+
+    const avgNellaCost = nellaRuns.length > 0 ? nellaAgg.totalCost / nellaRuns.length : 0;
+    const avgNonNellaCost = nonNellaRuns.length > 0 ? nonNellaAgg.totalCost / nonNellaRuns.length : 0;
+    const avgCostDiffPctVal = avgNonNellaCost > 0
+      ? ((avgNellaCost - avgNonNellaCost) / avgNonNellaCost) * 100
+      : null;
+    const avgCostDiffPct = avgCostDiffPctVal !== null
+      ? `${avgCostDiffPctVal >= 0 ? "+" : ""}${avgCostDiffPctVal.toFixed(1)}%`
+      : "—";
+
+    const totalCostDiff = nellaAgg.totalCost - nonNellaAgg.totalCost;
+    const passRateDiff = (nellaAgg.passRate - nonNellaAgg.passRate) * 100;
+
+    markdown += `| Runs | ${nellaRuns.length} | ${nonNellaRuns.length} | — |\n`;
+    markdown += `| Total Tokens | ${nellaAgg.totalTokens.toLocaleString()} | ${nonNellaAgg.totalTokens.toLocaleString()} | ${tokenDiff >= 0 ? "+" : ""}${tokenDiff.toLocaleString()} |\n`;
+    markdown += `| Avg Tokens/Run | ${Math.round(avgNellaTokens).toLocaleString()} | ${Math.round(avgNonNellaTokens).toLocaleString()} | ${avgTokenDiffPct} |\n`;
+    markdown += `| Total Cost | $${nellaAgg.totalCost.toFixed(2)} | $${nonNellaAgg.totalCost.toFixed(2)} | ${totalCostDiff >= 0 ? "+$" : "-$"}${Math.abs(totalCostDiff).toFixed(2)} |\n`;
+    markdown += `| Avg Cost/Run | $${avgNellaCost.toFixed(4)} | $${avgNonNellaCost.toFixed(4)} | ${avgCostDiffPct} |\n`;
+    markdown += `| Pass Rate | ${(nellaAgg.passRate * 100).toFixed(0)}% | ${(nonNellaAgg.passRate * 100).toFixed(0)}% | ${passRateDiff >= 0 ? "+" : ""}${passRateDiff.toFixed(0)}pp |\n`;
   }
 
   // Legend
