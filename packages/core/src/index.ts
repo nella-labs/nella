@@ -387,3 +387,19 @@ export type {
   AgentRunnerEventHandler,
   LLMCallOptions,
 } from "./agents";
+
+// =============================================================================
+// GCP (Cloud SQL + Cloud Storage)
+// =============================================================================
+
+export {
+  initCloudSQL,
+  isCloudSQLInitialized,
+  disconnectCloudSQL,
+  uploadBenchmarkResults,
+  getLatestBenchmarkResult,
+  getBenchmarkVersions,
+  getBenchmarkHistory,
+} from "./gcp";
+
+export type { CloudSQLConfig, BenchmarkResultRow } from "./gcp";

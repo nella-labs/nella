@@ -72,7 +72,14 @@ export {
   vectorSearch,
   textSearch,
   hybridSearch,
+  // Benchmark
+  uploadBenchmarkResults,
+  getLatestBenchmarkResult,
+  getBenchmarkVersions,
+  getBenchmarkHistory,
 } from "./cloudsql";
+
+export type { BenchmarkResultRow } from "./cloudsql";
 
 // Cloud Storage
 export {

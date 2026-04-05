@@ -663,3 +663,136 @@ export async function hybridSearch(
 
   return result.rows;
 }
+
+// ============================================================================
+// Benchmark Results
+// ============================================================================
+
+export interface BenchmarkResultRow {
+  id: string;
+  feature: string;
+  nella_version: string | null;
+  run_date: string;
+  trigger_source: string;
+  headline: Record<string, unknown>;
+  corpus_stats: Record<string, unknown>;
+  by_category: unknown[];
+  by_difficulty: unknown[];
+  by_layer: unknown[];
+  agent_attack_success_rate: Record<string, unknown> | null;
+  agent_per_category: unknown[] | null;
+  agent_per_scenario: unknown[] | null;
+  agent_agents: string[] | null;
+  agent_benchmark: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function uploadBenchmarkResults(
+  data: {
+    feature: string;
+    nellaVersion?: string;
+    runDate?: string;
+    triggerSource?: "manual" | "ci" | "scheduled";
+    headline?: Record<string, unknown>;
+    corpusStats?: Record<string, unknown>;
+    byCategory?: unknown[];
+    byDifficulty?: unknown[];
+    byLayer?: unknown[];
+    agentAttackSuccessRate?: Record<string, unknown> | null;
+    agentPerCategory?: unknown[] | null;
+    agentPerScenario?: unknown[] | null;
+    agentAgents?: string[] | null;
+    agentBenchmark?: Record<string, unknown> | null;
+  },
+): Promise<string> {
+  const result = await cloudSQLManager.query<{ id: string }>(
+    `INSERT INTO benchmark_results
+       (feature, nella_version, run_date, trigger_source,
+        headline, corpus_stats, by_category, by_difficulty, by_layer,
+        agent_attack_success_rate, agent_per_category, agent_per_scenario,
+        agent_agents, agent_benchmark)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     RETURNING id`,
+    [
+      data.feature,
+      data.nellaVersion ?? null,
+      data.runDate ?? new Date().toISOString(),
+      data.triggerSource ?? "manual",
+      JSON.stringify(data.headline ?? {}),
+      JSON.stringify(data.corpusStats ?? {}),
+      JSON.stringify(data.byCategory ?? []),
+      JSON.stringify(data.byDifficulty ?? []),
+      JSON.stringify(data.byLayer ?? []),
+      data.agentAttackSuccessRate ? JSON.stringify(data.agentAttackSuccessRate) : null,
+      data.agentPerCategory ? JSON.stringify(data.agentPerCategory) : null,
+      data.agentPerScenario ? JSON.stringify(data.agentPerScenario) : null,
+      data.agentAgents ? JSON.stringify(data.agentAgents) : null,
+      data.agentBenchmark ? JSON.stringify(data.agentBenchmark) : null,
+    ],
+  );
+
+  return result.rows[0].id;
+}
+
+export async function getLatestBenchmarkResult(
+  feature: string,
+  version?: string,
+): Promise<BenchmarkResultRow | null> {
+  let sql = `SELECT * FROM benchmark_results WHERE feature = $1`;
+  const params: unknown[] = [feature];
+
+  if (version) {
+    sql += ` AND nella_version = $2`;
+    params.push(version);
+  }
+
+  sql += ` ORDER BY run_date DESC LIMIT 1`;
+
+  const result = await cloudSQLManager.query<BenchmarkResultRow>(sql, params);
+  return result.rows[0] ?? null;
+}
+
+export async function getBenchmarkVersions(): Promise<
+  Array<{ version: string; latestRun: string; features: string[] }>
+> {
+  const result = await cloudSQLManager.query<{
+    nella_version: string;
+    latest_run: string;
+    features: string[];
+  }>(
+    `SELECT
+       COALESCE(nella_version, 'unknown') as nella_version,
+       MAX(run_date)::text as latest_run,
+       ARRAY_AGG(DISTINCT feature) as features
+     FROM benchmark_results
+     GROUP BY COALESCE(nella_version, 'unknown')
+     ORDER BY latest_run DESC`,
+  );
+
+  return result.rows.map((r) => ({
+    version: r.nella_version,
+    latestRun: r.latest_run,
+    features: r.features,
+  }));
+}
+
+export async function getBenchmarkHistory(
+  feature: string,
+  limit: number = 10,
+  version?: string,
+): Promise<BenchmarkResultRow[]> {
+  let sql = `SELECT id, feature, run_date, headline, corpus_stats, nella_version, trigger_source
+     FROM benchmark_results WHERE feature = $1`;
+  const params: unknown[] = [feature];
+
+  if (version) {
+    sql += ` AND nella_version = $${params.length + 1}`;
+    params.push(version);
+  }
+
+  sql += ` ORDER BY run_date DESC LIMIT $${params.length + 1}`;
+  params.push(limit);
+
+  const result = await cloudSQLManager.query<BenchmarkResultRow>(sql, params);
+  return result.rows;
+}
