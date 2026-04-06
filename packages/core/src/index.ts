@@ -318,26 +318,6 @@ export type {
 } from "./mcp";
 
 // =============================================================================
-// Playground Module
-// =============================================================================
-
-export { PlaygroundServer, createPlaygroundServer, DEFAULT_SERVER_CONFIG, DEFAULT_COST_CONFIG } from "./playground";
-
-export type {
-  PlaygroundServerConfig,
-  PlaygroundSession,
-  SessionState,
-  ChainOfThoughtEntry,
-  ToolCallEntry,
-  SearchEntry,
-  ClientMessage,
-  ServerMessage,
-  CostConfig,
-  WebSocketClient,
-  ServerEventHandlers,
-} from "./playground";
-
-// =============================================================================
 // Services (Shared Service Layer)
 // =============================================================================
 

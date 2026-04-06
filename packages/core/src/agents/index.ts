@@ -1,7 +1,7 @@
 /**
  * Agents Module
  *
- * LLM agent integration for the nella playground.
+ * LLM agent integration for nella.
  * Provides adapters for Anthropic and OpenAI, plus an agent runner
  * that implements a tool-use loop over the MCP tools.
  */

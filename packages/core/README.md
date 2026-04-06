@@ -22,7 +22,6 @@ Nella Core ships additional modules for larger agent systems:
 - **Auth + rate limiting** — API key issuance and per-agent quotas
 - **Context sharing** — Cross-agent memory with visibility controls
 - **Cloud sync** — Sync run artifacts to Google Cloud Storage
-- **Playground server** — Real-time playground with session telemetry
 
 ## Installation
 
@@ -48,32 +47,6 @@ const results = await search('/path/to/repo', {
 
 console.log('Results:', results);
 ```
-
-## Playground Server
-
-Start a real-time dashboard for monitoring agent sessions:
-
-```typescript
-import { createPlaygroundServer } from '@usenella/core';
-
-const server = createPlaygroundServer({
-  workspacePath: '/path/to/repo',
-  storagePath: '/path/to/repo/.nella',
-  port: 3847,
-});
-
-server.on({
-  onStart: (port) => console.log(`Dashboard: http://localhost:${port}`),
-  onClientConnect: (id) => console.log(`Client connected: ${id}`),
-});
-
-await server.start();
-```
-
-Features:
-- **WebSocket updates** — Real-time tool calls, chain of thought, cost tracking
-- **Dashboard UI** — Visual interface at `http://localhost:3847`
-- **HTTP API** — `/health`, `/api/status`, `/api/session/:id` endpoints
 
 ## API Overview
 

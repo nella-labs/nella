@@ -41,7 +41,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ContextManager, deriveHmacKey } from "@usenella/core";
 import { createChallengeState } from "./tools/heartbeat";
-import { WebSocketServer, WebSocket } from "ws";
 import Redis from "ioredis";
 
 let pkgVersion = "0.0.0";
@@ -445,87 +444,10 @@ async function logUsageEvent(params: {
   }
 }
 
-// =============================================================================
-// Playground Types & Session Management
-// =============================================================================
-
-interface PlaygroundSessionState {
-  activeAgent: string | null;
-  chainOfThought: PlaygroundCotEntry[];
-  recentToolCalls: PlaygroundToolCall[];
-  recentSearches: PlaygroundSearchEntry[];
-  indexStatus: "none" | "indexing" | "ready" | "error";
-  rateLimitStatus: {
-    minute: { used: number; limit: number };
-    hour: { used: number; limit: number };
-  };
-}
-
-interface PlaygroundCotEntry {
-  id: string;
-  type: "thought" | "action" | "observation" | "result";
-  content: string;
-  timestamp: string;
-  duration?: number;
-}
-
-interface PlaygroundToolCall {
-  id: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  result?: unknown;
-  success: boolean;
-  error?: string;
-  duration: number;
-  timestamp: string;
-  tokens?: number;
-  cost?: number;
-}
-
-interface PlaygroundSearchEntry {
-  id: string;
-  query: string;
-  resultsCount: number;
-  confidence: number;
-  duration: number;
-  timestamp: string;
-}
-
-interface PlaygroundClient {
-  id: string;
-  ws: WebSocket;
-  sessionId: string | null;
-  apiKeyId: string;
-  userId: string;
-  rateLimits: { requests_per_minute: number; requests_per_hour: number; requests_per_day: number };
-}
-
-interface PlaygroundSession {
-  id: string;
-  userId: string;
-  state: PlaygroundSessionState;
-  clients: Set<string>;
-  lastActivity: number;
-}
-
 const DEFAULT_COST_CONFIG = {
   inputCostPer1k: 0.01,
   outputCostPer1k: 0.03,
 };
-
-function createEmptySessionState(): PlaygroundSessionState {
-  return {
-    activeAgent: null,
-    chainOfThought: [],
-    recentToolCalls: [],
-    recentSearches: [],
-    indexStatus: "none",
-    rateLimitStatus: {
-      minute: { used: 0, limit: 60 },
-      hour: { used: 0, limit: 1000 },
-    },
-  };
-}
 
 // =============================================================================
 // Server
@@ -595,25 +517,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
         const callStart = Date.now();
         const callId = `mcp-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 
-        // Broadcast tool:start to playground
         log("info", "MCP tool call started", { toolName: name, callId, ownerUserId: ownerUserId || "none" });
-        if (ownerUserId) {
-          const startPayload = {
-            type: "tool:start",
-            callId,
-            toolName: name,
-          };
-
-          if (redisClient) {
-            // Publish to Redis — the subscriber (even on same instance) delivers to clients
-            redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(startPayload)).catch((err) => {
-              log("error", "Redis publish tool:start failed", { error: err instanceof Error ? err.message : String(err) });
-            });
-          } else {
-            // No Redis — fallback to in-memory broadcast
-            broadcastToUserPlayground(ownerUserId, startPayload);
-          }
-        }
 
         // Create a temporary workspace context for this call
         const tmpDir = path.join(
@@ -707,42 +611,6 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
           const cost = (inputTokens / 1000) * DEFAULT_COST_CONFIG.inputCostPer1k +
                        (outputTokens / 1000) * DEFAULT_COST_CONFIG.outputCostPer1k;
 
-          // Build tool call entry for playground
-          const toolCallEntry: PlaygroundToolCall = {
-            id: callId,
-            toolName: name,
-            arguments: toolArgs || {},
-            result: resultContent,
-            success,
-            error: errorMessage,
-            duration,
-            timestamp: new Date().toISOString(),
-            tokens: inputTokens + outputTokens,
-            cost,
-          };
-
-          // Broadcast tool:end to playground
-          if (ownerUserId) {
-            const endPayload = {
-              type: "tool:end",
-              callId,
-              entry: toolCallEntry,
-            };
-
-            if (redisClient) {
-              // Publish to Redis — subscriber handles delivery + session recording
-              try {
-                await redisClient.publish(`nella:tool-events:${ownerUserId}`, JSON.stringify(endPayload));
-              } catch {
-                // Best effort — Redis pubsub failure shouldn't block
-              }
-            } else {
-              // No Redis — fallback to in-memory
-              recordToolCallInPlayground(ownerUserId, toolCallEntry);
-              broadcastToUserPlayground(ownerUserId, endPayload);
-            }
-          }
-
           // Log usage to Supabase
           if (ownerApiKeyId) {
             await logUsageEvent({
@@ -819,7 +687,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     }
 
     // -----------------------------------------------------------------------
-    // GET /api/tools — tool definitions for Playground UI
+    // GET /api/tools — tool definitions
     // -----------------------------------------------------------------------
     if (pathname === "/api/tools" && req.method === "GET") {
       const toolsWithCategory = allTools.map((tool) => {
@@ -907,7 +775,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
             : (parsedBody as any)?.method === "initialize";
 
         if (isInit || !sessionId) {
-          // New session — pass user info for playground bridging & usage logging
+          // New session — pass user info for usage logging
           const { transport } = await createSession(keyRecord.user_id, keyRecord.id);
 
           await transport.handleRequest(req, res, parsedBody);
@@ -970,464 +838,9 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     res.end(JSON.stringify({ error: "Not found" }));
   });
 
-  // =========================================================================
-  // WebSocket Playground Server
-  // =========================================================================
-
-  const playgroundSessions = new Map<string, PlaygroundSession>();
-  const playgroundClients = new Map<string, PlaygroundClient>();
-
-  // -------------------------------------------------------------------------
-  // Redis pub/sub for cross-instance playground bridging
-  // When a tool call happens on instance A, it publishes to Redis.
-  // Instance B (which has the WebSocket) subscribes and forwards to clients.
-  // -------------------------------------------------------------------------
-  let redisSub: Redis | null = null;
-  // Track which user IDs we're subscribed to
-  const subscribedUsers = new Set<string>();
-
-  function setupRedisSubscriber(): void {
-    const redisUrl =
-      process.env.REDIS_URL ||
-      process.env.REDIS_PRIVATE_URL ||
-      process.env.REDIS_PUBLIC_URL;
-    if (!redisUrl) return;
-
-    try {
-      // Need a separate connection for subscribing (Redis constraint)
-      redisSub = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
-        retryStrategy(times: number) {
-          if (times > 5) return null;
-          return Math.min(times * 200, 2000);
-        },
-        enableReadyCheck: true,
-        lazyConnect: false,
-      });
-
-      redisSub.on("message", (channel: string, message: string) => {
-        try {
-          // Channel format: nella:tool-events:<userId>
-          const userId = channel.replace("nella:tool-events:", "");
-          const parsed = JSON.parse(message);
-
-          log("info", "Redis sub received tool event", { userId, type: parsed.type });
-
-          // Forward to all playground sessions for this user
-          for (const [_key, session] of playgroundSessions) {
-            if (session.userId === userId) {
-              // Also record in session state if it's a tool:end event
-              if (parsed.type === "tool:end" && parsed.entry) {
-                session.state.recentToolCalls = [
-                  ...session.state.recentToolCalls.slice(-49),
-                  parsed.entry,
-                ];
-                session.lastActivity = Date.now();
-              }
-
-              for (const cid of session.clients) {
-                const c = playgroundClients.get(cid);
-                if (c) sendToClient(c.ws, parsed);
-              }
-            }
-          }
-        } catch (err) {
-          log("error", "Redis sub message handling error", {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      });
-
-      redisSub.on("connect", () => {
-        log("info", "Redis subscriber connected for playground bridging");
-      });
-
-      redisSub.on("error", (err: Error) => {
-        log("error", "Redis subscriber error", { error: err.message });
-      });
-    } catch (err) {
-      log("error", "Failed to create Redis subscriber", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  // Subscribe to a user's tool events channel
-  function subscribeToUserEvents(userId: string): void {
-    if (!redisSub || subscribedUsers.has(userId)) return;
-    const channel = `nella:tool-events:${userId}`;
-    redisSub.subscribe(channel).then(() => {
-      subscribedUsers.add(userId);
-      log("info", "Subscribed to Redis channel", { channel });
-    }).catch((err) => {
-      log("error", "Failed to subscribe to Redis channel", {
-        channel,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-  }
-
-  // Unsubscribe when no more playground clients for a user
-  function unsubscribeFromUserEvents(userId: string): void {
-    if (!redisSub || !subscribedUsers.has(userId)) return;
-    // Check if any sessions still have clients for this user
-    for (const [_key, session] of playgroundSessions) {
-      if (session.userId === userId && session.clients.size > 0) return;
-    }
-    const channel = `nella:tool-events:${userId}`;
-    redisSub.unsubscribe(channel).then(() => {
-      subscribedUsers.delete(userId);
-      log("info", "Unsubscribed from Redis channel", { channel });
-    }).catch(() => {});
-  }
-
-  setupRedisSubscriber();
-
-  // Cleanup stale sessions every 60s
-  const playgroundCleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [id, session] of playgroundSessions) {
-      if (session.clients.size === 0 && now - session.lastActivity > 30 * 60 * 1000) {
-        playgroundSessions.delete(id);
-        log("debug", "Cleaned up stale playground session", { sessionId: id });
-      }
-    }
-  }, 60000);
-
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-
-  wss.on("connection", async (ws, req) => {
-    // Authenticate via ?token= query parameter
-    const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-    const token = reqUrl.searchParams.get("token");
-
-    if (!token) {
-      ws.close(4001, "Missing ?token= parameter");
-      return;
-    }
-
-    const authResult = await validateApiKey(token);
-    if (!authResult.success) {
-      ws.close(4001, authResult.error);
-      return;
-    }
-
-    const keyRecord = authResult.record;
-    const rateLimits = keyRecord.rate_limits || {
-      requests_per_minute: 20,
-      requests_per_hour: 100,
-      requests_per_day: 500,
-    };
-
-    const clientId = crypto.randomUUID();
-    const client: PlaygroundClient = {
-      id: clientId,
-      ws,
-      sessionId: null,
-      apiKeyId: keyRecord.id,
-      userId: keyRecord.user_id,
-      rateLimits,
-    };
-    playgroundClients.set(clientId, client);
-
-    log("info", "Playground client connected", { clientId, userId: keyRecord.user_id });
-
-    ws.on("message", async (raw) => {
-      try {
-        const message = JSON.parse(raw.toString());
-        await handlePlaygroundMessage(client, message);
-      } catch (err) {
-        sendToClient(ws, { type: "error", message: "Invalid message format" });
-      }
-    });
-
-    ws.on("close", () => {
-      if (client.sessionId) {
-        const session = playgroundSessions.get(client.sessionId);
-        if (session) {
-          session.clients.delete(clientId);
-        }
-      }
-      playgroundClients.delete(clientId);
-      log("info", "Playground client disconnected", { clientId });
-
-      // Unsubscribe from Redis if no more clients for this user
-      unsubscribeFromUserEvents(client.userId);
-    });
-
-    ws.on("error", (err) => {
-      log("error", "Playground WebSocket error", { clientId, error: String(err) });
-    });
-  });
-
-  function sendToClient(ws: WebSocket, message: unknown): void {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
-    }
-  }
-
-  function broadcastToSession(sessionId: string, message: unknown): void {
-    const session = playgroundSessions.get(sessionId);
-    if (!session) return;
-    for (const cid of session.clients) {
-      const c = playgroundClients.get(cid);
-      if (c) sendToClient(c.ws, message);
-    }
-  }
-
-  // Helper: find all playground sessions belonging to a user and broadcast
-  function broadcastToUserPlayground(userId: string, message: unknown): void {
-    log("info", "broadcastToUserPlayground called", {
-      userId,
-      totalSessions: playgroundSessions.size,
-      totalClients: playgroundClients.size,
-      sessionKeys: Array.from(playgroundSessions.keys()),
-      sessionUserIds: Array.from(playgroundSessions.values()).map(s => s.userId),
-    });
-    let matched = 0;
-    for (const [_key, session] of playgroundSessions) {
-      if (session.userId === userId) {
-        matched++;
-        for (const cid of session.clients) {
-          const c = playgroundClients.get(cid);
-          if (c) {
-            log("info", "Sending to playground client", { clientId: cid });
-            sendToClient(c.ws, message);
-          }
-        }
-      }
-    }
-    if (matched === 0) {
-      log("info", "No playground sessions found for user", { userId });
-    }
-  }
-
-  // Helper: update playground session state for a user with a tool call entry
-  function recordToolCallInPlayground(userId: string, entry: PlaygroundToolCall): void {
-    for (const [_key, session] of playgroundSessions) {
-      if (session.userId === userId) {
-        session.state.recentToolCalls = [...session.state.recentToolCalls.slice(-49), entry];
-        session.lastActivity = Date.now();
-      }
-    }
-  }
-
-  async function handlePlaygroundMessage(client: PlaygroundClient, message: any): Promise<void> {
-    switch (message.type) {
-      case "subscribe": {
-        const sessionKey = `${client.userId}:${message.sessionId || "default"}`;
-        let session = playgroundSessions.get(sessionKey);
-        if (!session) {
-          session = {
-            id: sessionKey,
-            userId: client.userId,
-            state: createEmptySessionState(),
-            clients: new Set(),
-            lastActivity: Date.now(),
-          };
-          // Set rate limit info from the client's key
-          session.state.rateLimitStatus = {
-            minute: { used: 0, limit: client.rateLimits.requests_per_minute },
-            hour: { used: 0, limit: client.rateLimits.requests_per_hour },
-          };
-          playgroundSessions.set(sessionKey, session);
-        }
-        client.sessionId = sessionKey;
-        session.clients.add(client.id);
-        session.lastActivity = Date.now();
-
-        sendToClient(client.ws, { type: "connected", sessionId: sessionKey, clientId: client.id });
-        sendToClient(client.ws, { type: "session:state", state: session.state });
-
-        // Subscribe to Redis channel for cross-instance tool event bridging
-        subscribeToUserEvents(client.userId);
-        break;
-      }
-
-      case "unsubscribe": {
-        if (client.sessionId) {
-          const session = playgroundSessions.get(client.sessionId);
-          if (session) session.clients.delete(client.id);
-          client.sessionId = null;
-        }
-        break;
-      }
-
-      case "tool:call": {
-        if (!client.sessionId) {
-          sendToClient(client.ws, { type: "error", message: "Not subscribed to a session" });
-          return;
-        }
-        const session = playgroundSessions.get(client.sessionId);
-        if (!session) return;
-
-        // Rate limit check
-        const rl = await checkRateLimit(client.apiKeyId, client.rateLimits);
-        if (!rl.allowed) {
-          sendToClient(client.ws, { type: "error", message: rl.reason || "Rate limit exceeded" });
-          return;
-        }
-
-        const { toolName, arguments: toolArgs, callId } = message;
-        const resolvedCallId = callId || `pg-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-        const callStart = Date.now();
-
-        // Broadcast tool:start
-        broadcastToSession(client.sessionId, {
-          type: "tool:start",
-          callId: resolvedCallId,
-          toolName,
-        });
-
-        // Add CoT action entry
-        const actionEntry: PlaygroundCotEntry = {
-          id: `cot-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
-          type: "action",
-          content: `Calling tool: ${toolName}`,
-          timestamp: new Date().toISOString(),
-        };
-        session.state.chainOfThought = [...session.state.chainOfThought.slice(-99), actionEntry];
-        broadcastToSession(client.sessionId, { type: "cot:entry", entry: actionEntry });
-
-        // Execute tool
-        const tmpDir = path.join(os.tmpdir(), `nella-pg-${crypto.randomBytes(4).toString("hex")}`);
-        let success = false;
-        let result: unknown = null;
-        let error: string | undefined;
-
-        try {
-          if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
-          const contextManager = new ContextManager(tmpDir);
-          const sessionToken = `nella-verify-${crypto.randomBytes(16).toString("hex")}`;
-          const hmacKey = deriveHmacKey(sessionToken);
-          const challengeState = createChallengeState();
-          const serverContext: ServerContext = { workspacePath: tmpDir, contextManager, sessionToken, hmacKey, challengeState };
-
-          const contextResult = await handleContextTool(toolName, toolArgs || {}, serverContext);
-          if (contextResult !== null) { result = contextResult; success = true; }
-
-          if (result === null) {
-            error = `Unknown tool: ${toolName}`;
-            success = false;
-          }
-        } catch (err) {
-          error = err instanceof Error ? err.message : String(err);
-          success = false;
-        } finally {
-          try { if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-        }
-
-        const duration = Date.now() - callStart;
-
-        // Estimate tokens & cost
-        const resultText = typeof result === "string" ? result : JSON.stringify(result || "");
-        const argsText = JSON.stringify(toolArgs || {});
-        const inputTokens = Math.ceil(argsText.length / 4);
-        const outputTokens = Math.ceil(resultText.length / 4);
-        const cost = (inputTokens / 1000) * DEFAULT_COST_CONFIG.inputCostPer1k +
-                     (outputTokens / 1000) * DEFAULT_COST_CONFIG.outputCostPer1k;
-
-        // Build tool call entry
-        const toolCallEntry: PlaygroundToolCall = {
-          id: resolvedCallId,
-          toolName,
-          arguments: toolArgs || {},
-          result,
-          success,
-          error,
-          duration,
-          timestamp: new Date().toISOString(),
-          tokens: inputTokens + outputTokens,
-          cost,
-        };
-
-        session.state.recentToolCalls = [...session.state.recentToolCalls.slice(-49), toolCallEntry];
-
-        // Broadcast tool:end
-        broadcastToSession(client.sessionId, { type: "tool:end", callId: resolvedCallId, entry: toolCallEntry });
-
-        // Add CoT observation entry
-        const obsEntry: PlaygroundCotEntry = {
-          id: `cot-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
-          type: "observation",
-          content: success ? `Tool ${toolName} completed in ${duration}ms` : `Tool ${toolName} failed: ${error}`,
-          timestamp: new Date().toISOString(),
-          duration,
-        };
-        session.state.chainOfThought = [...session.state.chainOfThought.slice(-99), obsEntry];
-        broadcastToSession(client.sessionId, { type: "cot:entry", entry: obsEntry });
-
-        // Update rate limit display
-        const minuteAgo = Date.now() - 60000;
-        const hourAgo = Date.now() - 3600000;
-        const rlEntry = rateLimitStore.get(client.apiKeyId);
-        if (rlEntry) {
-          session.state.rateLimitStatus = {
-            minute: {
-              used: rlEntry.timestamps.filter(t => t > minuteAgo).length,
-              limit: client.rateLimits.requests_per_minute,
-            },
-            hour: {
-              used: rlEntry.timestamps.filter(t => t > hourAgo).length,
-              limit: client.rateLimits.requests_per_hour,
-            },
-          };
-        }
-
-        // Check rate limit warning at 80%
-        const minuteUsed = session.state.rateLimitStatus.minute.used;
-        const minuteLimit = session.state.rateLimitStatus.minute.limit;
-        if (minuteUsed / minuteLimit >= 0.8) {
-          broadcastToSession(client.sessionId, {
-            type: "rate:warning",
-            window: "minute",
-            percentUsed: (minuteUsed / minuteLimit) * 100,
-          });
-        }
-
-        session.lastActivity = Date.now();
-
-        // Log usage
-        logUsageEvent({
-          apiKeyId: client.apiKeyId,
-          userId: client.userId,
-          toolName,
-          durationMs: duration,
-          success,
-          error,
-          tokensUsed: inputTokens + outputTokens,
-        });
-        break;
-      }
-
-      case "session:clear": {
-        if (!client.sessionId) return;
-        const session = playgroundSessions.get(client.sessionId);
-        if (!session) return;
-        session.state = createEmptySessionState();
-        session.state.rateLimitStatus = {
-          minute: { used: 0, limit: client.rateLimits.requests_per_minute },
-          hour: { used: 0, limit: client.rateLimits.requests_per_hour },
-        };
-        broadcastToSession(client.sessionId, { type: "session:state", state: session.state });
-        break;
-      }
-
-      default:
-        sendToClient(client.ws, { type: "error", message: `Unknown message type: ${message.type}` });
-    }
-  }
-
   // Graceful shutdown
   const shutdown = () => {
     log("info", "Shutting down...");
-    clearInterval(playgroundCleanupInterval);
-    // Close all playground WebSocket connections
-    for (const client of playgroundClients.values()) {
-      client.ws.close(1001, "Server shutting down");
-    }
-    wss.close();
     // Disconnect Redis
     if (redisClient) {
       redisClient.disconnect();
@@ -1452,7 +865,6 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
       endpoints: {
         mcp: `http://${host}:${port}/mcp`,
         health: `http://${host}:${port}/health`,
-        playground: `ws://${host}:${port}/ws`,
         tools: `http://${host}:${port}/api/tools`,
       },
     });
