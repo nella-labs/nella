@@ -2,7 +2,7 @@
  * Result Isolation
  *
  * Re-exports the core result isolation module. Defense logic lives in
- * @usenella/core so that any consumer (benchmark, playground, MCP server)
+ * @usenella/core so that any consumer (benchmark, MCP server)
  * gets defense automatically.
  */
 

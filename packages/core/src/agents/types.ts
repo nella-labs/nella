@@ -1,7 +1,7 @@
 /**
- * Agent Types for Playground
+ * Agent Types
  *
- * Types for LLM agent integration in the nella playground.
+ * Types for LLM agent integration.
  */
 
 // =============================================================================

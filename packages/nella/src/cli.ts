@@ -156,7 +156,7 @@ interface CliArgs {
   output?: "json" | "pretty";
   // MCP-specific args
   workspace?: string;
-  // Playground-specific args
+  // Server args
   port?: number;
   host?: string;
   // Connect-specific args

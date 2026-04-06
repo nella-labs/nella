@@ -95,8 +95,6 @@ Nella Core is **agent-agnostic**. The agent calls Core (via MCP, CLI, or library
 - **Workspace management** — Register and switch between multiple workspaces.
 - **Authentication & rate limiting** — API key management and per-agent throttling.
 - **Cloud sync** — Push/pull run artifacts to Google Cloud Storage.
-- **Playground server** — Run a local, real-time playground with cost tracking.
-
 See [Core Modules](./docs/core/modules.md) for setup guides and examples.
 
 ## Development

@@ -40,7 +40,7 @@ export type AgentRunnerEventHandler = (event: AgentRunnerEvent) => void;
 // System prompt
 // =============================================================================
 
-const PLAYGROUND_SYSTEM_PROMPT = `You are a coding assistant using the Nella MCP tools to explore and work with a codebase.
+const DEFAULT_SYSTEM_PROMPT = `You are a coding assistant using the Nella MCP tools to explore and work with a codebase.
 
 Available capabilities:
 - Search the indexed codebase for code, functions, classes, and documentation
@@ -99,7 +99,7 @@ export class AgentRunner {
 
     // Build initial messages
     const messages: AgentMessage[] = [
-      { role: "system", content: config.systemPrompt ?? PLAYGROUND_SYSTEM_PROMPT },
+      { role: "system", content: config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT },
       { role: "user", content: config.prompt },
     ];
 
