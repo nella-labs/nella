@@ -48,7 +48,7 @@
     "@msgpack/msgpack": "^3.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "@typescript-eslint/typescript-estree": "^7.0.0",
-    "minimatch": "^10.2.4",
+    "minimatch": "^10.2.5",
     "natural": "^6.10.0",
     "pg": "^8.11.0"
   },
