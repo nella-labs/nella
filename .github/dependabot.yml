@@ -26,6 +26,7 @@ updates:
           - "eslint*"
           - "prettier*"
           - "typescript"
+          - "typedoc"
           - "@changesets/*"
         update-types:
           - minor
@@ -36,14 +37,18 @@ updates:
           - "eslint*"
           - "prettier*"
           - "typescript"
+          - "typedoc"
           - "@changesets/*"
         update-types:
           - minor
           - patch
-    # Ignore major bumps by default — handle manually
+    # Ignore major bumps by default — handle manually.
+    # Ignore minimatch: it's a pnpm override (not a direct dep) and Dependabot's
+    # pnpm parser fails on it, generating noisy failed runs without producing PRs.
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "minimatch"
 
   # GitHub Actions
   - package-ecosystem: github-actions
