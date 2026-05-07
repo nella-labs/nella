@@ -71,14 +71,31 @@ jobs:
           echo "::warning::DOCS_SYNC_TOKEN secret not configured — skipping docs sync."
           echo "See workflow comments above for setup instructions."
 
+      - name: Validate DOCS_SYNC_TOKEN
+        id: validate_token
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN }}
+        run: |
+          status=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/nella-labs/nella-website)
+          if [ "$status" != "200" ]; then
+            echo "::warning::DOCS_SYNC_TOKEN is set but invalid (HTTP $status from nella-website API). Rotate the token at https://github.com/nella-labs/nella/settings/secrets/actions — skipping docs sync."
+            echo "valid=false" >> $GITHUB_OUTPUT
+          else
+            echo "valid=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout nella repo
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: actions/checkout@v6
         with:
           path: nella
 
       - name: Checkout nella-website repo
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: actions/checkout@v6
         with:
           repository: nella-labs/nella-website
@@ -86,24 +103,24 @@ jobs:
           token: ${{ secrets.DOCS_SYNC_TOKEN }}
 
       - name: Setup Node.js
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: '20'
 
       - name: Setup pnpm
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: pnpm/action-setup@v5
         with:
           version: "10.28.0"
 
       - name: Install dependencies
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         working-directory: nella
         run: pnpm install --frozen-lockfile
 
       - name: Run docs sync
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         working-directory: nella
         env:
           DRY_RUN: ${{ inputs.dry_run }}
@@ -115,7 +132,7 @@ jobs:
           fi
 
       - name: Check for changes
-        if: env.HAS_TOKEN == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         id: changes
         working-directory: nella-website
         run: |
@@ -129,7 +146,7 @@ jobs:
           fi
 
       - name: Create Pull Request
-        if: env.HAS_TOKEN == 'true' && steps.changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true' && steps.changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           path: nella-website
