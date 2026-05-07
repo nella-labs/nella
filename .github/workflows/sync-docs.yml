@@ -73,7 +73,7 @@ jobs:
 
       - name: Validate DOCS_SYNC_TOKEN
         id: validate_token
-        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
+        if: env.HAS_TOKEN == 'true'
         env:
           GH_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN }}
         run: |
@@ -89,13 +89,13 @@ jobs:
           fi
 
       - name: Checkout nella repo
-        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true' && steps.validate_token.outputs.valid == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: actions/checkout@v6
         with:
           path: nella
 
       - name: Checkout nella-website repo
-        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true' && steps.validate_token.outputs.valid == 'true'
+        if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
         uses: actions/checkout@v6
         with:
           repository: nella-labs/nella-website
