@@ -68,6 +68,7 @@ CLAUDE.md
 
 # Supabase migrations (managed separately)
 supabase/migrations/
+supabase/.temp/
 
 # Task management (local)
 tasks/
