@@ -33,6 +33,7 @@ dotenv.config();
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -490,6 +491,7 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
 
   // Track active transports per session
   const transports = new Map<string, StreamableHTTPServerTransport>();
+  const sseTransports = new Map<string, SSEServerTransport>();
 
   // Create a new MCP server + transport for a session
   async function createSession(ownerUserId?: string, ownerApiKeyId?: string): Promise<{ server: Server; transport: StreamableHTTPServerTransport }> {
@@ -647,6 +649,76 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     return { server, transport };
   }
 
+  // Create a new MCP server + standard SSE transport for a session (n8n, etc.)
+  async function createSseSession(res: http.ServerResponse, ownerUserId?: string, ownerApiKeyId?: string): Promise<{ server: Server; transport: SSEServerTransport }> {
+    // The endpoint must be where the client will POST messages
+    const transport = new SSEServerTransport("/message", res);
+
+    const server = new Server(
+      { name: "nella", version: "0.0.0" },
+      { capabilities: { tools: {} } }
+    );
+
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return { tools: allTools };
+    });
+
+    server.setRequestHandler(
+      CallToolRequestSchema,
+      async (request: { params: { name: string; arguments?: Record<string, unknown> } }): Promise<CallToolResult> => {
+        const { name, arguments: toolArgs } = request.params;
+        const callStart = Date.now();
+        const callId = `mcp-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+        log("info", "MCP tool call started (SSE)", { toolName: name, callId, ownerUserId: ownerUserId || "none" });
+
+        const tmpDir = path.join(os.tmpdir(), `nella-hosted-${crypto.randomBytes(4).toString("hex")}`);
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
+        const contextManager = new ContextManager(tmpDir);
+        const serverContext: ServerContext = {
+          workspacePath: tmpDir,
+          contextManager,
+          sessionToken: `hosted-verify-${crypto.randomBytes(16).toString("hex")}`,
+          hmacKey: deriveHmacKey(`hosted-verify-${crypto.randomBytes(16).toString("hex")}`),
+          challengeState: createChallengeState(),
+        };
+
+        try {
+          const contextResult = await handleContextTool(name, toolArgs || {}, serverContext);
+          if (contextResult !== null) {
+            log("info", "MCP tool call completed", { toolName: name, duration: Date.now() - callStart, callId, success: !contextResult.isError });
+            checkUsageMilestones(ownerApiKeyId || "unknown", name);
+            return contextResult as CallToolResult;
+          }
+
+          const indexingResult = await handleIndexingTool(name, toolArgs || {}, serverContext);
+          if (indexingResult !== null) {
+            log("info", "MCP tool call completed", { toolName: name, duration: Date.now() - callStart, callId, success: !indexingResult.isError });
+            checkUsageMilestones(ownerApiKeyId || "unknown", name);
+            return indexingResult as CallToolResult;
+          }
+
+          return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true } as CallToolResult;
+        } catch (error) {
+          log("error", "MCP tool call failed", { toolName: name, error: String(error), callId });
+          return { content: [{ type: "text", text: `Error: ${String(error)}` }], isError: true } as CallToolResult;
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      }
+    );
+
+    await server.connect(transport);
+    
+    server.onerror = (err) => log("error", "MCP SSE server error", { error: String(err) });
+    server.onclose = () => {
+      log("info", "MCP SSE server closed", { sessionId: transport.sessionId });
+      sseTransports.delete(transport.sessionId);
+    };
+
+    return { server, transport };
+  }
+
   // =========================================================================
   // HTTP Server
   // =========================================================================
@@ -710,6 +782,74 @@ export async function startHostedServer(options: HostedServerOptions = {}): Prom
     // -----------------------------------------------------------------------
     // MCP endpoint: POST/GET/DELETE /mcp
     // -----------------------------------------------------------------------
+    if (pathname === "/sse" || pathname === "/message") {
+      // Standard SSE transport endpoints for n8n and other standard clients
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing Authorization: Bearer <api_key> header" }));
+        return;
+      }
+
+      const apiKey = authHeader.slice(7);
+      const authResult = await validateApiKey(apiKey);
+      if (!authResult.success) {
+        res.writeHead(authResult.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: authResult.error }));
+        return;
+      }
+
+      const keyRecord = authResult.record;
+      const rateLimits = keyRecord.rate_limits || {
+        requests_per_minute: 20,
+        requests_per_hour: 100,
+        requests_per_day: 500,
+      };
+
+      if (req.method === "POST" && pathname === "/message") {
+        const rl = await checkRateLimit(keyRecord.id, rateLimits);
+        if (!rl.allowed) {
+          res.writeHead(429, {
+            "Content-Type": "application/json",
+            "Retry-After": String(rl.retryAfter || 60),
+          });
+          res.end(JSON.stringify({ error: rl.reason }));
+          return;
+        }
+
+        // Get sessionId from query param
+        const sessionId = url.searchParams.get("sessionId");
+        if (!sessionId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing sessionId query parameter" }));
+          return;
+        }
+
+        const transport = sseTransports.get(sessionId);
+        if (!transport) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Session not found" }));
+          return;
+        }
+
+        await transport.handlePostMessage(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/sse") {
+        // Create new SSE session
+        const { transport } = await createSseSession(res, keyRecord.user_id, keyRecord.id);
+        await transport.start();
+        sseTransports.set(transport.sessionId, transport);
+        log("info", "New standard MCP SSE session registered", { sessionId: transport.sessionId });
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
     if (pathname === "/mcp") {
       // Authenticate
       const authHeader = req.headers.authorization;
