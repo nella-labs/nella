@@ -11,6 +11,7 @@
  */
 
 import * as crypto from "crypto";
+import { loadEnvFiles } from "../load-env";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -160,11 +161,18 @@ Example:
 
   const workspacePath = args.workspace!;
 
-  // Require authentication — no free rides
+  // Load .env from cwd and workspace so VOYAGE_API_KEY / AZURE_* picked up
+  // for providers that don't require a Nella session.
+  loadEnvFiles(workspacePath);
+
+  // Require authentication — either a Nella session OR a direct provider key.
   const session = await initSession();
-  if (!session) {
-    console.error("[nella] Not authenticated. Run 'nella login' to continue.");
-    console.error("[nella] Authentication is required to use Nella.");
+  const hasDirectKey =
+    !!process.env.VOYAGE_API_KEY ||
+    (!!process.env.AZURE_EMBEDDING_API_KEY && !!process.env.AZURE_ENDPOINT);
+  if (!session && !hasDirectKey) {
+    console.error("[nella] Not authenticated.");
+    console.error("[nella] Set VOYAGE_API_KEY (or AZURE_EMBEDDING_API_KEY + AZURE_ENDPOINT) in your .env, or run 'nella auth login'.");
     process.exit(1);
   }
 
