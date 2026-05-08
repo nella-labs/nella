@@ -277,6 +277,8 @@ export class Embedder {
   private config: EmbedderConfig;
   private sqliteCache: SQLiteEmbeddingCache | null = null;
   private jsonCache: JSONEmbeddingCache | null = null;
+  private confirmedVoyage = false;
+  private warnedFallback = false;
 
   constructor(config: Partial<EmbedderConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -498,13 +500,19 @@ export class Embedder {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Embedding service error: ${response.status}`);
+      throw new Error(`Voyage AI error (${response.status}): ${error.slice(0, 300)}`);
     }
 
     const data = await response.json() as {
       data: { embedding: number[]; index: number }[];
       usage: { total_tokens: number };
     };
+
+    if (!this.confirmedVoyage) {
+      const dims = data.data?.[0]?.embedding?.length ?? this.config.dimensions;
+      console.error(`[nella] Voyage AI connected — ${model}, ${dims}d, endpoint=${endpoint}`);
+      this.confirmedVoyage = true;
+    }
 
     return {
       embeddings: data.data.map((d) => d.embedding),
@@ -554,9 +562,22 @@ export class Embedder {
       dimensions?: number;
     };
 
-    // Auto-detect dimensions from server response
+    // Auto-detect dimensions from server response. If the server fell back
+    // to a different provider (e.g. Voyage → Azure when the upstream key is
+    // missing), the dimensions won't match what we requested. Surface this
+    // once so the user knows the proxy isn't routing to the model they
+    // think it is.
     const serverDims = data.dimensions || data.data?.[0]?.embedding?.length;
     if (serverDims && serverDims !== this.config.dimensions) {
+      if (!this.warnedFallback) {
+        const expected = this.config.dimensions;
+        console.warn(
+          `[nella] Nella proxy returned ${serverDims}d embeddings; ` +
+          `expected ${expected}d for ${model}. The proxy likely fell back ` +
+          `to a different provider — set VOYAGE_API_KEY locally to use Voyage directly.`
+        );
+        this.warnedFallback = true;
+      }
       this.config.dimensions = serverDims;
     }
 

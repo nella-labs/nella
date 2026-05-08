@@ -18,6 +18,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { loadEnvFiles } from "./load-env";
+
+// Load .env from cwd before reading any provider env vars (VOYAGE_API_KEY,
+// AZURE_*). Workspace .env is loaded later in `runIndex` once we know the path.
+loadEnvFiles();
+
 import chalk from "chalk";
 import Table from "cli-table3";
 import figures from "figures";
@@ -793,6 +799,10 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
   const graphOnly = args.graph && !args.force;
   const needsIndex = !graphOnly;
 
+  // Pick up VOYAGE_API_KEY / AZURE_* from the workspace's .env so users
+  // don't have to export them globally.
+  loadEnvFiles(workspacePath);
+
   console.log(logo);
   console.log(tagline);
 
@@ -806,34 +816,48 @@ async function runIndexCommand(args: CliArgs): Promise<void> {
     console.log(`  ${theme.muted("Mode: full reindex (--force)")}\n`);
   }
 
-  // Resolve embedder config — graph-only mode doesn't need auth
+  // Resolve embedder config — graph-only mode doesn't need auth.
+  // Priority: direct VOYAGE_API_KEY > Nella session (proxy) > direct Azure.
+  // Direct keys win because they (a) have lower latency, (b) bypass any
+  // server-side fallback that could silently route to a different provider,
+  // and (c) make usage attributable on the key owner's dashboard.
   let embedderConfig: IndexManagerConfig["embedder"];
   if (needsIndex) {
-    const session = await getValidSession();
-    if (session) {
-      console.log(`  ${theme.icons.info}  Using Nella cloud embeddings ${theme.muted(`(${session.user.email})`)}\n`);
-      embedderConfig = {
-        provider: "nella",
-        model: DEFAULT_EMBEDDING_MODEL,
-        dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
-        apiKey: session.access_token,
-        apiBase: "https://app.getnella.dev/api",
-      };
-    } else if (process.env.VOYAGE_API_KEY) {
+    if (process.env.VOYAGE_API_KEY) {
+      console.log(`  ${theme.icons.info}  Using ${theme.primary.bold("Voyage AI")} ${theme.muted("(direct, voyage-code-3, 2048d)")}\n`);
       embedderConfig = {
         provider: "voyage",
         model: DEFAULT_EMBEDDING_MODEL,
         dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
       };
-    } else if (process.env.AZURE_EMBEDDING_API_KEY) {
-      embedderConfig = {
-        provider: "azure",
-        model: "text-embedding-3-small",
-        dimensions: 1536,
-      };
     } else {
-      console.log(`  ${theme.icons.error}  ${theme.error("Not authenticated. Run")} ${theme.primary.bold("nella auth login")} ${theme.error("first.")}\n`);
-      process.exit(1);
+      const session = await getValidSession();
+      if (session) {
+        console.log(`  ${theme.icons.info}  Using ${theme.primary.bold("Nella cloud")} ${theme.muted(`(proxied, ${session.user.email})`)}\n`);
+        embedderConfig = {
+          provider: "nella",
+          model: DEFAULT_EMBEDDING_MODEL,
+          dimensions: MODEL_DIMENSIONS[DEFAULT_EMBEDDING_MODEL],
+          apiKey: session.access_token,
+          apiBase: "https://app.getnella.dev/api",
+        };
+      } else if (process.env.AZURE_EMBEDDING_API_KEY && process.env.AZURE_ENDPOINT) {
+        console.log(`  ${theme.icons.info}  Using ${theme.primary.bold("Azure OpenAI")} ${theme.muted("(text-embedding-3-small, 1536d)")}\n`);
+        embedderConfig = {
+          provider: "azure",
+          model: "text-embedding-3-small",
+          dimensions: 1536,
+        };
+      } else {
+        console.log(`  ${theme.icons.error}  ${theme.error("No embedding provider configured.")}\n`);
+        console.log(`  ${theme.muted("Set one of:")}\n`);
+        console.log(`    ${theme.accent("VOYAGE_API_KEY")}                            ${theme.muted("(direct Voyage AI — recommended)")}`);
+        console.log(`    ${theme.accent("AZURE_EMBEDDING_API_KEY + AZURE_ENDPOINT")}  ${theme.muted("(direct Azure OpenAI)")}`);
+        console.log(`    ${theme.muted("or run")} ${theme.primary.bold("nella auth login")}                ${theme.muted("(Nella cloud proxy)")}`);
+        console.log("");
+        console.log(`  ${theme.muted("Tip: drop the env var into")} ${theme.accent(".env")} ${theme.muted("at the workspace root.")}\n`);
+        process.exit(1);
+      }
     }
   } else {
     // Dummy config for graph-only mode (embedder is never called)
