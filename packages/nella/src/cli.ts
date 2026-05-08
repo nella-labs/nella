@@ -18,6 +18,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { loadEnvFiles } from "./load-env";
+
+// Load .env from cwd before reading any provider env vars (VOYAGE_API_KEY,
+// AZURE_*). Workspace .env is loaded later in `runIndex` once we know the path.
+loadEnvFiles();
+
 import chalk from "chalk";
 import Table from "cli-table3";
 import figures from "figures";
