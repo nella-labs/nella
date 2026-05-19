@@ -88,6 +88,17 @@ export class IndexManager {
 
     this.lexicalIndex = createLexicalIndex();
 
+    // When embeddings are proxied through Nella (session-auth users have no
+    // local VOYAGE_API_KEY), route rerank through the same proxy so rerank
+    // actually fires instead of silently degrading to RRF-only.
+    const providerInfo = this.embedder.getProviderInfo();
+    const rerankOverride = providerInfo.provider === "nella" && providerInfo.apiKey && providerInfo.apiBase
+      ? {
+          rerankApiKey: providerInfo.apiKey,
+          rerankUrl: `${providerInfo.apiBase.replace(/\/$/, "")}/rerank`,
+        }
+      : {};
+
     this.hybridSearcher = createHybridSearcher(
       this.vectorStore,
       this.lexicalIndex,
@@ -97,6 +108,7 @@ export class IndexManager {
         lexicalWeight: config.search.lexicalWeight,
         topK: config.search.topK,
         rerankEnabled: config.search.rerankEnabled,
+        ...rerankOverride,
       }
     );
 

@@ -23,6 +23,14 @@ export interface HybridSearchConfig {
   rerankEnabled: boolean;
   rerankTopK: number;     // How many to rerank
   rerankModel: string;    // Cohere rerank model
+  /**
+   * Override the rerank transport. When set, VoyageReranker uses these instead
+   * of reading VOYAGE_API_KEY / VOYAGE_ENDPOINT from env — lets session-auth
+   * users reach rerank through the Nella proxy (e.g. app.getnella.dev/api).
+   */
+  rerankApiKey?: string;
+  /** Full URL to POST rerank requests to (e.g. https://app.getnella.dev/api/rerank). */
+  rerankUrl?: string;
 }
 
 interface RankedResult {
@@ -122,9 +130,11 @@ const DEFAULT_CONFIG: HybridSearchConfig = {
 // =============================================================================
 
 class VoyageReranker {
+  constructor(private readonly override: { apiKey?: string; url?: string } = {}) {}
+
   /** Check env vars fresh each time (credentials may rotate mid-session). */
   isAvailable(): boolean {
-    return !!process.env.VOYAGE_API_KEY;
+    return !!(this.override.apiKey || process.env.VOYAGE_API_KEY);
   }
 
   async rerank(
@@ -133,8 +143,9 @@ class VoyageReranker {
     model?: string,
     topK?: number
   ): Promise<{ id: string; score: number }[]> {
-    const apiKey = process.env.VOYAGE_API_KEY;
-    const endpoint = process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1";
+    const apiKey = this.override.apiKey || process.env.VOYAGE_API_KEY;
+    const url = this.override.url
+      || `${(process.env.VOYAGE_ENDPOINT || "https://ai.mongodb.com/v1").replace(/\/$/, "")}/rerank`;
     if (!apiKey) {
       throw new Error("Reranking service not configured");
     }
@@ -147,7 +158,7 @@ class VoyageReranker {
       return_documents: false,
     };
 
-    const response = await fetch(`${endpoint.replace(/\/$/, "")}/rerank`, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -248,7 +259,10 @@ export class HybridSearcher {
     this.embedder = embedder;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.cohereReranker = new CohereReranker();
-    this.voyageReranker = new VoyageReranker();
+    this.voyageReranker = new VoyageReranker({
+      apiKey: this.config.rerankApiKey,
+      url: this.config.rerankUrl,
+    });
   }
 
   /**
@@ -526,6 +540,7 @@ export class HybridSearcher {
       } else if (this.cohereReranker.isAvailable()) {
         reranked = await this.cohereReranker.rerank(query, documents);
       } else {
+        console.warn("Rerank enabled but no reranker is configured (no VOYAGE_API_KEY, no proxy override, no Azure fallback) — returning RRF-only results");
         return results;
       }
 

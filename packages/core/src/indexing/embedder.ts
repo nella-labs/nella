@@ -593,6 +593,19 @@ export class Embedder {
   }
 
   /**
+   * Expose provider + credentials so callers (e.g. HybridSearcher) can route
+   * sibling services (like rerank) through the same proxy.
+   */
+  getProviderInfo(): { provider: EmbedderConfig["provider"]; apiKey?: string; apiBase?: string; endpoint?: string } {
+    return {
+      provider: this.config.provider,
+      apiKey: this.config.apiKey,
+      apiBase: this.config.apiBase,
+      endpoint: this.config.endpoint,
+    };
+  }
+
+  /**
    * Get a single embedding
    */
   /**
