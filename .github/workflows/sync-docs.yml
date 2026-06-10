@@ -110,7 +110,7 @@ jobs:
 
       - name: Setup pnpm
         if: env.HAS_TOKEN == 'true' && steps.validate_token.outputs.valid == 'true'
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
         with:
           version: "10.28.0"
 
