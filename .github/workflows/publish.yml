@@ -38,7 +38,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Notify Pushover
-        if: success()
+        if: false  # pushover silenced 2026-06-10 (was: success())
         env:
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
