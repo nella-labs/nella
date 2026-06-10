@@ -283,7 +283,7 @@ jobs:
             }
 
       - name: Notify Pushover
-        if: failure()
+        if: false  # pushover silenced 2026-06-10 (was: failure())
         env:
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}

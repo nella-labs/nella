@@ -107,7 +107,7 @@ jobs:
           curl -sf "$URL/health" | python3 -m json.tool
 
       - name: Notify Pushover (Success)
-        if: success()
+        if: false  # pushover silenced 2026-06-10 (was: success())
         env:
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
@@ -124,7 +124,7 @@ jobs:
             --form-string "html=1" || true
 
       - name: Notify Pushover (Failure)
-        if: failure()
+        if: false  # pushover silenced 2026-06-10 (was: failure())
         env:
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER_KEY }}
