@@ -18,6 +18,17 @@ build/
 .env.*.local
 !.env.example
 
+# Secrets / keys (belt-and-suspenders — never commit real credentials)
+*.pem
+*.key
+*.p12
+*-service-account*.json
+service-account*.json
+serviceaccount*.json
+gcp-*.json
+*-credentials.json
+.private/keys/
+
 # Benchmark results (generated)
 benchmark-results/
 
