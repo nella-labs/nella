@@ -14,9 +14,13 @@
 
 steps:
   # Build the Docker image
+  # --target production: Dockerfile has builder/production/benchmark stages;
+  # without an explicit target Docker picks the last stage (benchmark).
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "build"
+      - "--target"
+      - "production"
       - "-t"
       - "${_REGION}-docker.pkg.dev/$PROJECT_ID/nella/${_SERVICE_NAME}:$COMMIT_SHA"
       - "-t"
