@@ -1,6 +1,6 @@
 # Nella
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Health Check](https://github.com/nella-labs/nella/actions/workflows/health-check.yml/badge.svg)](https://github.com/nella-labs/nella/actions/workflows/health-check.yml)
 
 **Codebase intelligence for AI coding agents.** Nella gives agents real codebase understanding, persistent context, and grounded search.
@@ -61,6 +61,38 @@ nella index --force
 
 `nella index` needs either a Nella login or Azure embedding environment variables.
 
+### Configuration
+
+All configuration is read from the environment — nothing is hardcoded. Copy
+[`.env.example`](./.env.example) to `.env` and set only the values you need:
+
+```bash
+cp .env.example .env
+```
+
+Core secrets (embeddings/auth) and each optional cloud-sync tier are documented
+in `.env.example`. Never commit `.env` — it is gitignored.
+
+**Google Cloud (optional `gcp` sync tier).** Nella uses Application Default
+Credentials (ADC), the same pattern as any Google Cloud client. Point it at a
+service account or use ambient credentials, then set the project/resource env
+vars:
+
+```bash
+# Auth — pick ONE:
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json  # explicit key file
+# ...or run on GCP / after `gcloud auth application-default login` for ambient ADC
+
+# Project + resources (read from env, never hardcoded):
+export GCP_PROJECT_ID=your-project          # also honored: GOOGLE_CLOUD_PROJECT
+export GCP_STORAGE_BUCKET=your-index-bucket
+export GCP_CLOUD_SQL_INSTANCE=project:region:instance
+export GCP_DB_USER=... GCP_DB_PASSWORD=... GCP_DB_NAME=nella
+```
+
+If you self-host the full GCP stack, `scripts/setup-gcp.sh` provisions it and
+also reads these same env vars (with overridable defaults).
+
 ### CLI commands
 
 `nella` currently exposes `index`, `mcp`, `serve`, `connect`, `auth`, `setup`, and `help`.
@@ -101,7 +133,7 @@ See [Core Modules](./docs/core/modules.md) for setup guides and examples.
 
 ```bash
 # Clone the repo
-git clone https://github.com/usenella/nella.git
+git clone https://github.com/nella-labs/nella.git
 cd nella
 
 # Install dependencies
@@ -120,7 +152,7 @@ pnpm build
 
 ## License
 
-[Apache-2.0](./LICENSE)
+[MIT](./LICENSE)
 
 ---
 

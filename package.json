@@ -2,6 +2,7 @@
   "name": "nella-workspace",
   "version": "0.0.0",
   "description": "A monorepo containing a benchmark tool and Nella MCP",
+  "license": "MIT",
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "workspaces": [
