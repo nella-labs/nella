@@ -21,6 +21,10 @@ Nella sits between an AI coding agent and your repository. It indexes the real c
 
 It ships as three surfaces over one engine: an MCP server a coding agent calls, a `nella` CLI for the terminal, and a REST plus WebSocket API. Live at [getnella.dev](https://getnella.dev).
 
+## See it in action
+
+<p align="center"><img src=".github/nella-demo.gif" alt="Nella indexing a repo and answering agent queries" width="100%" /></p>
+
 ## Highlights
 
 - **AST-aware chunking.** `chunker.ts` parses TypeScript and JavaScript with `@typescript-eslint/typescript-estree` and cuts chunks on real function, class, and interface boundaries (a 512-token target, a 100-token floor, 50-token overlap), then falls back to recursive splitting for other languages. Each chunk carries the symbols it defines, so a hit is a whole unit of code rather than an arbitrary window of lines.
