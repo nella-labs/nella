@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://pablomanjarres.com/oss/nella"><img src=".github/banner.png" alt="Nella" width="100%" /></a>
+  <a href="https://pablomanjarres.com/oss/nella"><img src=".github/banner.webp" alt="Nella" width="100%" /></a>
 </p>
 
 <h1 align="center">Nella</h1>
