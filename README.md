@@ -23,7 +23,7 @@ It ships as three surfaces over one engine: an MCP server a coding agent calls, 
 
 ## See it in action
 
-<p align="center"><img src=".github/nella-demo.gif" alt="Nella indexing a repo and answering agent queries" width="100%" /></p>
+<p align="center"><img src=".github/nella-demo.gif" alt="Nella product tour: agent setup, codebase search, and persistent context" width="100%" /></p>
 
 ## Highlights
 

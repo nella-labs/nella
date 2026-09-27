@@ -27,6 +27,7 @@ loadEnvFiles();
 import chalk from "chalk";
 import Table from "cli-table3";
 import figures from "figures";
+import { TERMINAL_LOGO, TERMINAL_LOGO_WIDTH } from "./brand";
 import {
   createIndexManager,
   DEFAULT_INDEX_CONFIG,
@@ -75,7 +76,7 @@ const PKG_VERSION = (() => {
 
 const theme = {
   // Brand colors — Nella green identity
-  primary: chalk.hex("#2ECC71"),      // Nella green (from logo)
+  primary: chalk.hex("#69C07A"),      // Selected Nella accent
   secondary: chalk.hex("#27AE60"),    // Darker green
   accent: chalk.hex("#F1C40F"),       // Gold
 
@@ -102,22 +103,10 @@ const theme = {
   },
 };
 
-// ASCII art logo with green gradient (bright → dark from top to bottom)
-const g1 = chalk.hex("#5BF5A0"); // Lightest
-const g2 = chalk.hex("#3DE87D");
-const g3 = chalk.hex("#2ECC71"); // Brand green
-const g4 = chalk.hex("#27AE60");
-const g5 = chalk.hex("#1F8A4C");
-const g6 = chalk.hex("#176E3A"); // Darkest
-
-const logo = `
-${g1("  ███╗   ██╗")}${g1("███████╗")}${g1("██╗     ██╗      █████╗ ")}
-${g2("  ████╗  ██║")}${g2("██╔════╝")}${g2("██║     ██║     ██╔══██╗")}
-${g3("  ██╔██╗ ██║")}${g3("█████╗  ")}${g3("██║     ██║     ███████║")}
-${g4("  ██║╚██╗██║")}${g4("██╔══╝  ")}${g4("██║     ██║     ██╔══██║")}
-${g5("  ██║ ╚████║")}${g5("███████╗")}${g5("███████╗███████╗██║  ██║")}
-${g6("  ╚═╝  ╚═══╝")}${g6("╚══════╝")}${g6("╚══════╝╚══════╝╚═╝  ╚═╝")}
-`;
+// Keep the selected lockup without wrapping narrow or dumb terminals.
+const terminalColumns = process.stdout.columns ?? (Number(process.env.COLUMNS) || 80);
+const logo = process.env.TERM === "dumb" || terminalColumns < TERMINAL_LOGO_WIDTH
+  ? "\n  nella\n" : chalk.whiteBright(TERMINAL_LOGO);
 
 const tagline = `  ${theme.muted("Codebase intelligence for AI agents")}  ${chalk.dim(`v${PKG_VERSION}`)}\n`;
 
