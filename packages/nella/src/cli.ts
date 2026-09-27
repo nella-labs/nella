@@ -27,7 +27,7 @@ loadEnvFiles();
 import chalk from "chalk";
 import Table from "cli-table3";
 import figures from "figures";
-import { TERMINAL_LOGO } from "./brand";
+import { TERMINAL_LOGO, TERMINAL_LOGO_WIDTH } from "./brand";
 import {
   createIndexManager,
   DEFAULT_INDEX_CONFIG,
@@ -103,8 +103,10 @@ const theme = {
   },
 };
 
-// Keep the selected lowercase lockup in terminals, with a plain fallback for dumb terminals.
-const logo = process.env.TERM === "dumb" ? "\n  nella\n" : chalk.whiteBright(TERMINAL_LOGO);
+// Keep the selected lockup without wrapping narrow or dumb terminals.
+const terminalColumns = process.stdout.columns ?? (Number(process.env.COLUMNS) || 80);
+const logo = process.env.TERM === "dumb" || terminalColumns < TERMINAL_LOGO_WIDTH
+  ? "\n  nella\n" : chalk.whiteBright(TERMINAL_LOGO);
 
 const tagline = `  ${theme.muted("Codebase intelligence for AI agents")}  ${chalk.dim(`v${PKG_VERSION}`)}\n`;
 
