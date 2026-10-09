@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="900" viewBox="0 0 2400 900" role="img" aria-label="Nella">
+  <title>Nella</title>
+  <desc>Nella logo in an atmospheric light field.</desc>
+  <defs>
+    <filter id="soft-light" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="65" />
+    </filter>
+    <filter id="edge-light" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="9" />
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .032 0" />
+    </filter>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#071718" />
+      <stop offset=".52" stop-color="#091615" />
+      <stop offset="1" stop-color="#08100E" />
+    </linearGradient>
+    <radialGradient id="lime">
+      <stop stop-color="#86D991" stop-opacity=".76" />
+      <stop offset=".38" stop-color="#69C07A" stop-opacity=".32" />
+      <stop offset="1" stop-color="#69C07A" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="cold">
+      <stop stop-color="#86C7C9" stop-opacity=".35" />
+      <stop offset="1" stop-color="#73BCBD" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="glass" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#63B57A" stop-opacity="0" />
+      <stop offset=".25" stop-color="#78BF90" stop-opacity=".11" />
+      <stop offset=".62" stop-color="#B6EDCC" stop-opacity=".25" />
+      <stop offset="1" stop-color="#8DDFA0" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="seam" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#88DEAF" stop-opacity="0" />
+      <stop offset=".43" stop-color="#AFECCB" stop-opacity=".55" />
+      <stop offset="1" stop-color="#AFFAC2" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="2400" height="900" fill="url(#ground)" />
+  <ellipse cx="1760" cy="215" rx="760" ry="580" fill="url(#lime)" opacity=".68" />
+  <ellipse cx="60" cy="830" rx="750" ry="660" fill="url(#cold)" />
+  <ellipse cx="2220" cy="850" rx="580" ry="350" fill="url(#lime)" opacity=".44" />
+  <path d="M-310 1050 L870 -180 L1120 -180 L-70 1050 Z" fill="url(#glass)" />
+  <path d="M1240 1050 L2380 -180 L2600 -180 L1470 1050 Z" fill="url(#glass)" opacity=".7" />
+  <path d="M-90 1060 L1100 -180" stroke="url(#seam)" stroke-width="10" filter="url(#edge-light)" />
+  <path d="M1290 1060 L2460 -180" stroke="url(#seam)" stroke-width="10" filter="url(#edge-light)" opacity=".76" />
+  <path d="M-390 1100 L825 -165" stroke="url(#seam)" stroke-width="110" filter="url(#soft-light)" opacity=".58" />
+  <path d="M1600 1100 L2790 -170" stroke="url(#seam)" stroke-width="115" filter="url(#soft-light)" opacity=".45" />
+  <rect width="2400" height="900" filter="url(#grain)" opacity=".55" />
+  <g id="brand-lockup" transform="translate(696 330) scale(1.6)">
+    <g transform="translate(0 1) scale(1)">
+      <g fill="#FFFFFF" transform="translate(0 149) scale(0.1 -0.1)">
+        <path d="M808 1480 c-72 -22 -114 -59 -253 -225 -78 -93 -228 -273 -334 -398 -105 -126 -198 -242 -206 -257 -11 -21 -15 -62 -15 -144 0 -105 2 -117 23 -141 l23 -27 182 1 c267 1 292 15 412 235 111 202 170 250 330 267 172 17 185 28 378 317 142 213 157 239 157 278 0 34 -6 49 -28 71 l-27 28 -308 2 c-169 1 -319 -2 -334 -7z M1503 980 c-64 -13 -116 -44 -164 -98 -24 -27 -143 -175 -264 -328 -346 -437 -318 -398 -319 -449 -1 -36 4 -50 27 -72 l27 -28 278 0 277 0 53 29 c44 25 90 75 295 324 133 162 252 308 265 325 19 28 22 43 22 139 0 99 -2 109 -24 135 l-24 28 -204 2 c-111 1 -222 -2 -245 -7z" />
+      </g>
+    </g>
+    <g transform="translate(241 0) scale(1)">
+      <g fill="#FFFFFF" transform="translate(0 132) scale(0.1 -0.1)">
+        <path d="M2101 680 l2 -640 112 0 112 0 7 48 c8 57 7 1178 -1 1209 -5 22 -9 23 -120 23 l-114 0 2 -640z M2460 680 l0 -640 115 0 115 0 0 640 0 640 -115 0 -115 0 0 -640z M1370 1005 c-95 -26 -162 -66 -231 -134 -101 -101 -149 -216 -149 -358 0 -234 161 -438 390 -494 140 -34 314 -5 428 72 57 37 152 140 152 165 0 5 -46 22 -102 36 l-103 26 -39 -35 c-61 -55 -109 -73 -201 -73 -94 0 -149 21 -208 78 -43 41 -77 100 -77 132 0 20 4 20 395 20 l395 0 0 73 c0 207 -119 389 -306 467 -69 29 -92 34 -184 37 -72 2 -122 -2 -160 -12z m246 -207 c59 -25 114 -70 139 -112 14 -23 25 -48 25 -54 0 -9 -73 -12 -275 -12 -151 0 -275 2 -275 5 0 34 77 127 125 153 81 42 190 51 261 20z M3145 1001 c-121 -34 -241 -125 -300 -226 -65 -109 -88 -252 -61 -368 52 -222 223 -373 457 -401 126 -16 299 42 373 124 20 22 38 40 41 40 3 0 5 -29 5 -65 l0 -65 115 0 115 0 0 475 0 476 -112 -3 -113 -3 -3 -68 -3 -69 -49 50 c-81 83 -187 122 -325 121 -44 0 -107 -8 -140 -18z m300 -224 c137 -70 199 -228 145 -371 -61 -162 -259 -239 -413 -161 -63 31 -104 72 -139 138 -33 61 -33 193 1 257 41 79 105 133 191 161 49 16 162 4 215 -24z M433 996 c-65 -21 -128 -62 -167 -107 l-35 -41 -3 68 -3 69 -112 3 -113 3 0 -476 0 -475 114 0 114 0 4 278 c4 312 8 332 83 405 78 76 208 90 282 31 75 -60 78 -71 81 -411 l3 -303 115 0 114 0 0 304 c0 167 -5 327 -10 356 -24 125 -98 224 -207 276 -69 32 -193 42 -260 20z" />
+      </g>
+    </g>
+  </g>
+</svg>
