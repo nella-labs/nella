@@ -56,7 +56,7 @@ You should see tools such as `nella_search`, `nella_index`, `nella_get_context`,
 | Issue | Solution |
 |-------|----------|
 | Tools not appearing | Restart Claude Desktop. Check that `npx -y @getnella/mcp --workspace /path/to/project` runs without errors in your terminal. |
-| "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from Claude Desktop's default shell. |
+| "MCP server disconnected" | Check that Node.js 22.23.4+, 24.22.1+, or 26.12.1+ is installed and accessible from Claude Desktop's default shell. |
 | Permission errors | Ensure the configured `--workspace` path exists and is readable by the MCP process. |
 | Slow startup | The first `npx` run downloads the package. Subsequent starts are faster. |
 
