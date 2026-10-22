@@ -8,7 +8,7 @@
 
 <p align="center">
   <img alt="TypeScript 5.3" src="https://img.shields.io/badge/TypeScript-5.3-3178C6?style=flat&logo=typescript&logoColor=white" />
-  <img alt="Node.js 18+" src="https://img.shields.io/badge/Node.js-18+-5FA04E?style=flat&logo=nodedotjs&logoColor=white" />
+  <img alt="Node.js 22.23.4+" src="https://img.shields.io/badge/Node.js-22.23.4+-5FA04E?style=flat&logo=nodedotjs&logoColor=white" />
   <img alt="Model Context Protocol, 18 tools" src="https://img.shields.io/badge/MCP-18_tools-c8542a?style=flat&logo=modelcontextprotocol&logoColor=white" />
   <a href="https://www.npmjs.com/package/@getnella/mcp"><img alt="npm @getnella/mcp" src="https://img.shields.io/npm/v/@getnella/mcp?style=flat&logo=npm&color=c8542a&label=%40getnella%2Fmcp" /></a>
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-c8542a?style=flat" />

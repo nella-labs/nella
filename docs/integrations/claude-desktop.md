@@ -5,7 +5,7 @@ Set up Nella as an MCP server for Claude Desktop.
 ## Prerequisites
 
 - [Claude Desktop](https://claude.ai/download) installed
-- Node.js 18 or later
+- Node.js 22.23.4+, 24.22.1+, or 26.12.1+ (supported release lines)
 
 ## Setup
 
@@ -118,6 +118,6 @@ Use nella_check_dependencies to see if any packages changed since we started.
 | Issue | Solution |
 |-------|----------|
 | Tools not appearing | Restart Claude Desktop. Check that `npx -y @getnella/mcp --workspace /path/to/project` runs without errors in your terminal |
-| "MCP server disconnected" | Check that Node.js 18+ is installed and accessible from the default shell |
+| "MCP server disconnected" | Check that Node.js 22.23.4+, 24.22.1+, or 26.12.1+ is installed and accessible from the default shell |
 | Workspace errors | Ensure the `--workspace` path exists and is readable |
 | Slow startup | First run downloads the package via npx. Subsequent starts are faster |

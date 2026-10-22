@@ -4,7 +4,7 @@ Install Nella and connect it to your AI coding agent in under 5 minutes.
 
 ## Prerequisites
 
-- Node.js 18 or later
+- Node.js 22.23.4+, 24.22.1+, or 26.12.1+ (supported release lines)
 
 ## Install
 

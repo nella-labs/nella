@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22.23.4-slim AS builder
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ ENV PATH="/app/node_modules/.bin:$PATH"
 RUN cd packages/core && tsc && cd /app/packages/nella && tsc && cd /app/packages/benchmark && tsc
 
 # ---- Production stage ----
-FROM node:20-slim AS production
+FROM node:22.23.4-slim AS production
 
 WORKDIR /app
 
@@ -68,7 +68,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 CMD ["node", "packages/nella/dist/mcp/hosted-server.js"]
 
 # ---- Benchmark stage ----
-FROM node:20-slim AS benchmark
+FROM node:22.23.4-slim AS benchmark
 
 WORKDIR /app
 
