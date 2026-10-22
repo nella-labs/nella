@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22.23.4-slim AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ ENV PATH="/app/node_modules/.bin:$PATH"
 RUN cd packages/core && tsc && cd /app/packages/api && tsc
 
 # ---- Production stage ----
-FROM node:20-slim AS production
+FROM node:22.23.4-slim AS production
 
 WORKDIR /app
 
